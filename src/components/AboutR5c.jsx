@@ -1,6 +1,7 @@
 import styled from 'styled-components';
 
 const REPO_URL = 'https://github.com/vilt9/requirement5';
+const DISCORD_URL = 'https://discord.gg/ywRCSATau3';
 
 // The in-world transmission behind R5c. Single source of truth — rendered on the
 // About page and inside the "About Requirement5" disclosure on shared card pages.
@@ -26,6 +27,10 @@ const AboutR5c = () => (
     </Dates>
 
     <Rule />
+    <p>
+      We have representatives on Earth aiding in our fight. Speak to them on Discord:{' '}
+      <a href={DISCORD_URL} target="_blank" rel="noopener noreferrer">discord.gg/ywRCSATau3</a>.
+    </p>
     <p className="note">
       Bug reports and feature requests strengthen the protocol. The R5c platform is
       source-available — if you write code, open an issue or a pull request on{' '}

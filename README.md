@@ -23,6 +23,9 @@
 > 45/04/32484 (Umdo1)<br>
 > 30/06/2026 (Earth)
 
+We have representatives on Earth aiding in our fight. Speak to them on
+[Discord](https://discord.gg/ywRCSATau3).
+
 **Bug reports and feature requests strengthen the protocol** — they help the cause.
 The R5c platform is source-available: if you write code, open an
 [issue or a pull request](https://github.com/vilt9/requirement5/issues) and
