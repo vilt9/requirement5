@@ -4,6 +4,10 @@ Holographic trading cards on the web. Generate a card, watch the holo react to
 your cursor, save it to a collection, share a per-card URL, and export the moving
 card as a GIF or MP4. A React + Vite SPA with an Express API.
 
+Source-available — read it, run it, modify it, and contribute features. You may
+use it for anything except building a competing product or service (see
+[License](#license)).
+
 ## Stack
 
 - **Frontend** — React 19, Vite 6, styled-components, react-router-dom 7, framer-motion.
@@ -44,4 +48,9 @@ Nothing secret is committed; real values live in a gitignored `.env`.
 
 ## License
 
-[MIT](LICENSE).
+[Functional Source License 1.1 (FSL-1.1-ALv2)](LICENSE) — source-available, not
+OSI "open source." Any use is permitted **except a Competing Use** (making the
+software available in a product or service that substitutes for or substantially
+duplicates it). Internal use, self-hosting, education, research, and contributing
+back are all fine. Each release converts to the Apache License 2.0 two years
+after its release date.
