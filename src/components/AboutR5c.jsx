@@ -28,8 +28,8 @@ const AboutR5c = () => (
 
     <Rule />
     <p>
-      We have representatives on Earth aiding in our fight. Speak to them on Discord:{' '}
-      <a href={DISCORD_URL} target="_blank" rel="noopener noreferrer">discord.gg/ywRCSATau3</a>.
+      We have representatives on Earth aiding in our fight. Speak to them on{' '}
+      <a href={DISCORD_URL} target="_blank" rel="noopener noreferrer">Discord</a>.
     </p>
     <p className="note">
       Bug reports and feature requests strengthen the protocol. The R5c platform is
