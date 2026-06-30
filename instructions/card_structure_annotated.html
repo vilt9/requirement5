@@ -1,0 +1,101 @@
+<!-- ANNOTATED CARD STRUCTURE -->
+<!-- This file explains the relationship between the HTML structure and the React card components -->
+
+<div style="opacity: 1; transform: none;">
+    <!-- CardScene - The main perspective container that gives the card its 3D space -->
+    <div class="sc-icnseD huljoQ">
+        <!-- CardContainer - Handles hover states, moving state, and cursor interaction -->
+        <div data-rarity="wowa-holo" class="sc-jMsorb geYpbC floating" style="--effect-intensity: 0; --h: 58; --s: 70; --l: 50; --space: 4; --shineColor1: rgba(255, 0, 0, 0.5); --shineColor2: rgba(0, 146, 255, 0.5); --shineColor3: rgba(255, 0, 255, 0.5); --shineOffset1: 20%; --shineOffset2: 40%; --shineOffset3: 60%; --imageShineIntensity: 0.95; --aberrationIntensity: -0.07; --aberrationSpeed: 9s;">
+            <!-- EdgeHighlight - The outer edge glow/highlight effect (ThinEdgeBorder in Card.styles.jsx) -->
+            <div class="sc-cXawGu fDYwku" style="--edge-color1: rgba(220, 220, 220, 0.7); --edge-color2: rgba(100, 100, 100, 0.3);"></div>
+            <!-- CardElement - Container for both front and back of card -->
+            <div class="sc-dcKlJK hSvaQB">
+                <!-- CardFace - The front face of the card with all visual elements -->
+                <div class="sc-jPkiSJ iNNCAj" style="--card-gradient: linear-gradient(142deg, hsl(58, 75.83585582231844%, 40.17525999443502%), hsl(118, 86.28643551136922%, 35.81382476032974%), hsl(238, 76.32284123608378%, 44.32522225458986%));">
+                    <!-- DepthLayer - Creates 3D effect and depth -->
+                    <div class="sc-lixPIL gVTgJF"></div>
+                    <!-- PatternOverlay - Applies pattern on card, like grids or dots -->
+                    <div class="sc-etfXYe ifaFHC" style="--pattern: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px) 0 0 / 28.466573709098448px 28.466573709098448px; --pattern-opacity: 0.3295371558362101;"></div>
+                    <!-- CardImage - Container for the main card illustration -->
+                    <div class="sc-dKKIkQ dKkUgb">
+                        <!-- The actual image element displaying the card illustration -->
+                        <img alt="Card Illustration" src="/src/assets/card_images/dark_flowers_1.png">
+                        <!-- ImageMask - Controls image vignetting and fade effects -->
+                        <div class="sc-gAqISa kMvxlV horizontal-fade" style="--mask-opacity: 0.12;"></div>
+                    </div>
+                    <!-- CardBorder - Thick integrated border (Pokemon style) -->
+                    <div class="sc-jJAtPt dNcZRi" style="--border-color: rgba(192, 192, 192, 0.4); --border-opacity: 0.7656117449793661; display: block;"></div>
+                    <!-- CardBorderImage - Blurred image border that overlays on the thick border -->
+                    <div class="sc-cUiCeM zlcmQ" style="--card-image: url(&quot;/src/assets/card_images/dark_flowers_1.png&quot;); --border-image-opacity: 0.6656117449793661; --initial-blur: blur(2px); --hover-blur: blur(2px); --hover-opacity: 0.8; display: block;"></div>
+                    <!-- HoloEffect - Base holographic effect layer for gradient interaction -->
+                    <div class="sc-dFaThA gvgEbm" style="--shine-color1: rgba(255, 0, 0, 0.5); --shine-color2: rgba(0, 146, 255, 0.5); --shine-color3: rgba(255, 0, 255, 0.5); --shine-offset1: 20%; --shine-offset2: 40%; --shine-offset3: 60%;"></div>
+                    <!-- ImageShine - Shine effect positioned on top of the image, visible on hover -->
+                    <div class="sc-fpEFIB gZZyZd" style="--shine-intensity: 0.95;"></div>
+                    <!-- HoloShine - Different holographic effects based on card rarity -->
+                    <!-- These are conditional components that show based on the card's rarity -->
+                    <div class="sc-fjUQFl kQtZrR rare-holo"></div> <!-- Standard holographic effect -->
+                    <div class="sc-fjUQFl kQtZrR rare-holo-galaxy"></div> <!-- Galaxy holographic effect -->
+                    <div class="sc-fjUQFl igVvLg wowa-holo"></div> <!-- WOWA holographic effect -->
+                    <div class="sc-fjUQFl kQtZrR rare-holo-vmax"></div> <!-- VMAX holographic effect -->
+                    <div class="sc-fjUQFl kQtZrR rare-ultra"></div> <!-- Ultra rare holographic effect -->
+                    <!-- ChromaticAberration - Creates color separation effect -->
+                    <div class="sc-hZARmv czHELC" style="--aberration-intensity: -0.07; --aberration-speed: 9s;"></div>
+                    <!-- ThinEdgeBorder - Subtle edge border like paper edge -->
+                    <div class="sc-jScdur dPfFVj" style="--edge-angle: 90deg; --edge-color1: rgba(192, 192, 192, 0.8); --edge-color2: rgba(192, 192, 192, 0.8); display: block;"></div>
+                    <!-- TimeSymbol - Container for time-based effect indicator (Day/Night) -->
+                    <div class="sc-ifkGpL ivnkYE">
+                        <!-- TimeIcon - Icon showing day or night symbol -->
+                        <div class="sc-fbguzk jBnDVu day"></div>
+                        <!-- TimeValue - Text showing "Day" or "Night" -->
+                        <span class="sc-gGarWV URAj">Day</span>
+                    </div>
+                </div>
+                <!-- CardBack - The back face of the card (shown when flipped) -->
+                <div class="sc-cZSric glZlNP"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!--
+Component Hierarchy Summary:
+
+1. Scene Container
+   - CardScene: The main perspective container (3D space for the card)
+
+2. Card Container
+   - CardContainer: Handles hover states, animations, and cursor interaction
+     - Has data-rarity attribute that controls which holographic effects are applied
+     - Contains various CSS variables (--effect-intensity, etc.) for visual effects
+
+3. Edge and Border Elements
+   - EdgeHighlight: Outer glow/highlight effect around the card edges
+   - CardBorder: Thick integrated border (Pokemon style)
+   - CardBorderImage: Blurred image border overlay
+   - ThinEdgeBorder: Subtle edge border simulating paper edge
+
+4. Card Face Elements
+   - CardElement: Container for front and back faces
+     - CardFace: Front of the card with all visual elements
+       - DepthLayer: Creates 3D effect
+       - PatternOverlay: Background patterns (grids, dots, etc.)
+       - CardImage: Main card illustration container
+       - Various holographic effects:
+         - HoloEffect: Base holographic gradient layer
+         - ImageShine: Shine effect on top of the image
+         - HoloShine variants: Different holographic styles based on card rarity
+         - WowaHolo: Special holographic effect for specific rarity range (0.85-0.9)
+       - ChromaticAberration: Color separation effect
+       - TimeSymbol: Day/Night indicator (if applicable)
+     - CardBack: Back of the card (shown when flipped)
+
+5. Special Effects
+   - CustomHoloEffect: For custom uploaded holographic patterns
+   - ImageMask: Controls vignetting and fade effects on the card image
+
+The interactive card responds to mouse movements by:
+- Tracking mouse position relative to the card
+- Applying 3D rotation effects
+- Adjusting holographic shine intensity and direction 
+- Modifying CSS variables to control visual effects
+-->
