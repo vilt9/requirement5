@@ -1,4 +1,34 @@
-# R5c — Requirement5 cards
+# Requirement5 cards (R5c)
+
+> **A transmission from Vilt9, government of Eglivitan3.**
+>
+> Requirement5 cards (R5c) is a project set up by Vilt9 the government of Eglivitan3 on the planet Umdo1. You know this planet, our home, as LHS 1140 b, a habitable exoplanet 48.8 lightyears from Earth.
+>
+> Umdo1 is suffering due to a rise in strict governance. Imagination is strictly controlled in all regions outside of Eglivitan3.
+>
+> Vilt9 is the last remaining government promoting imagination. However our imagination is being depleted. Technology on Umdo1 is more advanced than it is on Earth, and strict governments use high frequency electromagnetic waves to actively destroy imaginative thinking.
+>
+> We need supplies of imagination from Earth. Our scientists recently invented the Quantum Entangled Card Based Imagination Transport Protocol (QECBIT_P). This allows the transfer of imagination at 10^6 times the speed of light. This means those on Earth can now help us in the fight to preserve and grow imagination.
+>
+> You can help the resistant government Vilt9 by creating, generating and saving Requirement5 cards. Please be as imaginative as you can. In exchange we offer you our currency Slash_T2.6 (/t26 for short). When your species migrates to Umdo1, as we believe you will in Earth year 2082, recorded stocks of this currency will be given to their rightful owners.
+>
+> Please note, Slash_T is a currency branch which can be subject to self correcting erosion. Erosion on the R5c platform is being prevented. This may change in future.
+>
+> This is just the start of our collaborative resistance with Earth. We will be in touch with further information and adjustments to the R5c platform.
+>
+> LitronTevnaka8554,<br>
+> Head of State Eglivitan3/Vilt9/32,482–present
+>
+> Dated:<br>
+> 45/04/32484 (Umdo1)<br>
+> 30/06/2026 (Earth)
+
+**Bug reports and feature requests strengthen the protocol** — they help the cause.
+The R5c platform is source-available: if you write code, open an
+[issue or a pull request](https://github.com/vilt9/requirement5/issues) and
+your improvements widen the channel.
+
+---
 
 Holographic trading cards on the web. Generate a card, watch the holo react to
 your cursor, save it to a collection, share a per-card URL, and export the moving

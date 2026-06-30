@@ -10,6 +10,7 @@ import CardCustomizer from './pages/CardCustomizer';
 import Account from './pages/Account';
 import ShareCard from './pages/ShareCard';
 import CaptureCard from './pages/CaptureCard';
+import About from './pages/About';
 import TestSavedCards from './pages/TestSavedCards';
 import './App.css';
 
@@ -138,6 +139,7 @@ function App() {
                 <Route path="/collection" element={<Collection />} />
                 <Route path="/customize" element={<CardCustomizer />} />
                 <Route path="/account" element={<Account />} />
+                <Route path="/about" element={<About />} />
                 <Route path="/card/:id" element={<ShareCard />} />
                 <Route path="/capture/:id" element={<CaptureCard />} />
                 <Route path="/test-saved-cards" element={<TestSavedCards />} />

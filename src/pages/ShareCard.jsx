@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { api, ApiError, apiBase } from '../utils/api';
 import { poolCardToCardData, asOdds } from '../utils/poolCard';
 import { scoreCard } from '../utils/cardGenerator';
+import AboutR5c from '../components/AboutR5c';
 import { Page, Panel, PillButton, Dim, TagList } from '../components/UI';
 import { ensureTags } from '../utils/tags';
 
@@ -257,6 +258,11 @@ const ShareCard = () => {
         )}
         {saveError && <Result $error>{saveError}</Result>}
 
+        <AboutBox>
+          <summary>About Requirement5</summary>
+          <div className="body"><AboutR5c /></div>
+        </AboutBox>
+
         <Details>
           {/* Rarity & standing — rarity is computed from the card's own params */}
           <Detail label="Rarity">{num(rarity, 3)}</Detail>
@@ -397,6 +403,28 @@ const Result = styled.div`
 const Note = styled.div`
   line-height: 1.6;
   font-size: 13px;
+`;
+
+// Collapsed by default, but inviting — the lore behind R5c, one click away.
+const AboutBox = styled.details`
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: var(--panel);
+
+  summary {
+    cursor: pointer;
+    padding: 10px 12px;
+    color: var(--gold-bright);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    list-style: none;
+    user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: '▸ '; color: var(--amber-dim); }
+  &[open] summary::before { content: '▾ '; }
+
+  .body { padding: 4px 14px 16px; }
 `;
 
 // Card details, in the plain label: value style of requirement5.com under a card.

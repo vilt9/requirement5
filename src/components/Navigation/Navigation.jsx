@@ -10,6 +10,7 @@ const LINKS = [
   { to: '/pool', label: 'Pool' },
   { to: '/collection', label: 'Collection' },
   { to: '/customize', label: 'Create' },
+  { to: '/about', label: 'About' },
   { to: '/account', label: 'Account' }
 ];
 
