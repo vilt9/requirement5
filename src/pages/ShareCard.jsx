@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { api, ApiError, apiBase } from '../utils/api';
 import { poolCardToCardData, asOdds } from '../utils/poolCard';
 import { scoreCard } from '../utils/cardGenerator';
+import { useScrollBloom } from '../utils/useScrollBloom';
 import AboutR5c from '../components/AboutR5c';
 import { Page, Panel, PillButton, Dim, TagList } from '../components/UI';
 import { ensureTags } from '../utils/tags';
@@ -32,7 +33,7 @@ const ShareCard = () => {
   const [busy, setBusy] = useState(false);
   const [saveResult, setSaveResult] = useState(null); // { value, provenance } | 'exists'
   const [saveError, setSaveError] = useState(null);
-  const [scrolling, setScrolling] = useState(false); // colour values bloom into their colour while scrolling
+  const scrolling = useScrollBloom(); // colour values bloom into their colour while scrolling
   const [rendering, setRendering] = useState(null); // 'gif' | 'mp4' while a moving image renders
   const [renderError, setRenderError] = useState(null);
 
@@ -57,22 +58,6 @@ const ShareCard = () => {
       })
       .catch(() => {});
     return () => { active = false; };
-  }, []);
-
-  // While the page is actively scrolling, colour values bloom into their own colour,
-  // then ease back to text colour once it comes to rest — a small sign of life.
-  useEffect(() => {
-    let restTimer;
-    const onScroll = () => {
-      setScrolling(true);
-      clearTimeout(restTimer);
-      restTimer = setTimeout(() => setScrolling(false), 180);
-    };
-    // Capture phase + window: this page actually scrolls on <body> (the global
-    // overflow-x:hidden makes body its own scroller), so a plain window 'scroll'
-    // listener never fires. Capturing on window catches scroll from any element.
-    window.addEventListener('scroll', onScroll, { passive: true, capture: true });
-    return () => { window.removeEventListener('scroll', onScroll, { capture: true }); clearTimeout(restTimer); };
   }, []);
 
   const copyLink = useCallback(async () => {
