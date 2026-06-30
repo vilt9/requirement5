@@ -33,10 +33,6 @@ your improvements widen the channel.
 
 ---
 
-Holographic trading cards on the web. Generate a card, watch the holo react to
-your cursor, save it to a collection, share a per-card URL, and export the moving
-card as a GIF or MP4. A React + Vite SPA with an Express API.
-
 Source-available — read it, run it, modify it, and contribute features. You may
 use it for anything except building a competing product or service (see
 [License](#license)).
