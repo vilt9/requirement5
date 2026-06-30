@@ -21,17 +21,27 @@ use it for anything except building a competing product or service (see
 
 ## Run locally
 
+Prerequisites: **Node 18+**. No database needed — the API runs on a local JSON
+file store by default, so there's nothing to provision.
+
 ```bash
 npm install
-cp .env.example .env        # then edit as needed
-
-npm run server              # API on :4000
-npm run dev                 # SPA on :5173 (Vite)
+cp .env.example .env        # the defaults work as-is for local dev
 ```
 
-Open the SPA URL Vite prints. For GIF/MP4 export you also need **ffmpeg** on your
-PATH and a Playwright chromium install (`npx playwright install chromium`), and
-`CAPTURE_BASE_URL` pointing at the running SPA.
+Then run the API and the SPA **in two separate terminals** (both stay running):
+
+```bash
+npm run server              # terminal 1 — API on http://localhost:4000
+npm run dev                 # terminal 2 — SPA on http://localhost:5173
+```
+
+Open the SPA URL Vite prints (http://localhost:5173) and you're in — create a
+card from the **Create** page to populate the pool.
+
+GIF/MP4 export is optional and needs two extra things: **ffmpeg** on your PATH and
+a Playwright chromium install (`npx playwright install chromium`). It uses
+`CAPTURE_BASE_URL` (defaults to the Vite dev server) to find the running SPA.
 
 ## Scripts
 
