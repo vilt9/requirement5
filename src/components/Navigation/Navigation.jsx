@@ -1,6 +1,9 @@
 import { Link, useLocation } from 'react-router-dom';
 import styled from 'styled-components';
+import { FiGithub } from 'react-icons/fi';
 import { useAuth } from '../../context/AuthContext';
+
+const REPO_URL = 'https://github.com/vilt9/requirement5';
 
 const LINKS = [
   { to: '/', label: 'Generate' },
@@ -29,6 +32,15 @@ const Navigation = () => {
             </NavLink>
           ))}
         </Links>
+        <GitHubLink
+          href={REPO_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Source on GitHub"
+          aria-label="Source on GitHub"
+        >
+          <FiGithub />
+        </GitHubLink>
         <Balance to="/account">
           {user
             ? <>{user.username} · <b>{user.balance} /t26</b></>
@@ -86,6 +98,14 @@ const NavLink = styled(Link)`
   white-space: nowrap;
   &:hover { color: var(--white); text-decoration: none; }
   &.active { color: var(--gold-bright); font-weight: 700; }
+`;
+
+const GitHubLink = styled.a`
+  display: flex;
+  align-items: center;
+  color: var(--amber-dim);
+  font-size: 16px;
+  &:hover { color: var(--white); text-decoration: none; }
 `;
 
 const Balance = styled(Link)`
