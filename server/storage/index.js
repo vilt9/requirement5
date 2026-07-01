@@ -9,7 +9,32 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import sharp from 'sharp';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+
+// Uploaded images are normalized before storage: a card only ever displays at
+// ~380px, but people paste multi-MB MidJourney PNGs (1024–4096px). We downscale to
+// fit within IMAGE_MAX_DIM and re-encode to WebP, so stored bytes stay small (a few
+// hundred KB) with no visible loss at card size. Preserves aspect + alpha, never
+// enlarges. Non-raster types (svg/gif) and failures pass through untouched.
+const IMAGE_MAX_DIM = Number(process.env.IMAGE_MAX_DIM || 1200);
+const IMAGE_WEBP_QUALITY = Number(process.env.IMAGE_WEBP_QUALITY || 80);
+const NORMALIZABLE = new Set(['image/png', 'image/jpeg', 'image/webp']);
+
+const normalizeImage = async (buffer, mime) => {
+  if (!NORMALIZABLE.has(mime)) return { buffer, mime };
+  try {
+    const out = await sharp(buffer)
+      .rotate() // honor EXIF orientation before metadata is dropped
+      .resize(IMAGE_MAX_DIM, IMAGE_MAX_DIM, { fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: IMAGE_WEBP_QUALITY })
+      .toBuffer();
+    return { buffer: out, mime: 'image/webp' };
+  } catch (error) {
+    console.error('Image normalize failed, storing original:', error.message);
+    return { buffer, mime };
+  }
+};
 
 // Server runs from app/ (npm run server / server:dev); override with R5C_UPLOADS_DIR.
 export const UPLOADS_DIR = process.env.R5C_UPLOADS_DIR || path.join(process.cwd(), 'server', 'uploads');
@@ -83,13 +108,15 @@ export const storeBuffer = async (buffer, mime, hint, { prefix = 'card-images' }
 };
 
 // Store a data URL; returns { url, key, driver } or null if not a valid image data URL.
+// Raster images are normalized (downscaled + WebP) before storage.
 export const storeDataUrl = async (dataUrl, hint) => {
   const parsed = parseDataUrl(dataUrl);
   if (!parsed) return null;
-  const key = keyFor(parsed.buffer, parsed.mime, hint);
+  const { buffer, mime } = await normalizeImage(parsed.buffer, parsed.mime);
+  const key = keyFor(buffer, mime, hint);
   const url = s3
-    ? await storeS3(key, parsed.buffer, parsed.mime)
-    : storeLocal(key, parsed.buffer);
+    ? await storeS3(key, buffer, mime)
+    : storeLocal(key, buffer);
   return { url, key, driver: s3 ? 's3' : 'local' };
 };
 
