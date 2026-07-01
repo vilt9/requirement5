@@ -11,7 +11,6 @@ import Account from './pages/Account';
 import ShareCard from './pages/ShareCard';
 import CaptureCard from './pages/CaptureCard';
 import About from './pages/About';
-import TestSavedCards from './pages/TestSavedCards';
 import './App.css';
 
 // The design language (refreshed, after midjourney.com/medical): JetBrains Mono
@@ -142,7 +141,6 @@ function App() {
                 <Route path="/about" element={<About />} />
                 <Route path="/card/:id" element={<ShareCard />} />
                 <Route path="/capture/:id" element={<CaptureCard />} />
-                <Route path="/test-saved-cards" element={<TestSavedCards />} />
               </Routes>
             </main>
           </div>
