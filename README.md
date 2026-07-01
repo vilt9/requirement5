@@ -43,8 +43,9 @@ use it for anything except building a competing product or service (see
   Cards render with DOM/CSS blend-modes + holo gradients (no canvas/WebGL).
 - **API** — Express 4 (`server/`). Auth (JWT), cards, a small virtual economy
   (tiers, rarity, saves, dividends), and image storage (local disk or S3).
-- **Storage** — JSON file store by default (`server/data/`); a Postgres adapter is
-  stubbed. Images go to local disk (`server/uploads`) or S3 when configured.
+- **Storage** — JSON file store by default (`server/data/`); set `DATABASE_URL` to
+  use Postgres as the system of record (schema auto-applied on startup). Images go
+  to local disk (`server/uploads`) or S3 when configured.
 - **Video export** — Playwright drives a chrome-free capture route through a
   deterministic tilt, then ffmpeg stitches frames into a GIF/MP4.
 

@@ -1,7 +1,8 @@
+import './config/env.js'; // must be first — loads .env before modules read process.env
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import { testConnection, initializeDatabase } from './config/database.js';
+import { testConnection, initializeDatabase, shutdownDatabase } from './config/database.js';
 import cardRoutes from './routes/cards.js';
 import authRoutes from './routes/auth.js';
 import economyRoutes from './routes/economy.js';
@@ -66,11 +67,21 @@ const startServer = async () => {
     await initializeDatabase();
     
     // Start server
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
       console.log(`Health check: http://localhost:${PORT}/health`);
       console.log(`API base: http://localhost:${PORT}/api`);
     });
+
+    // Flush pending write-through and close the DB pool before exiting.
+    const shutdown = async (signal) => {
+      console.log(`\n${signal} received — shutting down.`);
+      server.close();
+      try { await shutdownDatabase(); } catch (error) { console.error('Shutdown flush failed:', error); }
+      process.exit(0);
+    };
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
   } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);

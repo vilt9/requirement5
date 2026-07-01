@@ -1,13 +1,26 @@
-// File-backed JSON store. In-memory collections with write-through persistence
-// to server/data/db.json. Tests (NODE_ENV=test) stay memory-only.
-// A pg adapter can replace this behind the same API when DATABASE_URL is set up.
+// Working set lives in memory (single Node process → synchronous reads/writes,
+// so the economy's multi-step updates stay atomic). Persistence is pluggable:
+//   - NODE_ENV=test        → memory only, no persistence
+//   - DATABASE_URL set      → Postgres system-of-record (write-through, see pgStore.js)
+//   - otherwise             → JSON file at server/data/db.json (local dev, no DB needed)
+// Reads never hit the backend, so no call site changed when Postgres was added.
 import fs from 'fs';
 import path from 'path';
+import {
+  connect as pgConnect,
+  ping as pgPing,
+  ensureSchema as pgEnsureSchema,
+  hydrate as pgHydrate,
+  flush as pgFlush,
+  close as pgClose
+} from './pgStore.js';
 
 // Server runs from app/ (npm run server / server:dev); override with R5C_DATA_DIR.
 const DATA_DIR = process.env.R5C_DATA_DIR || path.join(process.cwd(), 'server', 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 const IS_TEST = process.env.NODE_ENV === 'test';
+const DATABASE_URL = process.env.DATABASE_URL || null;
+const USE_PG = !IS_TEST && !!DATABASE_URL;
 
 const db = {
   cards: [],
@@ -20,9 +33,66 @@ const db = {
   cloud: { total_issued: 0, total_absorbed: 0 }
 };
 
+// ---------- Postgres write-through bookkeeping ----------
+// Track which rows changed since the last flush so we only upsert the deltas
+// (transactions are append-only and unbounded — a full-snapshot flush would grow
+// linearly). Counters + cloud are tiny and rewritten every flush.
+const dirty = { cards: new Set(), users: new Set(), transactions: new Set(), saves: new Set() };
+const removed = { cards: new Set(), users: new Set(), saves: new Set() };
+let truncateRequested = false;
+
+const markDirty = (table, id) => {
+  if (!USE_PG) return;
+  removed[table]?.delete(id);
+  dirty[table].add(id);
+};
+const markRemoved = (table, id) => {
+  if (!USE_PG) return;
+  dirty[table].delete(id);
+  removed[table].add(id);
+};
+
 let saveTimer = null;
-const persistSoon = () => {
-  if (IS_TEST) return;
+let flushing = false;
+let flushQueued = false;
+
+const scheduleFlush = () => {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(runFlush, 200);
+};
+
+const takeSnapshot = () => {
+  const snap = { dirty: {}, removed: {}, truncate: truncateRequested };
+  for (const t of Object.keys(dirty)) { snap.dirty[t] = dirty[t]; dirty[t] = new Set(); }
+  for (const t of Object.keys(removed)) { snap.removed[t] = removed[t]; removed[t] = new Set(); }
+  truncateRequested = false;
+  return snap;
+};
+
+const requeue = (snap) => {
+  for (const t of Object.keys(snap.dirty)) for (const id of snap.dirty[t]) dirty[t].add(id);
+  for (const t of Object.keys(snap.removed)) for (const id of snap.removed[t]) removed[t].add(id);
+  if (snap.truncate) truncateRequested = true;
+};
+
+const runFlush = async () => {
+  if (flushing) { flushQueued = true; return; }
+  flushing = true;
+  const snap = takeSnapshot();
+  try {
+    await pgFlush({ db, ...snap });
+  } catch (error) {
+    console.error('Postgres flush failed, will retry:', error.message);
+    requeue(snap);
+    flushQueued = true;
+  } finally {
+    flushing = false;
+    if (flushQueued) { flushQueued = false; scheduleFlush(); }
+  }
+};
+
+// ---------- JSON file persistence (local dev) ----------
+const persistFile = () => {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     try {
@@ -32,6 +102,12 @@ const persistSoon = () => {
       console.error('Failed to persist database:', error);
     }
   }, 200);
+};
+
+const persistSoon = () => {
+  if (IS_TEST) return;
+  if (USE_PG) return scheduleFlush();
+  persistFile();
 };
 
 const load = () => {
@@ -50,13 +126,13 @@ const load = () => {
 
 const now = () => new Date().toISOString();
 
-// Mock pool object kept for compatibility with the planned pg migration
+// Retained for import compatibility; real pooling lives in pgStore.js.
 const pool = {
   query: async () => ({ rows: [], rowCount: 0 }),
   end: async () => {}
 };
 
-const dbConfig = { type: 'json-file', file: DB_FILE };
+const dbConfig = { type: USE_PG ? 'postgres' : 'json-file', file: DB_FILE };
 
 const memoryDb = {
   // ---------- cards ----------
@@ -76,6 +152,7 @@ const memoryDb = {
       tags: card.tags || []
     };
     db.cards.push(newCard);
+    markDirty('cards', newCard.id);
     persistSoon();
     return newCard;
   },
@@ -88,6 +165,7 @@ const memoryDb = {
     const index = db.cards.findIndex(card => card.id === id);
     if (index !== -1) {
       db.cards[index] = { ...db.cards[index], ...updateData };
+      markDirty('cards', id);
       persistSoon();
       return db.cards[index];
     }
@@ -99,6 +177,7 @@ const memoryDb = {
     if (index !== -1) {
       const deletedCard = db.cards[index];
       db.cards.splice(index, 1);
+      markRemoved('cards', id);
       persistSoon();
       return deletedCard;
     }
@@ -133,6 +212,7 @@ const memoryDb = {
     if (card) {
       card.collection_count = (card.collection_count || 0) + 1;
       card.updated_at = now();
+      markDirty('cards', cardId);
       persistSoon();
       return card;
     }
@@ -144,6 +224,7 @@ const memoryDb = {
     if (card) {
       card[field] = (card[field] || 0) + 1;
       card.updated_at = now();
+      markDirty('cards', cardId);
       persistSoon();
       return card;
     }
@@ -172,6 +253,7 @@ const memoryDb = {
       created_at: now()
     };
     db.users.push(newUser);
+    markDirty('users', newUser.id);
     persistSoon();
     return newUser;
   },
@@ -185,6 +267,7 @@ const memoryDb = {
     const index = db.users.findIndex(u => u.id === id);
     if (index !== -1) {
       db.users[index] = { ...db.users[index], ...updateData };
+      markDirty('users', id);
       persistSoon();
       return db.users[index];
     }
@@ -199,6 +282,7 @@ const memoryDb = {
       created_at: now()
     };
     db.transactions.push(newTxn);
+    markDirty('transactions', newTxn.id);
     persistSoon();
     return newTxn;
   },
@@ -214,6 +298,7 @@ const memoryDb = {
       created_at: now()
     };
     db.saves.push(newSave);
+    markDirty('saves', newSave.id);
     persistSoon();
     return newSave;
   },
@@ -228,6 +313,7 @@ const memoryDb = {
     if (index !== -1) {
       const deleted = db.saves[index];
       db.saves.splice(index, 1);
+      markRemoved('saves', deleted.id);
       persistSoon();
       return deleted;
     }
@@ -255,19 +341,46 @@ const memoryDb = {
     db.saves.length = 0;
     db.counters = { card: 1, user: 1, txn: 1, save: 1 };
     db.cloud = { total_issued: 0, total_absorbed: 0 };
+    if (USE_PG) {
+      truncateRequested = true;
+      for (const t of Object.keys(dirty)) dirty[t].clear();
+      for (const t of Object.keys(removed)) removed[t].clear();
+    }
     persistSoon();
     return true;
   }
 };
 
 const testConnection = async () => {
-  return true;
+  if (!USE_PG) return true;
+  try {
+    pgConnect(DATABASE_URL);
+    await pgPing();
+    return true;
+  } catch (error) {
+    console.error('Postgres connection failed:', error.message);
+    return false;
+  }
 };
 
 const initializeDatabase = async () => {
-  load();
+  if (USE_PG) {
+    await pgEnsureSchema();
+    await pgHydrate(db);
+  } else {
+    load();
+  }
   console.log(`Database ready (${dbConfig.type}): ${db.cards.length} cards, ${db.users.length} users`);
   return true;
 };
 
-export { pool, dbConfig, testConnection, initializeDatabase, memoryDb };
+// Flush any pending write-through and close the pool (graceful shutdown).
+const shutdownDatabase = async () => {
+  if (!USE_PG) return;
+  clearTimeout(saveTimer);
+  await runFlush();
+  if (flushQueued) { flushQueued = false; await runFlush(); }
+  await pgClose();
+};
+
+export { pool, dbConfig, testConnection, initializeDatabase, shutdownDatabase, memoryDb };
