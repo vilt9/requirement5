@@ -500,7 +500,7 @@ export const HoloShine = styled.div`
     
     /* Extreme mode - layered architecture with image texture */
     &[data-intensity="extreme"] {
-      background-image: var(--rare-holo-background-image, url("/src/assets/img/shine1.png"));
+      background-image: var(--rare-holo-background-image, url("/assets/img/shine1.png"));
       background-size: cover;
       background-position: var(--posx, 50%) var(--posy, 50%);
       mix-blend-mode: soft-light;
@@ -560,8 +560,8 @@ export const HoloShine = styled.div`
     --space: var(--rare-holo-galaxy-space, 4%);
     
     background-image: 
-      var(--rare-holo-galaxy-background-image, url("/src/assets/img/galaxy.jpg")),
-      var(--rare-holo-galaxy-background-image, url("/src/assets/img/galaxy.jpg")),
+      var(--rare-holo-galaxy-background-image, url("/assets/img/galaxy.jpg")),
+      var(--rare-holo-galaxy-background-image, url("/assets/img/galaxy.jpg")),
       repeating-linear-gradient(
         82deg,
         var(--rare-holo-galaxy-color-1, rgb(219, 204, 86)) calc(var(--space)*1),
@@ -616,7 +616,7 @@ export const HoloShine = styled.div`
     z-index: 7;
     transform: translateZ(6px);
     
-    background-image: var(--rare-holo-vmax-background-image, url("/src/assets/img/shine4.png")),
+    background-image: var(--rare-holo-vmax-background-image, url("/assets/img/shine4.png")),
       /* Diagonal gradient with reds and pinks - more subtle now */
       repeating-linear-gradient(-33deg,
         rgba(206, 42, 36, 0.2) calc(var(--space)*1),    /* Red - much lower opacity */
@@ -655,7 +655,7 @@ export const HoloShine = styled.div`
   &.wowa-holo {
     --space: 4%;
     
-    background-image: var(--wowa-holo-background-image, url("/src/assets/new_shiny_imgs/illusion.png")),
+    background-image: var(--wowa-holo-background-image, url("/assets/new_shiny_imgs/illusion.png")),
       repeating-linear-gradient(
         var(--angle, 45deg),
         rgba(255, 140, 0, 0.2) calc(var(--space)*1),   /* Orange - very low opacity */
@@ -1004,45 +1004,4 @@ export const ImageMask = styled.div`
   &.diagonal-fade {
     background: linear-gradient(135deg, black 0%, transparent 40%, transparent 60%, black 100%);
   }
-`;
-
-// Time symbol for time-based effects
-export const TimeSymbol = styled.div`
-  position: absolute;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border-radius: 10px;
-  padding: 6px 10px;
-  transform: rotate(90deg);
-  background: rgba(0, 0, 0, 0.7);
-  top: 30px;
-  right: calc(0px - 36px);
-  z-index: 5;
-`;
-
-// Icon for time symbol
-export const TimeIcon = styled.div`
-  width: 18px;
-  height: 18px;
-  background-size: contain;
-  background-repeat: no-repeat;
-  background-position: center;
-  
-  &.night {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z' fill='white'/%3E%3C/svg%3E");
-  }
-  
-  &.day {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='5' fill='white'/%3E%3Cpath d='M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42' stroke='white' stroke-width='2'/%3E%3C/svg%3E");
-  }
-`;
-
-// Text value for time symbol
-export const TimeValue = styled.span`
-  color: white;
-  font-size: 12px;
-  font-weight: bold;
-  letter-spacing: 0.5px;
-  transform: translateY(1px);
 `;

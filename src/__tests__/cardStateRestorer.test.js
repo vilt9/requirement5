@@ -182,22 +182,6 @@ describe('Card State Restorer', () => {
       expect(mockElement.classList.add).toHaveBeenCalledWith('floating');
     });
 
-    it('should restore time effects successfully', () => {
-      const savedState = {
-        animations: {
-          timeEffects: {
-            isNight: true,
-            mode: 'night'
-          }
-        }
-      };
-      
-      restoreCardState(mockElement, savedState);
-      
-      expect(mockElement.classList.remove).toHaveBeenCalledWith('day', 'night');
-      expect(mockElement.classList.add).toHaveBeenCalledWith('night');
-    });
-
     it('should restore CSS animations successfully', () => {
       const savedState = {
         animations: {

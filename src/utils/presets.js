@@ -17,8 +17,6 @@ export const DESIGN_FIELDS = [
   'rareHoloGalaxyParams',
   'wowaHoloParams',
   'rareHoloVmaxParams',
-  'hasTimeEffect',
-  'timeEffects',
   'rarity',
   'animationSpeed',
   'pixelDensity',

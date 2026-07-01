@@ -246,39 +246,6 @@ export const generateBaseBackground = (baseHue = null) => {
   };
 };
 
-// Helper function for time-based effects
-export const getTimeBasedEffects = () => {
-  // Get current hour
-  const now = new Date();
-  const hour = now.getHours();
-  
-  // Check if it's night (8 PM to 6 AM)
-  const isNight = hour >= 20 || hour < 6;
-  
-  // Time-based adjustments
-  const adjustments = {
-    isNight: isNight,
-    symbol: isNight ? 'night' : 'day',
-    brightnessAdjust: isNight ? 0.2 : 0, // Slight boost at night
-    contrastAdjust: isNight ? 0.1 : 0,   // Slight boost at night
-    saturationAdjust: isNight ? -0.05 : 0 // Slight desaturation at night
-  };
-  
-  return adjustments;
-};
-
-// Time-based probability adjustments
-export const getTimeBasedProbability = (rarity) => {
-  const { isNight } = getTimeBasedEffects();
-  
-  // Slightly boost rarity at night (10% boost)
-  if (isNight && Math.random() > 0.7) {
-    return Math.min(1, rarity * 1.1);
-  }
-  
-  return rarity;
-};
-
 // Function to generate random card attributes.
 // options.rarityRange: [low, high] forces the rarity score into a tier band
 // (used when the server rolls a tier and the client synthesises the card).
@@ -290,7 +257,6 @@ export const generateCardAttributes = (options = {}) => {
     rarity = low + Math.random() * (high - low);
   } else {
     rarity = Math.random();
-    rarity = getTimeBasedProbability(rarity);
   }
   
   // Determine card background color/gradient
@@ -312,16 +278,12 @@ export const generateCardAttributes = (options = {}) => {
   ];
   
   const pattern = getRandomItem(patternGenerators)();
-  
-  // Determine if card has time effect
-  const hasTimeEffect = Math.random() > 0.75;
-  const timeEffects = hasTimeEffect ? getTimeBasedEffects() : null;
-  
+
   // Select random image
   const cardImageSet = getRandomItem(Object.entries(getRandomItem(window.cardImagesData || [])));
   const cardImageCategory = cardImageSet[0];
   const cardImageVariant = getRandomItem(cardImageSet[1]);
-  const cardImagePath = `${cardImageCategory}${cardImageVariant}.png`;
+  const cardImagePath = `${cardImageCategory}${cardImageVariant}.webp`;
   
   // Generate effect parameters based on rarity
   const effectParams = generateHolographicParams(rarity, bgColor.baseHue);
@@ -348,8 +310,6 @@ export const generateCardAttributes = (options = {}) => {
     },
     backgroundColor: bgColor,
     baseBackground: generateBaseBackground(bgColor.baseHue),
-    hasTimeEffect,
-    timeEffects,
     imagePath: cardImagePath,
     effectParams,
     imageEffects,

@@ -157,11 +157,6 @@ const Home = () => {
                 <TagList tags={ensureTags(draw?.card?.tags)} />
               </div>
             )}
-            <div>
-              Time sensitive: {currentCard.hasTimeEffect
-                ? (currentCard.timeEffects?.isNight ? 'night boost' : 'day mode')
-                : 'timeless'}
-            </div>
             {user ? (
               <div>Yield remaining today: {yieldRemaining ?? '—'} /t26</div>
             ) : (

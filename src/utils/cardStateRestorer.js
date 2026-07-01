@@ -134,21 +134,6 @@ const restoreAnimations = (element, animations) => {
     element.classList.add('floating');
   }
   
-  // Restore time effects
-  if (animations.timeEffects) {
-    const { isNight, mode } = animations.timeEffects;
-    
-    // Remove existing time classes
-    element.classList.remove('day', 'night');
-    
-    // Add appropriate time class
-    if (mode === 'night') {
-      element.classList.add('night');
-    } else {
-      element.classList.add('day');
-    }
-  }
-  
   // Restore CSS animations
   if (animations.cssAnimations) {
     const { name, duration, timingFunction } = animations.cssAnimations;

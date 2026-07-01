@@ -157,15 +157,6 @@ const extractAnimationStates = (element) => {
     animations.floating = true;
   }
   
-  // Check for time effects
-  const timeElements = element.querySelectorAll('[class*="day"], [class*="night"]');
-  if (timeElements.length > 0) {
-    animations.timeEffects = {
-      isNight: element.querySelector('[class*="night"]') !== null,
-      mode: element.querySelector('[class*="night"]') ? 'night' : 'day'
-    };
-  }
-  
   // Extract CSS animations
   const computedStyle = window.getComputedStyle(element);
   const animationName = computedStyle.getPropertyValue('animation-name');

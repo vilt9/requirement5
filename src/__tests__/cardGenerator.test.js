@@ -18,7 +18,7 @@ describe('generateCardAttributes', () => {
     const card = generateCardAttributes();
     const expectedFields = [
       'id', 'createdAt', 'rarity', 'patternInfo', 'backgroundColor', 'baseBackground',
-      'hasTimeEffect', 'imagePath', 'effectParams', 'imageEffects', 'borderEffects',
+      'imagePath', 'effectParams', 'imageEffects', 'borderEffects',
       'animationSpeed', 'pixelDensity',
     ];
     for (const field of expectedFields) {

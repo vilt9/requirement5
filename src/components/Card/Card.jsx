@@ -26,6 +26,7 @@ const buildBaseBackground = (bg) => {
 const Card = ({ cardData, isInteractive = true, onClick }) => {
   const [isFlipped, setIsFlipped] = useState(false);
   const [isMoving, setIsMoving] = useState(false);
+  const [failedSrc, setFailedSrc] = useState(null); // hides an image that 404s, per-src, so it can't flicker
   const [mousePosition, setMousePosition] = useState({ x: 50, y: 50, rotateX: 0, rotateY: 0, hyp: 0, angle: 0 });
   const cardRef = useRef(null);
   const cardSceneRef = useRef(null);
@@ -52,8 +53,6 @@ const Card = ({ cardData, isInteractive = true, onClick }) => {
     patternInfo,
     backgroundColor,
     baseBackground,
-    hasTimeEffect,
-    timeEffects,
     imagePath,
     customImageUrl, // Support for direct custom image URLs
     customHoloImageUrl, // Support for custom holographic effect images
@@ -321,9 +320,9 @@ const Card = ({ cardData, isInteractive = true, onClick }) => {
   
   // Load image URL
   // Handle both custom image URLs and regular image paths
-  const imageUrl = imagePath === 'custom_image' && customImageUrl 
-    ? customImageUrl 
-    : `/src/assets/card_images/${imagePath}`;
+  const imageUrl = imagePath === 'custom_image' && customImageUrl
+    ? customImageUrl
+    : `/assets/card_images/${imagePath}`;
   
   return (
     <S.CardScene 
@@ -391,17 +390,17 @@ const Card = ({ cardData, isInteractive = true, onClick }) => {
               }}
             />
             
-            {/* Card image - use custom URL if provided, otherwise use default path */}
+            {/* Card image - custom R2 URL when provided, else a generated filler.
+                A missing image is hidden (tracked per-src) rather than swapped to
+                another path, so a 404 can't loop and flicker. */}
             <S.CardImage className="card-image">
-              <img 
-                src={imageUrl} 
-                alt="Card Illustration" 
-                onError={(e) => {
-                  console.error('Error loading card image:', imageUrl);
-                  e.target.onerror = null; 
-                  e.target.src = '/src/assets/card_images/default.png';
-                }}
-              />
+              {imageUrl && failedSrc !== imageUrl && (
+                <img
+                  src={imageUrl}
+                  alt="Card Illustration"
+                  onError={() => setFailedSrc(imageUrl)}
+                />
+              )}
             </S.CardImage>
             
             {/* Thick integrated border (Pokemon style) - moved here for proper layering */}
@@ -579,7 +578,7 @@ const Card = ({ cardData, isInteractive = true, onClick }) => {
                     }}
                     className="rare-holo-background"
                     $className="rare-holo-background"
-                    $imageUrl={cardData.rareHoloParams?.backgroundImage || "/src/assets/img/shine1.png"}
+                    $imageUrl={cardData.rareHoloParams?.backgroundImage || "/assets/img/shine1.png"}
                     $active={true}
                     data-intensity="extreme"
                   />
@@ -614,17 +613,6 @@ const Card = ({ cardData, isInteractive = true, onClick }) => {
                 'display': borderEffects?.thinEdgeEnabled ? 'block' : 'none'
               }}
             />
-            
-            
-            {/* Time-based symbol if applicable */}
-            {hasTimeEffect && timeEffects && (
-              <S.TimeSymbol className="time-symbol">
-                <S.TimeIcon className={`time-icon ${timeEffects.symbol}`} />
-                <S.TimeValue className="time-value">
-                  {timeEffects.isNight ? 'Night' : 'Day'}
-                </S.TimeValue>
-              </S.TimeSymbol>
-            )}
           </S.CardFace>
           
           <S.CardBack className="card-back" />

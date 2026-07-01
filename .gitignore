@@ -32,3 +32,6 @@ server/uploads/
 .env.*
 !.env.example
 *.pem
+
+# Wrangler local state
+.wrangler/

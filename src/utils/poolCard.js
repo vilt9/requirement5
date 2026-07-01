@@ -26,7 +26,6 @@ export const poolCardToCardData = (record) => {
     holoEffects: customCard.holoEffects || {},
     borderEffects: customCard.borderEffects || {},
     imageEffects: customCard.imageEffects || {},
-    timeEffects: customCard.timeEffects || {},
     patternInfo: customCard.patternInfo || {},
     rarity: typeof customCard.rarity === 'number' ? customCard.rarity : 0.5
   };

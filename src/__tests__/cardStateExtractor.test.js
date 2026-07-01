@@ -320,29 +320,5 @@ describe('Card State Extractor', () => {
       
       expect(state.animations.floating).toBe(true);
     });
-
-    it('should detect time effects', async () => {
-      const timeElement = {
-        ...mockElement,
-        querySelectorAll: jest.fn(),
-        querySelector: jest.fn()
-      };
-      
-      // Mock the day element with proper methods
-      const dayElement = { 
-        className: 'day',
-        getAttribute: jest.fn(() => null)
-      };
-      
-      timeElement.querySelectorAll.mockReturnValue([dayElement]);
-      // Mock querySelector to return null for night (since we only have day)
-      timeElement.querySelector.mockReturnValue(null);
-      
-      const state = await extractCardState(timeElement);
-      
-      expect(state.animations.timeEffects).toBeDefined();
-      expect(state.animations.timeEffects.mode).toBe('day');
-      expect(state.animations.timeEffects.isNight).toBe(false);
-    });
   });
 }); 

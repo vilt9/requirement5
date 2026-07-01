@@ -171,7 +171,6 @@ const ShareCard = () => {
   const holoLabel = cc.customHoloImageUrl
     ? (activeHolo.length ? `Custom image + ${activeHolo.join(', ')}` : 'Custom image')
     : (activeHolo.length ? activeHolo.join(', ') : 'None');
-  const timeState = cc.hasTimeEffect ? (cc.timeEffects?.isNight ? 'Night' : 'Day') : 'Timeless';
   const palette = [bg.cssVars?.['--color-1'], bg.cssVars?.['--color-2'], bg.cssVars?.['--color-3']].filter(Boolean);
   const borderParts = [be.thickBorderEnabled && 'thick', be.thinEdgeEnabled && 'thin edge'].filter(Boolean);
   const hasImage = cc.imagePath === 'custom_image' || cc.customImageUrl;
@@ -307,7 +306,6 @@ const ShareCard = () => {
           {/* Motion + meta */}
           <Detail label="Animation speed" secondary>{num(cc.animationSpeed)}</Detail>
           <Detail label="Pixel density" secondary>{cc.pixelDensity}</Detail>
-          <Detail label="Time-sensitive" secondary>{timeState}</Detail>
           <Detail label="Saved">{`${card.times_saved || 0} ${card.times_saved === 1 ? 'collection' : 'collections'}`}</Detail>
           <Detail label="Creator">{card.creator_id === 'cloud' ? 'synthetic' : card.creator_id}</Detail>
           <Detail label="Created" secondary>{created}</Detail>
