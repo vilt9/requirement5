@@ -49,7 +49,7 @@ const PublishPanel = ({ customCard }) => {
       <Panel>
         Publish to the pool
         <Divider />
-        <Dim><Link to="/account">Log in</Link> to publish cards and earn dividends when they are saved.</Dim>
+        <Dim>Publishing a card needs an account. <Link to="/account">Sign up or log in</Link> to publish.</Dim>
       </Panel>
     );
   }

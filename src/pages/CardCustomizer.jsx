@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import Card from '../components/Card/Card';
 import { useCards } from '../context/CardContext';
-import { api } from '../utils/api';
 // Import our new components
 import ControlSection from '../components/CardCustomizer/ControlSection';
 import ImageUploader from '../components/CardCustomizer/ImageUploader';
@@ -12,7 +11,6 @@ import HoloEffectToggles from '../components/CardCustomizer/HoloEffectToggles';
 import ImageEffectControls from '../components/CardCustomizer/ImageEffectControls';
 import EdgeHighlightControls from '../components/CardCustomizer/EdgeHighlightControls';
 import CentralPanelControls from '../components/CardCustomizer/CentralPanelControls';
-import SaveCard from '../components/CardCustomizer/SaveCard';
 import PublishPanel from '../components/PublishPanel';
 import ColorPicker from '../components/CardCustomizer/ColorPicker';
 import BlendModeSelector from '../components/CardCustomizer/BlendModeSelector';
@@ -32,7 +30,7 @@ const TABS = [
 
 const CardCustomizer = () => {
   const {
-    currentCard, generateNewCard, saveCard, updateCustomCard, saveCustomImage, customImages,
+    currentCard, generateNewCard, updateCustomCard, saveCustomImage, customImages,
     presets, savePreset, deletePreset
   } = useCards();
   const [customCard, setCustomCard] = useState(null);
@@ -41,7 +39,6 @@ const CardCustomizer = () => {
   const [holoImageFile, setHoloImageFile] = useState(null);
   const [mainImagePreview, setMainImagePreview] = useState(null);
   const [holoImagePreview, setHoloImagePreview] = useState(null);
-  const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [presetName, setPresetName] = useState('');
   const [selectedPresetId, setSelectedPresetId] = useState('');
@@ -284,51 +281,6 @@ const CardCustomizer = () => {
     reader.readAsDataURL(file);
   };
   
-  // Handle saving the custom card
-  const handleSaveCard = async () => {
-    if (!customCard) return;
-    
-    setIsSaving(true);
-    setFeedback(null);
-    
-    try {
-      // First, update the card in context
-      updateCustomCard(customCard);
-      
-      // Save to local storage (existing functionality)
-      await saveCard();
-      
-      // Now save to backend API
-      const cardName = `Custom Card ${new Date().toLocaleString()}`;
-      
-      // Create the card data for the backend
-      const cardData = {
-        name: cardName,
-        tags: customCard.tags || [],
-        stateData: {
-          // Include the custom card data
-          customCard: customCard,
-          // Include any additional state we want to preserve
-          timestamp: new Date().toISOString(),
-          version: '1.0'
-        }
-      };
-      
-      // Send to backend
-      await api('/api/cards', { method: 'POST', body: cardData });
-      setFeedback('Card saved successfully to server!');
-
-    } catch (error) {
-      console.error('Error saving card:', error);
-      setFeedback(`Error saving card: ${error.message}`);
-    } finally {
-      setIsSaving(false);
-      
-      // Clear feedback after 5 seconds
-      setTimeout(() => setFeedback(null), 5000);
-    }
-  };
-  
   return (
     <CustomizerContainer className="customizer-container">
       <h1 className="customizer-title">Card Customizer</h1>
@@ -472,12 +424,7 @@ const CardCustomizer = () => {
               <Dim style={{ fontSize: 10 }}>Saved with the card; shown across the pool and your collection.</Dim>
               <TagInput value={customCard?.tags || []} onChange={setTags} />
             </TagSection>
-            <SaveCard
-              className="save-card-button"
-              handleSaveCard={handleSaveCard}
-              isSaving={isSaving}
-              feedback={feedback}
-            />
+            {feedback && <Dim className="customizer-feedback">{feedback}</Dim>}
             <PublishPanel customCard={customCard} />
           </ControlsFooter>
         </ControlsSection>

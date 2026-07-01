@@ -9,7 +9,6 @@
 //
 // Requires Playwright (with chromium) and ffmpeg on the host. CAPTURE_BASE_URL points at
 // the running SPA (dev: the Vite server; prod: the deployed site).
-import { chromium } from 'playwright';
 import { spawn } from 'child_process';
 import fs from 'fs';
 import os from 'os';
@@ -29,13 +28,17 @@ const DEFAULTS = {
 };
 
 // One shared headless browser, launched lazily and reused across renders.
+// Playwright is imported dynamically so merely importing this module (e.g. via the
+// card routes in tests) doesn't pull in chromium — it's only needed to render.
 let browserPromise = null;
 const getBrowser = () => {
   if (!browserPromise) {
-    browserPromise = chromium.launch({ headless: true }).catch(err => {
-      browserPromise = null;
-      throw err;
-    });
+    browserPromise = import('playwright')
+      .then(({ chromium }) => chromium.launch({ headless: true }))
+      .catch(err => {
+        browserPromise = null;
+        throw err;
+      });
   }
   return browserPromise;
 };

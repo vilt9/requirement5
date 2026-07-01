@@ -275,10 +275,12 @@ router.get('/:id/render', async (req, res) => {
   }
 });
 
-// Create new card
-router.post('/', async (req, res) => {
+// Create a card. Requires auth — every card has a real creator_id, never
+// 'anonymous'. The customizer's Publish flow (POST /publish) is the usual entry
+// point; this remains for direct/programmatic creation.
+router.post('/', requireAuth, async (req, res) => {
   try {
-    const result = await Card.create(req.body);
+    const result = await Card.create({ ...req.body, creatorId: req.user.id });
     if (result.success) {
       res.status(201).json(result);
     } else {
@@ -290,10 +292,21 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Update card
-router.put('/:id', async (req, res) => {
+// Protected fields a card owner cannot rewrite through a generic update.
+const PROTECTED_CARD_FIELDS = ['id', 'creator_id', 'created_at'];
+
+// Update a card. Requires auth and ownership.
+router.put('/:id', requireAuth, async (req, res) => {
   try {
-    const result = await Card.update(req.params.id, req.body);
+    const existing = memoryDb.getCardById(req.params.id);
+    if (!existing) return res.status(404).json({ success: false, error: 'Card not found' });
+    if (existing.creator_id !== req.user.id) {
+      return res.status(403).json({ success: false, error: 'Not your card' });
+    }
+    const updateData = { ...(req.body || {}) };
+    for (const field of PROTECTED_CARD_FIELDS) delete updateData[field];
+
+    const result = await Card.update(req.params.id, updateData);
     if (result.success) {
       res.json(result);
     } else {
@@ -305,9 +318,14 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// Delete card
-router.delete('/:id', async (req, res) => {
+// Delete a card. Requires auth and ownership.
+router.delete('/:id', requireAuth, async (req, res) => {
   try {
+    const existing = memoryDb.getCardById(req.params.id);
+    if (!existing) return res.status(404).json({ success: false, error: 'Card not found' });
+    if (existing.creator_id !== req.user.id) {
+      return res.status(403).json({ success: false, error: 'Not your card' });
+    }
     const result = await Card.delete(req.params.id);
     if (result.success) {
       res.json(result);
@@ -383,7 +401,7 @@ router.get('/community/stats', async (req, res) => {
 });
 
 // Increment collection count for a card
-router.post('/:id/collect', async (req, res) => {
+router.post('/:id/collect', requireAuth, async (req, res) => {
   try {
     const result = await Card.incrementCollectionCount(req.params.id);
     if (result.success) {
@@ -397,19 +415,7 @@ router.post('/:id/collect', async (req, res) => {
   }
 });
 
-// Clear all cards from the database
-router.delete('/admin/clear', async (req, res) => {
-  try {
-    const result = await Card.clearDatabase();
-    if (result.success) {
-      res.json(result);
-    } else {
-      res.status(500).json(result);
-    }
-  } catch (error) {
-    console.error('Error clearing database:', error);
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-});
+// (Removed: DELETE /admin/clear — an unauthenticated full-database wipe. There is
+// no admin system yet; wipe via psql/the store directly if ever needed.)
 
-export default router; 
+export default router;
