@@ -233,11 +233,15 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Render a card to a moving image (GIF/MP4) for sharing. Cached by card id +
-// format + content version, so the same card returns instantly after the first
-// render and concurrent requests share one render.
-const renderCache = new Map();   // key -> { url, version }
+// Render a card to a moving image (GIF/MP4) for sharing. Rendering is expensive
+// (headless chromium + ffmpeg), so each card renders once and the result is stored
+// under the 'renders/' prefix and served statically; concurrent requests share one
+// render. Renders are meant to be disposable — set a bucket lifecycle rule to expire
+// 'renders/' (e.g. 14 days). The in-memory URL cache has a shorter TTL than that
+// expiry so it never hands back a URL the store has already cleared.
+const renderCache = new Map();   // key -> { url, version, at }
 const renderInFlight = new Map(); // key -> Promise<{ url }>
+const RENDER_CACHE_TTL_MS = 10 * 24 * 60 * 60 * 1000; // 10 days (< the 14-day expiry)
 
 const cardVersion = (card) => card?.updated_at || card?.updatedAt || '';
 
@@ -253,15 +257,17 @@ router.get('/:id/render', async (req, res) => {
     const key = `${id}:${format}`;
 
     const cached = renderCache.get(key);
-    if (cached && cached.version === version) {
+    const fresh = cached && cached.version === version &&
+      (Date.now() - cached.at) < RENDER_CACHE_TTL_MS;
+    if (fresh) {
       return res.json({ success: true, data: { url: cached.url, format } });
     }
 
     if (!renderInFlight.has(key)) {
       const job = (async () => {
         const buffer = await renderCard(id, { format });
-        const { url } = await storeBuffer(buffer, MIME[format], `card_${id}`);
-        renderCache.set(key, { url, version });
+        const { url } = await storeBuffer(buffer, MIME[format], `card_${id}`, { prefix: 'renders' });
+        renderCache.set(key, { url, version, at: Date.now() });
         return { url };
       })().finally(() => renderInFlight.delete(key));
       renderInFlight.set(key, job);

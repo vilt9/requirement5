@@ -1,6 +1,11 @@
-// Image storage. Uses S3 when S3_BUCKET is configured; otherwise falls back to
-// local disk under server/uploads (served at /uploads). All the S3 plumbing is
-// here — set S3_BUCKET / AWS_REGION (+ standard AWS credentials) and it switches over.
+// Object storage for card images and rendered exports. Uses S3-compatible object
+// storage when S3_BUCKET is configured; otherwise falls back to local disk under
+// server/uploads (served at /uploads).
+//
+// Works with AWS S3 or any S3-compatible provider. For Cloudflare R2 (recommended:
+// free egress, 10GB free), set S3_ENDPOINT to the R2 endpoint, AWS_REGION=auto, and
+// S3_PUBLIC_BASE to the bucket's public URL (r2.dev or a custom domain). Standard
+// AWS credential env vars (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY) apply either way.
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
@@ -10,11 +15,18 @@ import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client
 export const UPLOADS_DIR = process.env.R5C_UPLOADS_DIR || path.join(process.cwd(), 'server', 'uploads');
 
 const S3_BUCKET = process.env.S3_BUCKET || null;
-const AWS_REGION = process.env.AWS_REGION || 'eu-west-1';
+const S3_ENDPOINT = process.env.S3_ENDPOINT || null; // set for R2 / non-AWS providers
+const AWS_REGION = process.env.AWS_REGION || (S3_ENDPOINT ? 'auto' : 'eu-west-1');
 const S3_PUBLIC_BASE = process.env.S3_PUBLIC_BASE ||
-  (S3_BUCKET ? `https://${S3_BUCKET}.s3.${AWS_REGION}.amazonaws.com` : null);
+  (S3_BUCKET && !S3_ENDPOINT ? `https://${S3_BUCKET}.s3.${AWS_REGION}.amazonaws.com` : null);
 
-const s3 = S3_BUCKET ? new S3Client({ region: AWS_REGION }) : null;
+const s3 = S3_BUCKET
+  ? new S3Client({
+      region: AWS_REGION,
+      // A custom endpoint (R2, MinIO, etc.) needs path-style addressing.
+      ...(S3_ENDPOINT ? { endpoint: S3_ENDPOINT, forcePathStyle: true } : {})
+    })
+  : null;
 
 const EXT_BY_MIME = {
   'image/png': 'png',
@@ -31,11 +43,14 @@ const parseDataUrl = (dataUrl) => {
   return { mime: match[1], buffer: Buffer.from(match[2], 'base64') };
 };
 
-const keyFor = (buffer, mime, hint) => {
+// prefix groups objects so storage lifecycle rules can target them: 'card-images'
+// is permanent (a published card references it); 'renders' is a derived export that
+// a bucket expiry rule can clear (see storeBuffer).
+const keyFor = (buffer, mime, hint, prefix = 'card-images') => {
   const hash = crypto.createHash('sha256').update(buffer).digest('hex').slice(0, 16);
   const ext = EXT_BY_MIME[mime] || 'bin';
   const safeHint = String(hint || 'img').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 32);
-  return `card-images/${safeHint}_${hash}.${ext}`;
+  return `${prefix}/${safeHint}_${hash}.${ext}`;
 };
 
 const storeLocal = (key, buffer) => {
@@ -57,9 +72,10 @@ const storeS3 = async (key, buffer, mime) => {
 };
 
 // Store a raw buffer (e.g. a rendered GIF/MP4). Key is content-hashed so identical
-// renders dedupe; returns { url, key, driver }.
-export const storeBuffer = async (buffer, mime, hint) => {
-  const key = keyFor(buffer, mime, hint);
+// renders dedupe. Pass { prefix: 'renders' } for derived exports that a bucket
+// expiry rule should clear; returns { url, key, driver }.
+export const storeBuffer = async (buffer, mime, hint, { prefix = 'card-images' } = {}) => {
+  const key = keyFor(buffer, mime, hint, prefix);
   const url = s3
     ? await storeS3(key, buffer, mime)
     : storeLocal(key, buffer);
@@ -119,6 +135,7 @@ export const offloadImages = async (value, hint = 'card', trail = '', stored = [
 export const storageInfo = () => ({
   driver: s3 ? 's3' : 'local',
   bucket: S3_BUCKET,
+  endpoint: s3 ? S3_ENDPOINT : null,
   region: s3 ? AWS_REGION : null,
   uploadsDir: s3 ? null : UPLOADS_DIR
 });
