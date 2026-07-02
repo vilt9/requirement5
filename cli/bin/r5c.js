@@ -160,6 +160,31 @@ async function cmdPublish({ positional, flags }) {
   if (flags.open) openUrl(url);
 }
 
+async function cmdUpdate({ positional, flags }) {
+  const id = positional[0] || fail('update needs a card id: r5c update <id> <spec.json>');
+  const specPath = positional[1] || fail('update needs a spec file: r5c update <id> card.json');
+  let spec;
+  try {
+    spec = JSON.parse(fs.readFileSync(specPath, 'utf8'));
+  } catch (error) {
+    fail(`could not read spec ${specPath}: ${error.message}`);
+  }
+
+  // Same expansion as publish: the spec fully describes the new design and
+  // replaces the card's state. No new stake — the card was already staked.
+  const payload = buildPublishPayload(spec, path.dirname(path.resolve(specPath)));
+  const { data } = await api.put(`/api/cards/${id}`, payload, { auth: true });
+
+  const url = cardUrl(data.card.id);
+  if (flags.json) {
+    out({ ...data, url });
+  } else {
+    out(`Updated "${data.card.name}" (${data.card.tier}, rarity ${data.card.rarity_score})`);
+    out(`  ${url}`);
+  }
+  if (flags.open) openUrl(url);
+}
+
 async function cmdGet({ positional, flags }) {
   const id = positional[0] || fail('get needs a card id');
   const { data } = await api.get(`/api/cards/${id}`);
@@ -201,6 +226,33 @@ async function cmdRender({ positional, flags }) {
   if (flags.open) openUrl(data.url);
 }
 
+async function cmdPreview({ positional, flags }) {
+  const id = positional[0] || fail('preview needs a card id');
+  const count = Math.max(1, Math.min(8, parseInt(flags.frames, 10) || 4));
+  if (!flags.json) out(`Capturing ${count} still frame(s) of ${id} (rest pose + orbit poses)...`);
+  const { data } = await api.get(`/api/cards/${id}/render?format=frames&count=${count}`);
+  // Local storage hands back relative /uploads/... paths; resolve against the API.
+  const urls = (data.urls || []).map((u) => new URL(u, apiUrl()).href);
+
+  if (flags.out) {
+    fs.mkdirSync(flags.out, { recursive: true });
+    const files = [];
+    for (let i = 0; i < urls.length; i++) {
+      const res = await fetch(urls[i]);
+      if (!res.ok) fail(`could not download frame ${i}: HTTP ${res.status}`);
+      const file = path.join(flags.out, `${id}_frame${i}.png`);
+      fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
+      files.push(file);
+    }
+    if (flags.json) return out({ id, urls, files });
+    for (const f of files) out(f);
+    return;
+  }
+
+  if (flags.json) return out({ id, urls });
+  for (const u of urls) out(u);
+}
+
 async function cmdOpen({ positional }) {
   const id = positional[0] || fail('open needs a card id');
   const url = cardUrl(id);
@@ -224,6 +276,8 @@ const COMMANDS = {
   transactions: cmdTransactions,
   config: cmdConfig,
   publish: cmdPublish,
+  update: cmdUpdate,
+  preview: cmdPreview,
   get: cmdGet,
   list: cmdList,
   collection: cmdCollection,

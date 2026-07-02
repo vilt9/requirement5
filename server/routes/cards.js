@@ -6,7 +6,7 @@ import { absorb, issue, InsufficientFundsError } from '../services/ledger.js';
 import { cardStats } from '../services/drawEngine.js';
 import { requireAuth } from '../middleware/auth.js';
 import { offloadImages, storeBuffer } from '../storage/index.js';
-import { renderCard, MIME } from '../services/capture.js';
+import { renderCard, renderStills, MIME } from '../services/capture.js';
 
 const router = express.Router();
 
@@ -246,7 +246,8 @@ const RENDER_CACHE_TTL_MS = 10 * 24 * 60 * 60 * 1000; // 10 days (< the 14-day e
 const cardVersion = (card) => card?.updated_at || card?.updatedAt || '';
 
 router.get('/:id/render', async (req, res) => {
-  const format = req.query.format === 'mp4' ? 'mp4' : 'gif';
+  const format = req.query.format === 'mp4' ? 'mp4'
+    : req.query.format === 'frames' ? 'frames' : 'gif';
   const { id } = req.params;
 
   try {
@@ -254,27 +255,44 @@ router.get('/:id/render', async (req, res) => {
     if (!found.success) return res.status(404).json(found);
 
     const version = cardVersion(found.data);
-    const key = `${id}:${format}`;
+    // 'frames' returns a set of still PNGs (rest pose + orbit poses) instead of
+    // a stitched clip — cheap previews an agent can look at one by one.
+    const count = format === 'frames'
+      ? Math.max(1, Math.min(8, parseInt(req.query.count, 10) || 4))
+      : null;
+    const key = format === 'frames' ? `${id}:frames:${count}` : `${id}:${format}`;
 
     const cached = renderCache.get(key);
     const fresh = cached && cached.version === version &&
       (Date.now() - cached.at) < RENDER_CACHE_TTL_MS;
     if (fresh) {
-      return res.json({ success: true, data: { url: cached.url, format } });
+      return res.json({ success: true, data: { ...cached.payload, format } });
     }
 
     if (!renderInFlight.has(key)) {
       const job = (async () => {
-        const buffer = await renderCard(id, { format });
-        const { url } = await storeBuffer(buffer, MIME[format], `card_${id}`, { prefix: 'renders' });
-        renderCache.set(key, { url, version, at: Date.now() });
-        return { url };
+        let payload;
+        if (format === 'frames') {
+          const buffers = await renderStills(id, { count });
+          const urls = [];
+          for (let i = 0; i < buffers.length; i++) {
+            const { url } = await storeBuffer(buffers[i], MIME.png, `card_${id}_still${i}`, { prefix: 'renders' });
+            urls.push(url);
+          }
+          payload = { urls };
+        } else {
+          const buffer = await renderCard(id, { format });
+          const { url } = await storeBuffer(buffer, MIME[format], `card_${id}`, { prefix: 'renders' });
+          payload = { url };
+        }
+        renderCache.set(key, { payload, version, at: Date.now() });
+        return payload;
       })().finally(() => renderInFlight.delete(key));
       renderInFlight.set(key, job);
     }
 
-    const { url } = await renderInFlight.get(key);
-    res.json({ success: true, data: { url, format } });
+    const payload = await renderInFlight.get(key);
+    res.json({ success: true, data: { ...payload, format } });
   } catch (error) {
     console.error('Error rendering card:', error);
     res.status(500).json({ success: false, error: 'Failed to render card' });
@@ -301,7 +319,10 @@ router.post('/', requireAuth, async (req, res) => {
 // Protected fields a card owner cannot rewrite through a generic update.
 const PROTECTED_CARD_FIELDS = ['id', 'creator_id', 'created_at'];
 
-// Update a card. Requires auth and ownership.
+// Update a card. Requires auth and ownership. Accepts the same camelCase
+// fields as /publish (name, stateData, tier, rarityScore, tags) — a re-design
+// of a card you already staked, so no new charge. Embedded data-URL images are
+// offloaded to storage exactly like publish does.
 router.put('/:id', requireAuth, async (req, res) => {
   try {
     const existing = memoryDb.getCardById(req.params.id);
@@ -309,12 +330,38 @@ router.put('/:id', requireAuth, async (req, res) => {
     if (existing.creator_id !== req.user.id) {
       return res.status(403).json({ success: false, error: 'Not your card' });
     }
-    const updateData = { ...(req.body || {}) };
+
+    const { name, stateData, tier: tierKey, rarityScore, tags, ...rest } = req.body || {};
+    const updateData = { ...rest };
     for (const field of PROTECTED_CARD_FIELDS) delete updateData[field];
+
+    if (name !== undefined) updateData.name = name;
+    if (tags !== undefined) updateData.tags = tags;
+
+    if (tierKey !== undefined) {
+      const tier = getTier(tierKey);
+      if (!tier) return res.status(400).json({ success: false, error: `Unknown tier: ${tierKey}` });
+      updateData.tier = tier.key;
+    }
+    if (rarityScore !== undefined) {
+      const tier = getTier(updateData.tier || existing.tier);
+      const [low, high] = tier ? tier.scoreRange : [0, 1];
+      updateData.rarity_score = Math.min(high, Math.max(low, rarityScore));
+    }
+    if (stateData !== undefined) {
+      if (!stateData || typeof stateData !== 'object') {
+        return res.status(400).json({ success: false, error: 'stateData must be an object' });
+      }
+      const { value: offloadedState, stored } = await offloadImages(stateData, req.user.username);
+      updateData.state_data = offloadedState;
+      if (stored.length) {
+        updateData.image_keys = [...(existing.image_keys || []), ...stored.map(s => s.key)];
+      }
+    }
 
     const result = await Card.update(req.params.id, updateData);
     if (result.success) {
-      res.json(result);
+      res.json({ success: true, data: { card: result.data, stats: cardStats(result.data) } });
     } else {
       res.status(404).json(result);
     }

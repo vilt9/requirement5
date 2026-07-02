@@ -260,6 +260,53 @@ const main = async () => {
   }
   await page.screenshot({ path: path.join(SHOTS, '1_after_sweep.png'), fullPage: true });
 
+  // Phase 2b: pixel truth. The DOM sweep proves a control's value reaches the
+  // card, not that pixels change (an invalid CSS filter once nulled saturation
+  // AND contrast while every DOM diff passed). Measure actual card pixels for
+  // the artwork filter: saturation 0 must drain color vs saturation 2.
+  console.log('\n— phase 2b: pixel check (artwork saturation) —');
+  await selectTab('image');
+  const setByLabel = (name, v) => page.evaluate(([name, v]) => {
+    const lab = [...document.querySelectorAll('.controls-inner label')].find(l => l.textContent.trim() === name);
+    let g = lab?.parentElement, el = null;
+    for (let i = 0; i < 5 && g && !el; i++) { el = g.querySelector('input[type=range]'); g = g.parentElement; }
+    if (!el) return false;
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, v);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  }, [name, v]);
+  const cardChroma = async () => {
+    // The card animates forever by design — element screenshots never settle,
+    // so clip a fixed page region over the artwork instead.
+    const box = await page.locator('.card-scene').first().boundingBox();
+    const clip = { x: box.x + box.width * 0.25, y: box.y + box.height * 0.25, width: box.width * 0.5, height: box.height * 0.4 };
+    const buf = await page.screenshot({ clip });
+    return page.evaluate(async (b64) => {
+      const im = new Image();
+      im.src = 'data:image/png;base64,' + b64;
+      await im.decode();
+      const c = document.createElement('canvas');
+      c.width = im.width; c.height = im.height;
+      const ctx = c.getContext('2d');
+      ctx.drawImage(im, 0, 0);
+      const d = ctx.getImageData(0, 0, c.width, c.height).data;
+      let sum = 0, n = 0;
+      for (let i = 0; i < d.length; i += 40) { sum += Math.max(d[i], d[i + 1], d[i + 2]) - Math.min(d[i], d[i + 1], d[i + 2]); n++; }
+      return sum / n;
+    }, buf.toString('base64'));
+  };
+  if (await setByLabel('Color Saturation', '0')) {
+    await page.waitForTimeout(450);
+    const drained = await cardChroma();
+    await setByLabel('Color Saturation', '2');
+    await page.waitForTimeout(450);
+    const vivid = await cardChroma();
+    report('pixels · Color Saturation', `chroma ${drained.toFixed(0)} @0 vs ${vivid.toFixed(0)} @2`, vivid - drained > 15);
+    await setByLabel('Color Saturation', '1');
+  } else {
+    report('pixels · Color Saturation', 'find slider', false, 'label not found');
+  }
+
   // Phase 3: color pickers (react-color portals), per tab.
   console.log('\n— phase 3: color pickers —');
   const closePicker = async () => {

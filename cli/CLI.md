@@ -52,6 +52,10 @@ with `r5c balance` / `r5c transactions`.
 
 ### Cards
 - `r5c publish <spec.json> [--open] [--json]` — build and publish a card; prints its URL
+- `r5c update <id> <spec.json>` — re-design a card you own from a spec (no new stake)
+- `r5c preview <id> [--frames N] [--out <dir>]` — capture still PNGs of the live
+  card (one at rest, the others mid-orbit with the holo awake) — the agent-friendly
+  way to *look at* a card between updates
 - `r5c template [minimal|full]` — print an example spec to start from
 - `r5c get <id>` — full card record as JSON
 - `r5c list [--mine]` — community pool, or your published cards
@@ -165,6 +169,16 @@ Blend modes anywhere a `blendMode` appears: `normal`, `color-dodge`,
 `difference`, `exclusion`, `hue`, `saturation`, `color`, `luminosity`.
 
 ## Agent recipes
+
+The design-iterate loop — publish once, then look/adjust/update until it's right:
+
+```bash
+id=$(r5c publish card.json --json | jq -r .card.id)
+r5c preview "$id" --out shots/     # 4 PNGs: rest pose + 3 orbit poses
+# inspect shots/, edit card.json, then:
+r5c update "$id" card.json
+r5c preview "$id" --out shots/     # fresh frames (cache keys on card version)
+```
 
 Non-interactive end-to-end, no stored state:
 

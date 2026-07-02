@@ -81,7 +81,7 @@ describe('card CRUD', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ name: 'Renamed' });
     expect(updated.status).toBe(200);
-    expect(updated.body.data.name).toBe('Renamed');
+    expect(updated.body.data.card.name).toBe('Renamed');
 
     const deleted = await request(app)
       .delete(`/api/cards/${card.id}`)
@@ -116,7 +116,7 @@ describe('card CRUD', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ name: 'Renamed', creator_id: 'someone_else' });
     expect(res.status).toBe(200);
-    expect(res.body.data.creator_id).toBe(userId);
+    expect(res.body.data.card.creator_id).toBe(userId);
   });
 
   test('GET /search/:property/:value searches state and fields', async () => {

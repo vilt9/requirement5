@@ -18,6 +18,8 @@ ACCOUNT
 
 CARDS
   publish <spec.json> [--open] [--json]        Build + publish a card from a spec file (stake: 10 /t26)
+  update <id> <spec.json> [--json]             Re-design a card you own from a spec (no new stake)
+  preview <id> [--frames N] [--out <dir>]      Capture still PNGs of the live card (rest + orbit poses)
   template [minimal|full]                      Print an example spec to start from
   get <id>                                     Fetch a card as JSON
   list [--mine]                                List community cards (or your published cards)
@@ -122,6 +124,28 @@ Prints the card's public URL. --open additionally opens it in the browser.
 
 See \`r5c help spec\` for the spec format and \`r5c template full\` for a
 maximal example.`,
+  update: `r5c update <id> <spec.json> [--json]
+
+Rebuilds a card YOU created from the spec file and replaces its design —
+name, tier, tags, images, every visual parameter. No new stake: you already
+paid to publish it. The spec is expanded exactly like \`r5c publish\`, so the
+iterate loop is:
+
+  r5c publish card.json          # first version (prints the id)
+  r5c preview <id> --out shots/  # look at it
+  # edit card.json...
+  r5c update <id> card.json      # same card, new design
+  r5c preview <id> --out shots/  # look again (fresh frames after updates)`,
+  preview: `r5c preview <id> [--frames N] [--out <dir>] [--json]
+
+Captures still PNGs of the LIVE card — one at rest (holo dormant) and N-1
+poses along the tilt orbit with the holo awake — and prints their URLs.
+With --out the frames are downloaded as <dir>/<id>_frameN.png, ready for an
+agent (or a human) to look at. N defaults to 4, max 8.
+
+Much cheaper than \`r5c render\` and made for design iteration: publish or
+update, preview the frames, adjust the spec, update again. Frames re-capture
+automatically after an update (the cache is keyed to the card's version).`,
   template: `r5c template [minimal|full]
 
 Prints an example card spec as JSON, ready to save and edit:

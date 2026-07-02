@@ -893,9 +893,11 @@ export const CardImage = styled.div`
     object-position: center;
     transition: opacity 0.3s ease, transform 0.3s ease-out;
     mix-blend-mode: var(--image-blend, normal);
-    /* Apply opacity, contrast and saturation via CSS variables */
+    /* Apply opacity, contrast and saturation via CSS variables. NOTE: no
+       trailing free-form var() here — a fallback of "none" in a filter list
+       makes the whole declaration invalid and silently disables all of it. */
     opacity: var(--image-opacity, 1);
-    filter: contrast(var(--image-contrast, 1)) saturate(var(--image-saturation, 1)) var(--image-filter, none);
+    filter: contrast(var(--image-contrast, 1)) saturate(var(--image-saturation, 1));
     /* Parallax depth: at rest only the slight scale applies (so the image can
        shift on tilt without exposing edges). --parallax-depth 0 = no effect. */
     transform: scale(calc(1 + var(--parallax-depth, 0) * 0.07));

@@ -187,4 +187,46 @@ export const renderCard = async (id, { format = 'gif', ...opts } = {}) => {
   }
 };
 
-export const MIME = { gif: 'image/gif', mp4: 'video/mp4' };
+// Capture `count` still PNGs of the card: one at rest, the others along the
+// same orbit the GIF uses, holo awake. Cheap relative to a full render (no
+// ffmpeg, ~a dozen frames instead of ~130) — meant for agents that want to
+// SEE a card (or a draft) without pulling a whole GIF apart.
+export const renderStills = async (id, { count = 4, settleMs = 250 } = {}) => {
+  const n = Math.max(1, Math.min(8, count));
+  const browser = await getBrowser();
+  const context = await browser.newContext({
+    viewport: { width: FRAME.width, height: FRAME.height },
+    deviceScaleFactor: 2
+  });
+  const page = await context.newPage();
+
+  try {
+    await page.goto(`${BASE_URL}/capture/${id}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForFunction(() => window.__captureReady === true, { timeout: 20000 });
+
+    const frame = page.locator('#capture-frame');
+    const scene = page.locator('.card-scene');
+    const box = await scene.boundingBox();
+    if (!box) throw new Error('card scene not found on capture page');
+
+    const buffers = [];
+    // Still 1: at rest — pointer off the card, holo dormant.
+    await page.mouse.move(2, 2);
+    await page.waitForTimeout(settleMs);
+    buffers.push(await frame.screenshot());
+
+    // Remaining stills: poses along the orbit, holo awake. Spread over one
+    // loop, skipping t=0 so the first orbit pose differs from rest visibly.
+    for (let i = 1; i < n; i++) {
+      const { x, y } = poseFor((i / n) * 0.9 + 0.05, box);
+      await page.mouse.move(x, y);
+      await page.waitForTimeout(settleMs);
+      buffers.push(await frame.screenshot());
+    }
+    return buffers;
+  } finally {
+    await context.close().catch(() => {});
+  }
+};
+
+export const MIME = { gif: 'image/gif', mp4: 'video/mp4', png: 'image/png' };
