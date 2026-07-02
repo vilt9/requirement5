@@ -17,7 +17,10 @@ const GenerateGate = () => {
     if (loading || ran.current) return; // wait for the session restore
     ran.current = true;
     const entry = nextCard();
-    navigate(`/card/${entry.id}`, { replace: true, state: { discovered: entry.discovered } });
+    navigate(`/card/${entry.id}`, {
+      replace: true,
+      state: { discovered: entry.discovered, earned: entry.earned }
+    });
   }, [loading, nextCard, navigate]);
 
   return (

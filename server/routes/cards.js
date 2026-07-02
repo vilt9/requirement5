@@ -1,7 +1,8 @@
 import express from 'express';
 import Card from '../models/Card.js';
 import { memoryDb } from '../config/database.js';
-import { getTier, saveCost, ECONOMY, dividendFor, saveValue, normalizeProvenance, round1, tierForScore } from '../services/economy.js';
+import crypto from 'node:crypto';
+import { getTier, saveCostFor, saveValueFor, dividendFor, rollPublishStake, normalizeProvenance, round6, tierForScore } from '../services/economy.js';
 import { absorb, issue, InsufficientFundsError } from '../services/ledger.js';
 import { cardStats } from '../services/drawEngine.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -31,7 +32,10 @@ router.post('/publish', requireAuth, async (req, res) => {
 
     const { value: offloadedState, stored } = await offloadImages(stateData, req.user.username);
 
-    absorb(req.user.id, 'publish_stake', ECONOMY.PUBLISH_STAKE);
+    // The stake is rolled per publish within its band — small, and a little
+    // different every time.
+    const stake = rollPublishStake();
+    absorb(req.user.id, 'publish_stake', stake);
 
     const result = await Card.create({
       name: name || 'Untitled card',
@@ -53,7 +57,7 @@ router.post('/publish', requireAuth, async (req, res) => {
       data: {
         card,
         stats: cardStats(card),
-        stake: ECONOMY.PUBLISH_STAKE,
+        stake,
         balance: memoryDb.getUserById(req.user.id).balance,
         imagesStored: stored.length
       }
@@ -79,19 +83,14 @@ router.post('/:id/save', requireAuth, async (req, res) => {
       return res.status(409).json({ success: false, error: 'Already in your collection' });
     }
 
-    // Every public card is saveable. Untiered legacy customs are priced by their
-    // rarity (falling back to common) rather than refused — so the save flow, which
-    // doubles as our signup hook, never dead-ends on a card the pool happens to hold.
-    const tierKey = card.tier
-      || tierForScore(card.rarity_score ?? card.state_data?.customCard?.rarity ?? 0).key;
-
     // How the saver reached this card. 'discovered' (pressed Generate) is worth
     // more than 'direct' (opened a shared link). Defaults to 'discovered' so the
-    // existing generate→save flow is unchanged.
+    // existing generate→save flow is unchanged. The price is the card's own —
+    // seeded from its id, independent of rarity.
     const provenance = normalizeProvenance(req.body?.provenance);
-    const cost = saveCost(tierKey);
-    const dividend = dividendFor(tierKey, provenance);
-    const value = saveValue(tierKey, provenance);
+    const cost = saveCostFor(card.id);
+    const dividend = dividendFor(card.id, provenance);
+    const value = saveValueFor(card.id, provenance);
 
     absorb(req.user.id, 'save', cost, { card_id: card.id });
     // Dividend leaves the absorbed pot and goes to the creator, if they exist.
@@ -115,7 +114,7 @@ router.post('/:id/save', requireAuth, async (req, res) => {
         dividend,
         value,
         provenance,
-        cloudShare: round1(cost - dividend),
+        cloudShare: round6(cost - dividend),
         balance: memoryDb.getUserById(req.user.id).balance,
         stats: cardStats(memoryDb.getCardById(card.id))
       }
@@ -136,40 +135,35 @@ router.post('/:id/save', requireAuth, async (req, res) => {
 // uuid is claimed — the shared /card/<uuid> URL keeps working, now DB-backed.
 router.post('/save-synthetic', requireAuth, async (req, res) => {
   try {
-    const { id, name, stateData, tier: tierKey, tags } = req.body || {};
-    const tier = getTier(tierKey);
-    if (!tier) {
-      return res.status(400).json({ success: false, error: `Unknown tier: ${tierKey}` });
-    }
+    const { id, name, stateData, tags } = req.body || {};
     if (!stateData || typeof stateData !== 'object') {
       return res.status(400).json({ success: false, error: 'stateData is required' });
     }
     // Claim the requested uuid if it's sane and free (first save wins; a second
-    // saver of the same shared card gets a fresh id).
+    // saver of the same shared card gets a fresh id). The id is settled BEFORE
+    // charging: the card's own id seeds its price.
     const requestedId = typeof id === 'string' && /^[0-9a-f-]{10,64}$/i.test(id) && !memoryDb.getCardById(id)
       ? id : undefined;
+    const finalId = requestedId || crypto.randomUUID();
 
-    const cost = saveCost(tier.key);
+    const cost = saveCostFor(finalId);
     absorb(req.user.id, 'save', cost);
 
     const { value: offloadedState } = await offloadImages(stateData, req.user.username);
     const result = await Card.create({
-      id: requestedId,
+      id: finalId,
       name: name || 'Synthetic draw',
       stateData: offloadedState,
       creatorId: 'cloud',
       isPublic: false,
       tags: tags || stateData?.customCard?.tags || []
     });
-    // The user picked the tier at save time — clamp the generated rarity into
-    // that band so the stored score and tier agree.
-    const [low, high] = tier.scoreRange;
+    // The card keeps its NATURAL rarity — price and rarity are decoupled, so a
+    // rare-looking card can be cheap to claim (the diamond in the rough).
     const rawScore = Number(stateData?.customCard?.rarity);
-    const score = Number.isFinite(rawScore)
-      ? Math.min(high, Math.max(low, rawScore))
-      : Math.round(((low + high) / 2) * 1000) / 1000;
+    const score = Number.isFinite(rawScore) ? Math.max(0, Math.min(1, rawScore)) : 0.35;
     const card = memoryDb.updateCard(result.data.id, {
-      tier: tier.key,
+      tier: tierForScore(score).key,
       rarity_score: score,
       times_saved: 1
     });
@@ -261,18 +255,25 @@ const RENDER_CACHE_TTL_MS = 10 * 24 * 60 * 60 * 1000; // 10 days (< the 14-day e
 const cardVersion = (card) => card?.updated_at || card?.updatedAt || '';
 
 // Ensure a render exists for (card, format), sharing the cache and in-flight
-// dedupe. Returns { payload, card } or { notFound: true }.
+// dedupe. Returns { payload, card } or { notFound: true }. An unclaimed
+// uuid-ish id still renders: the capture page generates the card from its
+// seed, the same way the share page shows it before anyone saves it.
 const ensureRender = async (id, format, count) => {
   const found = await Card.findById(id);
-  if (!found.success) return { notFound: true, found };
+  if (!found.success) {
+    if (!/^[0-9a-f-]{10,64}$/i.test(id)) return { notFound: true, found };
+    return ensureRenderJob(id, format, count, 'seed', { name: `Draw ${id.slice(0, 8)}` });
+  }
+  return ensureRenderJob(id, format, count, cardVersion(found.data), found.data);
+};
 
-  const version = cardVersion(found.data);
+const ensureRenderJob = async (id, format, count, version, card) => {
   const key = format === 'frames' ? `${id}:frames:${count}` : `${id}:${format}`;
 
   const cached = renderCache.get(key);
   const fresh = cached && cached.version === version &&
     (Date.now() - cached.at) < RENDER_CACHE_TTL_MS;
-  if (fresh) return { payload: cached.payload, card: found.data };
+  if (fresh) return { payload: cached.payload, card };
 
   if (!renderInFlight.has(key)) {
     const job = (async () => {
@@ -297,7 +298,7 @@ const ensureRender = async (id, format, count) => {
   }
 
   const payload = await renderInFlight.get(key);
-  return { payload, card: found.data };
+  return { payload, card };
 };
 
 router.get('/:id/render', async (req, res) => {

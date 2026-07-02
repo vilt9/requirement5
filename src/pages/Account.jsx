@@ -4,6 +4,7 @@ import styled from 'styled-components';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
 import { Page, Panel, Row, PillButton, TextInput, Divider, Dim, ErrorText } from '../components/UI';
+import { fmtT26 } from '../utils/economyRandom';
 
 const TXN_LABELS = {
   grant: 'Signup grant',
@@ -102,8 +103,8 @@ const Account = () => {
     <Page>
       <Panel>
         Account: {user.username}<br />
-        Balance: <b>{user.balance} /t26</b><br />
-        Yield remaining today: {yieldRemaining ?? '—'} /t26 <Dim>(cap {config?.dailyYieldCap} /t26 per day)</Dim><br />
+        Balance: <b>{fmtT26(user.balance)} /t26</b><br />
+        Yield remaining today: {yieldRemaining != null ? fmtT26(yieldRemaining) : '—'} /t26 <Dim>(cap {config?.dailyYieldCap} /t26 per day)</Dim><br />
         Erosion: suppressed on this platform
         <Divider />
         Your cards: <Link to="/collection">creations &amp; collection</Link>
@@ -125,9 +126,9 @@ const Account = () => {
               {txn.capped ? <Dim> · daily cap reached</Dim> : null}
             </span>
             <span className="amount" style={{ color: txn.amount > 0 ? '#21e985' : txn.amount < 0 ? '#ff6b6b' : '#888' }}>
-              {txn.amount > 0 ? '+' : ''}{txn.amount}
+              {txn.amount > 0 ? '+' : ''}{fmtT26(txn.amount)}
             </span>
-            <span className="after"><Dim>{txn.balance_after}</Dim></span>
+            <span className="after"><Dim>{fmtT26(txn.balance_after)}</Dim></span>
           </LedgerLine>
         ))}
       </Panel>
@@ -141,7 +142,7 @@ const LedgerLine = styled.div`
   padding: 2px 0;
   .when { color: var(--amber-dim); flex-shrink: 0; }
   .what { flex: 1; }
-  .amount { width: 7ch; text-align: right; flex-shrink: 0; }
+  .amount { width: 11ch; text-align: right; flex-shrink: 0; }
   .after { width: 8ch; text-align: right; flex-shrink: 0; }
 `;
 

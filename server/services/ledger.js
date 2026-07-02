@@ -2,7 +2,7 @@
 // user row; every transaction records balance_after. The cloud is the system
 // treasury: credits from it count as issuance, payments to it as absorption.
 import { memoryDb } from '../config/database.js';
-import { round1, ECONOMY } from './economy.js';
+import { round6, ECONOMY } from './economy.js';
 
 const todayUTC = () => new Date().toISOString().slice(0, 10);
 
@@ -19,8 +19,8 @@ export class InsufficientFundsError extends Error {
 export const issue = (userId, type, amount, meta = {}) => {
   const user = memoryDb.getUserById(userId);
   if (!user) throw new Error(`Unknown user: ${userId}`);
-  const value = round1(amount);
-  const balance = round1(user.balance + value);
+  const value = round6(amount);
+  const balance = round6(user.balance + value);
   memoryDb.updateUser(userId, { balance });
   memoryDb.cloudIssue(value);
   return memoryDb.createTransaction({
@@ -32,9 +32,9 @@ export const issue = (userId, type, amount, meta = {}) => {
 export const absorb = (userId, type, amount, meta = {}) => {
   const user = memoryDb.getUserById(userId);
   if (!user) throw new Error(`Unknown user: ${userId}`);
-  const value = round1(amount);
+  const value = round6(amount);
   if (user.balance < value) throw new InsufficientFundsError(user.balance, value);
-  const balance = round1(user.balance - value);
+  const balance = round6(user.balance - value);
   memoryDb.updateUser(userId, { balance });
   memoryDb.cloudAbsorb(value);
   return memoryDb.createTransaction({
@@ -47,10 +47,10 @@ export const transfer = (fromUserId, toUserId, type, amount, meta = {}) => {
   const from = memoryDb.getUserById(fromUserId);
   const to = memoryDb.getUserById(toUserId);
   if (!from) throw new Error(`Unknown user: ${fromUserId}`);
-  const value = round1(amount);
+  const value = round6(amount);
   if (from.balance < value) throw new InsufficientFundsError(from.balance, value);
 
-  const fromBalance = round1(from.balance - value);
+  const fromBalance = round6(from.balance - value);
   memoryDb.updateUser(fromUserId, { balance: fromBalance });
   const debit = memoryDb.createTransaction({
     user_id: fromUserId, type, amount: -value, balance_after: fromBalance,
@@ -59,7 +59,7 @@ export const transfer = (fromUserId, toUserId, type, amount, meta = {}) => {
 
   // Creator may have deleted their account or be 'anonymous'; the amount is absorbed then.
   if (to) {
-    const toBalance = round1(to.balance + value);
+    const toBalance = round6(to.balance + value);
     memoryDb.updateUser(toUserId, { balance: toBalance });
     memoryDb.createTransaction({
       user_id: toUserId, type: 'dividend', amount: value, balance_after: toBalance,
@@ -78,12 +78,12 @@ export const creditDrawYield = (userId, fullAmount, meta = {}) => {
 
   const day = todayUTC();
   const usedToday = user.yield_day === day ? user.yield_today : 0;
-  const remaining = Math.max(0, round1(ECONOMY.DAILY_YIELD_CAP - usedToday));
-  const credited = round1(Math.min(fullAmount, remaining));
+  const remaining = Math.max(0, round6(ECONOMY.DAILY_YIELD_CAP - usedToday));
+  const credited = round6(Math.min(fullAmount, remaining));
 
   memoryDb.updateUser(userId, {
     yield_day: day,
-    yield_today: round1(usedToday + credited)
+    yield_today: round6(usedToday + credited)
   });
 
   if (credited > 0) {
@@ -101,5 +101,5 @@ export const creditDrawYield = (userId, fullAmount, meta = {}) => {
 
 export const yieldRemainingToday = (user) => {
   const usedToday = user.yield_day === todayUTC() ? user.yield_today : 0;
-  return Math.max(0, round1(ECONOMY.DAILY_YIELD_CAP - usedToday));
+  return Math.max(0, round6(ECONOMY.DAILY_YIELD_CAP - usedToday));
 };

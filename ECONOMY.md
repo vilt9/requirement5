@@ -34,32 +34,32 @@ Rarity score ranges match the bands already used by the renderer.
 
 ## Amounts
 
-All amounts derive from the tier multiplier `m`:
+Amounts are **per-card and decoupled from rarity**. Every card rolls its own price
+from its id: a bell-shaped roll mapped across a wide band on a log scale (most cards
+land near the band's geometric middle; the tails are rare but real). Deterministic —
+the same card id always prices the same, client and server agree exactly.
 
-| Action            | Amount        | Common | Holo | Galaxy | Wowa | Ultra | Vmax |
-|-------------------|---------------|--------|------|--------|------|-------|------|
-| Generate yield    | 1 × m         | 1      | 2    | 5      | 9    | 18    | 40   |
-| Save cost         | 4 × m         | 4      | 8    | 20     | 36   | 72    | 160  |
-| Creator dividend  | 20% of cost   | 0.8    | 1.6  | 4      | 7.2  | 14.4  | 32   |
-| Returns to cloud  | 80% of cost   | 3.2    | 6.4  | 16     | 28.8 | 57.6  | 128  |
+| Action            | Band            | Typical (median) |
+|-------------------|-----------------|------------------|
+| Generate yield    | 0.002 – 1.8     | ≈ 0.06           |
+| Save cost         | 1.5 – 48        | ≈ 8.5            |
+| Creator dividend  | 20% of the card's save cost | ≈ 1.7 |
+| Publish stake     | 1 – 4 (rolled at publish)   | ≈ 2   |
 
 Fixed amounts:
 
 - Starting grant on signup: **50 /t26** (from the cloud).
-- Publish stake: **10 /t26** to publish a card into the pool (anti-spam; absorbed by the cloud).
 - Daily yield cap: **100 /t26 per day** from generating. Past the cap you can keep
   drawing — draws are never blocked — but they yield 0 until the next day (UTC).
 
-Expected yield per draw ≈ 1.18 /t26, so the cap bites at roughly 85 draws/day.
-
 ## Why these numbers hold up
 
-- **Saving is a real decision.** A save costs ~3.4 draws' worth of average earnings per
-  multiplier unit. You cannot save everything you like; the collection means something.
-- **Creators are paid in proportion to scarcity.** A Vmax card pays its creator 32 /t26
-  per save but appears 1 draw in 2,000; a common pays 0.8 but circulates constantly.
-  Expected dividend income is roughly flat across tiers — creators should pick the tier
-  that fits the card, not the tier that pays.
+- **Saving is a real decision.** The median save costs ~140 draws' worth of median
+  yield. You cannot save everything you like; the collection means something. The
+  starting grant funds the first few saves.
+- **Rarity ≠ price is the point.** A rare-looking card can be cheap to claim — the
+  diamond in the rough — and an ordinary card can carry a surprising price. Price is
+  discovered per card, not read off a tier table.
 - **The cloud is the main sink.** 80% of every save plus every publish stake leaves
   circulation. An engaged user who saves regularly is roughly currency-neutral; pure
   generators accumulate slowly up to the daily cap.
@@ -80,7 +80,7 @@ every transaction records `balance_after`. Transaction types:
 - `dividend` — credit to a card's creator when someone saves their card
 - `publish_stake` — debit for publishing a card to the pool
 
-All amounts are rounded to one decimal place (/t26 has a smallest unit of 0.1).
+All amounts are rounded to six decimal places (/t26 has a smallest unit of 0.000001).
 
 ## The draw
 

@@ -1,6 +1,7 @@
 import {
-  TIERS, ECONOMY, getTier, tierForScore, rollTier,
-  drawYield, saveCost, creatorDividend, cloudShare, round1, economyConfig
+  TIERS, ECONOMY, getTier, tierForScore, rollTier, PRICE_BANDS,
+  saveCostFor, drawYieldFor, rollPublishStake, creatorDividendFor,
+  saveValueFor, dividendFor, round6, economyConfig
 } from '../services/economy.js';
 
 describe('economy tiers', () => {
@@ -63,23 +64,48 @@ describe('economy tiers', () => {
   });
 });
 
-describe('economy amounts', () => {
-  test('yields, costs and dividends derive from multipliers', () => {
-    expect(drawYield('common')).toBe(1);
-    expect(drawYield('vmax')).toBe(40);
-    expect(saveCost('common')).toBe(4);
-    expect(saveCost('galaxy')).toBe(20);
-    expect(saveCost('vmax')).toBe(160);
-    expect(creatorDividend('common')).toBe(0.8);
-    expect(creatorDividend('galaxy')).toBe(4);
-    expect(creatorDividend('vmax')).toBe(32);
+describe('economy amounts (per-card pricing)', () => {
+  test('prices are deterministic per id and stay inside their bands', () => {
+    const ids = Array.from({ length: 500 }, (_, i) => `card-${i}-abcdef`);
+    for (const id of ids) {
+      const cost = saveCostFor(id);
+      expect(cost).toBe(saveCostFor(id)); // same id → same price, always
+      expect(cost).toBeGreaterThanOrEqual(PRICE_BANDS.saveCost[0]);
+      expect(cost).toBeLessThanOrEqual(PRICE_BANDS.saveCost[1]);
+
+      const y = drawYieldFor(id);
+      expect(y).toBe(drawYieldFor(id));
+      expect(y).toBeGreaterThanOrEqual(PRICE_BANDS.drawYield[0]);
+      expect(y).toBeLessThanOrEqual(PRICE_BANDS.drawYield[1]);
+    }
   });
 
-  test('dividend + cloud share equals the save cost for every tier', () => {
-    for (const tier of TIERS) {
-      expect(round1(creatorDividend(tier.key) + cloudShare(tier.key)))
-        .toBe(saveCost(tier.key));
+  test('prices actually vary between cards', () => {
+    const costs = new Set(Array.from({ length: 100 }, (_, i) => saveCostFor(`v-${i}`)));
+    expect(costs.size).toBeGreaterThan(50);
+  });
+
+  test('publish stake rolls inside its band', () => {
+    for (let i = 0; i < 200; i++) {
+      const stake = rollPublishStake();
+      expect(stake).toBeGreaterThanOrEqual(PRICE_BANDS.publishStake[0]);
+      expect(stake).toBeLessThanOrEqual(PRICE_BANDS.publishStake[1]);
     }
+  });
+
+  test('dividend is the dividend rate of the card price, scaled by provenance', () => {
+    const id = 'some-card-id-123';
+    const cost = saveCostFor(id);
+    const round2 = (n) => Math.round(n * 100) / 100;
+    expect(creatorDividendFor(id)).toBe(round2(cost * ECONOMY.DIVIDEND_RATE));
+    // provenance weight applies to the (already-rounded) dividend
+    expect(dividendFor(id, 'direct')).toBe(round2(creatorDividendFor(id) * 0.5));
+    expect(saveValueFor(id, 'discovered')).toBe(cost);
+    expect(saveValueFor(id, 'direct')).toBe(round2(cost * 0.5));
+  });
+
+  test('round6 keeps six decimals', () => {
+    expect(round6(0.1234567)).toBe(0.123457);
   });
 
   test('config exposes everything the frontend needs', () => {
@@ -90,6 +116,10 @@ describe('economy amounts', () => {
     expect(config.erosion).toBe('suppressed');
     const vmax = config.tiers.find(t => t.key === 'vmax');
     expect(vmax.odds).toBe(2000);
-    expect(vmax.saveCost).toBe(160);
+    expect(config.pricing.saveCost.min).toBe(PRICE_BANDS.saveCost[0]);
+    expect(config.pricing.saveCost.max).toBe(PRICE_BANDS.saveCost[1]);
+    expect(config.pricing.drawYield.max).toBe(PRICE_BANDS.drawYield[1]);
+    expect(config.pricing.publishStake.min).toBe(PRICE_BANDS.publishStake[0]);
+    expect(config.pricing.dividendRate).toBe(ECONOMY.DIVIDEND_RATE);
   });
 });

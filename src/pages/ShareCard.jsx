@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { api, ApiError, apiBase } from '../utils/api';
 import { poolCardToCardData, asOdds } from '../utils/poolCard';
 import { scoreCard, generateCardAttributes } from '../utils/cardGenerator';
+import { saveCostFor, fmtT26 } from '../utils/economyRandom';
 import { prefetchedCards } from '../utils/drawQueue';
 import { HOLO_NAMES } from '../utils/holoNames';
 import { useScrollBloom } from '../utils/useScrollBloom';
@@ -25,8 +26,10 @@ const ShareCard = () => {
   const location = useLocation();
   const { user, config, setBalance, refreshBalance, nextCard } = useAuth();
 
-  // Reached via the Generate button this session? Lives in router state, never the URL.
+  // Reached via the Generate button this session? Lives in router state, never
+  // the URL. `earned` is the /t26 the generate paid — flashed on arrival.
   const discovered = !!location.state?.discovered;
+  const earned = location.state?.earned ?? null;
 
   const [card, setCard] = useState(null);
   const [rarities, setRarities] = useState(null); // every card's authentic rarity → percentile, pool composition
@@ -35,7 +38,6 @@ const ShareCard = () => {
   const [busy, setBusy] = useState(false);
   const [saveResult, setSaveResult] = useState(null); // { value, provenance } | 'exists'
   const [saveError, setSaveError] = useState(null);
-  const [tierIdx, setTierIdx] = useState(0); // synthetic save: user-chosen tier (slider)
   const scrolling = useScrollBloom(); // colour values bloom into their colour while scrolling
   const [rendering, setRendering] = useState(null); // 'gif' | 'mp4' while a moving image renders
   const [renderError, setRenderError] = useState(null);
@@ -138,23 +140,27 @@ const ShareCard = () => {
   // (not replaced) so Back walks through the cards you've seen.
   const generate = useCallback(() => {
     const entry = nextCard();
-    navigate(`/card/${entry.id}`, { state: { discovered: entry.discovered } });
+    navigate(`/card/${entry.id}`, {
+      state: { discovered: entry.discovered, earned: entry.earned }
+    });
   }, [nextCard, navigate]);
 
-  // Tiers commonest → rarest; the synthetic-save slider indexes into this.
+  // Tiers commonest → rarest (the ladder shown in the details).
   const orderedTiers = (config?.tiers || []).slice().sort((a, b) => a.scoreRange[0] - b.scoreRange[0]);
-  const chosenTier = orderedTiers[Math.min(tierIdx, Math.max(0, orderedTiers.length - 1))] || null;
 
-  const save = useCallback(async (tierKeyOverride, discoveredOverride) => {
+  // The card's own price — seeded from its id, independent of rarity. The
+  // server computes the identical number, so this is exactly what's charged.
+  const cardPrice = saveCostFor(id);
+
+  const save = useCallback(async (discoveredOverride) => {
     const synthetic = !!card?.synthetic;
-    const tierKey = tierKeyOverride || chosenTier?.key || 'common';
     const isDiscovered = discoveredOverride ?? discovered;
     if (!user) {
       // The conversion moment: remember exactly what they wanted to save, send
       // them to create a free account, and finish the save when they're back.
       try {
         sessionStorage.setItem('r5c_pending_save', JSON.stringify({
-          id, synthetic, tierKey, discovered: isDiscovered
+          id, synthetic, discovered: isDiscovered
         }));
       } catch { /* storage blocked — they can press Save again after login */ }
       navigate('/account', { state: { intent: 'save', returnTo: location.pathname, discovered } });
@@ -169,7 +175,6 @@ const ShareCard = () => {
           body: {
             id,
             name: `Draw ${id.slice(0, 8)}`,
-            tier: tierKey,
             stateData: { customCard: card.state_data.customCard }
           }
         });
@@ -190,17 +195,7 @@ const ShareCard = () => {
       else setSaveError(err?.message || 'Could not save this card.');
     }
     setBusy(false);
-  }, [user, id, card, chosenTier, discovered, navigate, location.pathname, setBalance, refreshBalance]);
-
-  // A synthetic card's slider starts on its natural tier (from its generated
-  // rarity) — the user slides from there.
-  useEffect(() => {
-    if (!card?.synthetic || !config?.tiers) return;
-    const r = scoreCard(card.state_data?.customCard);
-    const sorted = config.tiers.slice().sort((a, b) => a.scoreRange[0] - b.scoreRange[0]);
-    const idx = sorted.findIndex(t => r >= t.scoreRange[0] && r <= t.scoreRange[1]);
-    setTierIdx(idx >= 0 ? idx : 0);
-  }, [card, config]);
+  }, [user, id, card, discovered, navigate, location.pathname, setBalance, refreshBalance]);
 
   // Finish a save that was interrupted by signup/login: the intent was parked
   // in sessionStorage before the redirect; the Account page sends them back.
@@ -210,7 +205,7 @@ const ShareCard = () => {
     try { pending = JSON.parse(sessionStorage.getItem('r5c_pending_save') || 'null'); } catch { /* ignore */ }
     if (!pending || pending.id !== id) return;
     sessionStorage.removeItem('r5c_pending_save');
-    save(pending.tierKey, pending.discovered);
+    save(pending.discovered);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, status, id]);
 
@@ -262,13 +257,10 @@ const ShareCard = () => {
   const cardData = poolCardToCardData(card);
   const tags = ensureTags(card.tags);
   const synthetic = !!card.synthetic;
-  const provenanceLabel = synthetic
-    ? (chosenTier ? `−${chosenTier.saveCost} /t26` : null)
-    : discovered ? 'Discovered Save' : 'Linked Save';
 
   const saved = saveResult && saveResult !== 'exists';
   const mainLabel = saveResult === 'exists' ? 'In collection ✓' : saved ? 'Saved ✓' : 'Save';
-  const subLabel = saveResult ? null : provenanceLabel;
+  const subLabel = saveResult ? null : `−${fmtT26(cardPrice)} /t26`;
 
   // The underlying generation parameters — what the customizer controls.
   const cc = card.state_data?.customCard || {};
@@ -317,6 +309,11 @@ const ShareCard = () => {
             </FadeSwap>
           )
           : <Panel><Dim>This card has no renderable data.</Dim></Panel>}
+        {/* The earn, made visible: floats up off the card and fades. Keyed on
+            the card id so every generate flashes anew. */}
+        {earned != null && (
+          <EarnFlash key={id} aria-hidden>+{fmtT26(earned)} /t26</EarnFlash>
+        )}
       </Hero>
 
       <Column>
@@ -328,60 +325,36 @@ const ShareCard = () => {
           {tags.length > 0 && <div className="tags"><TagList tags={tags} /></div>}
         </Meta>
 
-        {/* Synthetic saves let the saver pick how rare the card should be —
-            the slider walks the tier ladder; rarer tiers cost more to save.
-            Hidden while provisional (the server may yet reveal a stored card). */}
-        {synthetic && !provisional && !saveResult && orderedTiers.length > 0 && (
-          <TierSlider className="tier-slider">
-            <div className="row">
-              <span className="k">Save as:</span>
-              <b style={{ color: chosenTier?.color || 'var(--gold-bright)' }}>{chosenTier?.name}</b>
-              <Dim>· {chosenTier?.saveCost} /t26{chosenTier?.odds ? ` · appears at 1 : ${chosenTier.odds.toLocaleString()}` : ''}</Dim>
-            </div>
-            <input
-              type="range"
-              min={0}
-              max={orderedTiers.length - 1}
-              step={1}
-              value={Math.min(tierIdx, orderedTiers.length - 1)}
-              onChange={(e) => setTierIdx(Number(e.target.value))}
-            />
-          </TierSlider>
-        )}
+        {/* Generate + Save live in a fixed dock at the bottom of the screen —
+            always visible, so the next card is one tap away from anywhere. */}
+        <FixedDock className="card-actions">
+          <SaveButton onClick={generate} disabled={busy}>
+            <span className="main">{busy ? 'Working…' : 'Generate'}</span>
+            <span className="sub">{earned != null ? `+${fmtT26(earned)} /t26` : '+ /t26'}</span>
+          </SaveButton>
+          <SaveButton
+            $secondary
+            onClick={() => save()}
+            disabled={busy || provisional || saveResult === 'exists' || !!saveResult}
+          >
+            <span className="main">{mainLabel}</span>
+            {subLabel && <span className="sub">{subLabel}</span>}
+          </SaveButton>
+        </FixedDock>
 
-        {/* The action bar floats pinned to the bottom of the screen until its
-            natural spot scrolls into view, then locks into place (sticky). */}
-        <StickyActions className="card-actions">
-          <Actions>
-            <SaveButton onClick={generate} disabled={busy}>
-              <span className="main">{busy ? 'Working…' : 'Generate'}</span>
-              <span className="sub">earns +1 /t26</span>
-            </SaveButton>
-            <SaveButton
-              $secondary
-              onClick={() => save()}
-              disabled={busy || provisional || saveResult === 'exists' || !!saveResult}
-            >
-              <span className="main">{mainLabel}</span>
-              {subLabel && <span className="sub">{subLabel}</span>}
-            </SaveButton>
-            <PillButton $secondary onClick={copyLink}>
-              {copied ? 'Link copied ✓' : 'Copy link'}
-            </PillButton>
-          </Actions>
-
-          {/* Server-side rendering needs the card in the database. */}
-          {!synthetic && (
-            <Actions>
-              <PillButton $secondary onClick={() => download('gif')} disabled={!!rendering}>
-                {rendering === 'gif' ? 'Rendering…' : 'Download GIF'}
-              </PillButton>
-              <PillButton $secondary onClick={() => download('mp4')} disabled={!!rendering}>
-                {rendering === 'mp4' ? 'Rendering…' : 'Download MP4'}
-              </PillButton>
-            </Actions>
-          )}
-        </StickyActions>
+        {/* Secondary actions stay in the page flow. Unclaimed cards render
+            from their seed, so downloads work before a card is ever saved. */}
+        <Actions>
+          <PillButton $secondary onClick={copyLink}>
+            {copied ? 'Link copied ✓' : 'Copy link'}
+          </PillButton>
+          <PillButton $secondary onClick={() => download('gif')} disabled={!!rendering}>
+            {rendering === 'gif' ? 'Rendering…' : 'Download GIF'}
+          </PillButton>
+          <PillButton $secondary onClick={() => download('mp4')} disabled={!!rendering}>
+            {rendering === 'mp4' ? 'Rendering…' : 'Download MP4'}
+          </PillButton>
+        </Actions>
         {renderError && <Result $error>{renderError}</Result>}
 
         {saved && (
@@ -415,7 +388,9 @@ const ShareCard = () => {
           <Detail label="Class">{klass}</Detail>
           <Detail label="Draw weight">{drawWeight != null ? `${drawWeight.toExponential(2)} (${asOdds(drawWeight)})` : null}</Detail>
           <Detail label="Pool share">{poolShare != null ? `${(poolShare * 100).toFixed(1)}%` : null}</Detail>
-          <Detail label="Creator dividend">{tier?.creatorDividend != null ? `${tier.creatorDividend} per save` : null}</Detail>
+          <Detail label="Price">{`${fmtT26(cardPrice)} /t26`}</Detail>
+          <Detail label="Creator dividend">{config?.pricing?.dividendRate != null
+            ? `${fmtT26(cardPrice * config.pricing.dividendRate)} per save` : null}</Detail>
 
           <DetailDivider />
           {/* Background */}
@@ -473,7 +448,8 @@ const ShareCard = () => {
               <>
                 <span className="k">Unclaimed:</span>{' '}
                 <Dim>This card is generated from its URL — anyone with the link sees the
-                same card. Saving claims it at the rarity you choose above.</Dim>
+                same card. Every card carries its own price, independent of rarity;
+                this one costs {fmtT26(cardPrice)} /t26 to claim.</Dim>
               </>
             ) : (
               <>
@@ -490,8 +466,10 @@ const ShareCard = () => {
   );
 };
 
-// The card is a hero element — fine to centre it.
+// The card is a hero element — fine to centre it. (Relative: the earn flash
+// positions against it.)
 const Hero = styled.div`
+  position: relative;
   display: flex;
   justify-content: center;
   padding: 18px 12px 4px;
@@ -499,6 +477,30 @@ const Hero = styled.div`
   /* Phones: vertical space is precious — the card starts almost at the top. */
   @media (max-width: 640px) {
     padding: 4px 10px 2px;
+  }
+`;
+
+// The moment of earning, made visible: the amount floats up over the card and
+// fades. Re-keyed per card id, so every generate flashes.
+const EarnFlash = styled.div`
+  position: absolute;
+  top: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 25;
+  pointer-events: none;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--gold-bright);
+  text-shadow: 0 0 12px rgba(232, 180, 85, 0.8), 0 1px 2px rgba(0, 0, 0, 0.9);
+  animation: earnFloat 2.2s ease-out forwards;
+
+  @keyframes earnFloat {
+    0%   { opacity: 0; transform: translate(-50%, 14px); }
+    12%  { opacity: 1; transform: translate(-50%, 0); }
+    70%  { opacity: 1; }
+    100% { opacity: 0; transform: translate(-50%, -26px); }
   }
 `;
 
@@ -516,7 +518,8 @@ const Column = styled.div`
   width: 100%;
   max-width: 460px;
   margin: 0 auto;
-  padding: 8px 14px 64px;
+  /* Extra bottom clearance: the fixed Generate/Save dock floats over the page. */
+  padding: 8px 14px 96px;
   text-align: left;
   display: flex;
   flex-direction: column;
@@ -538,23 +541,24 @@ const Actions = styled.div`
   button { font-family: var(--font-mono); font-weight: 600; font-size: 13px; }
 `;
 
-// Bottom-sticky: while the bar's natural spot is below the fold it hovers
-// pinned above the screen edge (over the content), and once you scroll down
-// to where it belongs it locks into the flow. The translucent panel makes the
-// hovering state read as deliberate rather than as overlap.
-const StickyActions = styled.div`
-  position: sticky;
-  bottom: 8px;
-  z-index: 20;
+// Generate + Save, fixed to the bottom of the screen — always visible, so a
+// user can chain generates without ever scrolling. The translucent panel keeps
+// it readable over whatever it floats above.
+const FixedDock = styled.div`
+  position: fixed;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+  align-items: stretch;
   padding: 8px 10px;
-  margin: 0 -10px;
-  border-radius: 10px;
-  background: rgba(8, 6, 3, 0.82);
+  border-radius: 12px;
+  background: rgba(8, 6, 3, 0.85);
   backdrop-filter: blur(6px);
   border: 1px solid var(--panel-border);
+  button { font-family: var(--font-mono); font-weight: 600; font-size: 13px; }
 `;
 
 // "Save" with a small provenance subtext beneath it.
@@ -574,45 +578,6 @@ const Result = styled.div`
   line-height: 1.6;
   font-size: 13px;
   color: ${p => (p.$error ? '#ff8a8a' : 'var(--amber-text)')};
-`;
-
-// The rarity picker for saving a synthetic card: a chunky slider that walks
-// the tier ladder, commonest to rarest.
-const TierSlider = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 13px;
-
-  .row { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
-  .k { color: var(--amber-dim); }
-
-  input[type=range] {
-    -webkit-appearance: none;
-    width: 100%;
-    max-width: 320px;
-    height: 32px;
-    background: transparent;
-    outline: none;
-
-    &::-webkit-slider-runnable-track {
-      height: 8px;
-      border-radius: 4px;
-      background: rgba(255, 255, 255, 0.18);
-    }
-    &::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 24px;
-      height: 24px;
-      margin-top: -8px;
-      border-radius: 50%;
-      background: var(--gold);
-      border: 2px solid rgba(0, 0, 0, 0.35);
-      cursor: pointer;
-    }
-    &::-moz-range-track { height: 8px; border-radius: 4px; background: rgba(255,255,255,0.18); }
-    &::-moz-range-thumb { width: 24px; height: 24px; border-radius: 50%; background: var(--gold); border: 2px solid rgba(0,0,0,0.35); cursor: pointer; }
-  }
 `;
 
 const Note = styled.div`

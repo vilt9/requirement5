@@ -11,6 +11,7 @@ import { useParams } from 'react-router-dom';
 import Card from '../components/Card/Card';
 import { api } from '../utils/api';
 import { poolCardToCardData } from '../utils/poolCard';
+import { generateCardAttributes } from '../utils/cardGenerator';
 
 const CaptureCard = () => {
   const { id } = useParams();
@@ -21,7 +22,19 @@ const CaptureCard = () => {
     let active = true;
     api(`/api/cards/${id}`)
       .then(record => { if (active) setCardData(poolCardToCardData(record)); })
-      .catch(() => { if (active) { setError(true); window.__captureReady = true; } });
+      .catch(err => {
+        if (!active) return;
+        // Unclaimed uuid: the card exists only as math — render it from its seed,
+        // exactly like the share page does. Downloads work before a card is saved.
+        if (err?.status === 404 && /^[0-9a-f-]{10,64}$/i.test(id)) {
+          setCardData(poolCardToCardData({
+            state_data: { customCard: generateCardAttributes({ seed: id }) }
+          }));
+        } else {
+          setError(true);
+          window.__captureReady = true;
+        }
+      });
     return () => { active = false; };
   }, [id]);
 

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { api, getToken, setToken } from '../utils/api';
 import { prefetchedCards } from '../utils/drawQueue';
+import { drawYieldFor } from '../utils/economyRandom';
 
 const AuthContext = createContext();
 
@@ -9,9 +10,10 @@ const AuthContext = createContext();
 // count rides along on the auth request and the server credits it, capped.
 const STASH_KEY = 'r5c_stash';
 const readStash = () => {
-  const n = parseInt(localStorage.getItem(STASH_KEY), 10);
+  const n = parseFloat(localStorage.getItem(STASH_KEY));
   return Number.isFinite(n) && n > 0 ? n : 0;
 };
+const round6 = (n) => Math.round(n * 1e6) / 1e6;
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -22,7 +24,7 @@ export function AuthProvider({ children }) {
 
   const bumpStash = useCallback((amount = 1) => {
     setStash(current => {
-      const next = current + amount;
+      const next = round6(current + amount);
       try { localStorage.setItem(STASH_KEY, String(next)); } catch { /* private mode */ }
       return next;
     });
@@ -113,10 +115,13 @@ export function AuthProvider({ children }) {
   const userRef = useRef(null);
   userRef.current = user;
 
+  // Every entry carries `earned` — the /t26 the draw paid — so the card page
+  // can flash it. Yields are seeded from the card's uuid (same maths client
+  // and server), so the shown amount is the ledger's amount.
   const mintFresh = useCallback(() => {
     const id = crypto.randomUUID();
     prefetchedCards.set(id, 'synthetic');
-    return { id, discovered: false };
+    return { id, discovered: false, earned: drawYieldFor(id) };
   }, []);
 
   const refill = useCallback(async () => {
@@ -124,17 +129,23 @@ export function AuthProvider({ children }) {
     refillingRef.current = true;
     try {
       while (userRef.current && queueRef.current.length < 2) {
-        const result = await api('/api/draw', { method: 'POST' });
+        // Mint the synthetic uuid up front and send it as the yield seed; if
+        // the draw lands on a pool card instead, the server seeds from that
+        // card's id. Either way result.yield is what was actually credited.
+        const seed = crypto.randomUUID();
+        const result = await api('/api/draw', { method: 'POST', body: { seed } });
         setBalance(result.balance);
+        const earned = result.yield?.credited ?? 0;
         // Rare pool finds always surface; common pool finds only half the
         // time, so generating stays generative even with a populated pool.
         const showPool = result.source === 'pool' && result.card &&
           (result.tier?.key !== 'common' || Math.random() < 0.5);
         if (showPool) {
           prefetchedCards.set(result.card.id, result.card);
-          queueRef.current.push({ id: result.card.id, discovered: true });
+          queueRef.current.push({ id: result.card.id, discovered: true, earned });
         } else {
-          queueRef.current.push(mintFresh());
+          prefetchedCards.set(seed, 'synthetic');
+          queueRef.current.push({ id: seed, discovered: false, earned });
         }
       }
     } catch (error) {
@@ -142,7 +153,7 @@ export function AuthProvider({ children }) {
     } finally {
       refillingRef.current = false;
     }
-  }, [setBalance, mintFresh]);
+  }, [setBalance]);
 
   // Fresh session or auth change: the old queue's provenance is stale.
   // Keyed on the user's ID, not the object — refill updates the balance,
@@ -159,8 +170,9 @@ export function AuthProvider({ children }) {
   // uuid on the spot (its card generates from the seed, no network needed).
   const nextCard = useCallback(() => {
     if (!user) {
-      bumpStash(1);
-      return mintFresh();
+      const entry = mintFresh();
+      bumpStash(entry.earned); // the stash grows by the card's own seeded yield
+      return entry;
     }
     const entry = queueRef.current.shift();
     refill();

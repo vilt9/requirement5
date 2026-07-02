@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import styled from 'styled-components';
 import { FiGithub } from 'react-icons/fi';
 import { useAuth } from '../../context/AuthContext';
+import { fmtT26 } from '../../utils/economyRandom';
 
 const REPO_URL = 'https://github.com/vilt9/requirement5';
 
@@ -45,9 +46,9 @@ const Navigation = () => {
         </GitHubLink>
         <Balance to="/account" className="nav-balance">
           {user
-            ? <><span className="who">{user.username} · </span><b>{user.balance} /t26</b></>
+            ? <><span className="who">{user.username} · </span><b>{fmtT26(user.balance)} /t26</b></>
             : stash > 0
-              ? <><b>{stash} /t26</b> <span className="who">· log in to claim</span><span className="short">· claim</span></>
+              ? <><b>{fmtT26(stash)} /t26</b> <span className="who">· log in to claim</span><span className="short">· claim</span></>
               : <span className="dim"><span className="who">Not logged in</span><span className="short">Log in</span></span>}
         </Balance>
       </Inner>

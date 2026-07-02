@@ -17,7 +17,7 @@ ACCOUNT
   transactions                                 Show your /t26 ledger
 
 CARDS
-  publish <spec.json> [--open] [--json]        Build + publish a card from a spec file (stake: 10 /t26)
+  publish <spec.json> [--open] [--json]        Build + publish a card from a spec file (stake: 1–4 /t26, rolled)
   update <id> <spec.json> [--json]             Re-design a card you own from a spec (no new stake)
   preview <id> [--frames N] [--out <dir>]      Capture still PNGs of the live card (rest + orbit poses)
   template [minimal|full]                      Print an example spec to start from
@@ -169,7 +169,7 @@ NOTES
   - Enabling a holo effect without its params block applies that effect's defaults.
   - Any local image path anywhere in spec.card (e.g. rareHoloParams.backgroundImage)
     is inlined automatically if the file exists (relative to the spec file).
-  - Publishing stakes 10 /t26 (new accounts start with 50). When others save your
+  - Publishing stakes 1–4 /t26, rolled per publish (new accounts start with 50). When others save your
     card you earn a dividend scaled by tier. Updating a published card is free.
   - The published card lives at <api-url>/card/<id>.
   - Design loop: publish → \`r5c preview <id> --out shots/\` → look → edit spec →
@@ -181,7 +181,7 @@ export const COMMAND_HELP = {
   publish: `r5c publish <spec.json> [--open] [--json]
 
 Builds a complete card from the spec file and publishes it into the public pool.
-Costs the 10 /t26 publish stake. Local image paths in the spec are resolved
+Costs the publish stake (1–4 /t26, rolled at publish). Local image paths in the spec are resolved
 relative to the spec file, inlined, and offloaded to the server's image store.
 
 Prints the card's public URL. --open additionally opens it in the browser.

@@ -11,7 +11,9 @@ const router = express.Router();
 // signup/login and is credited here. Client-claimed, so clamp it to one day's
 // yield cap — the stakes are toy, the clamp keeps them that way.
 const claimStash = (userId, stash) => {
-  const amount = Math.min(ECONOMY.DAILY_YIELD_CAP, Math.max(0, Math.floor(Number(stash) || 0)));
+  // Stashes are fractional (each generate earns a small random amount).
+  const amount = Math.min(ECONOMY.DAILY_YIELD_CAP,
+    Math.max(0, Math.round((Number(stash) || 0) * 1e6) / 1e6));
   if (amount > 0) issue(userId, 'claimed_yield', amount);
   return memoryDb.getUserById(userId);
 };

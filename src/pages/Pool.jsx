@@ -37,7 +37,9 @@ const Pool = () => {
     <Page>
       <Panel>
         The pool is the shared deck every generate draws from. Publishing adds a card to it
-        (stake: {config?.publishStake ?? 10} /t26); every save of your card pays you a dividend.
+        (stake: {config?.pricing?.publishStake
+          ? `${config.pricing.publishStake.min}–${config.pricing.publishStake.max}`
+          : '1–4'} /t26); every save of your card pays you a dividend.
         All books are open.
       </Panel>
 

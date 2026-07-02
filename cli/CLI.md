@@ -37,7 +37,7 @@ at `/card/<id>`.
 | `R5C_TOKEN` env var | Bypasses the config file entirely | CI, agents, multi-account |
 
 New accounts are granted **50 /t26** (the platform currency). Publishing a card
-stakes **10 /t26**, so a fresh account can publish five cards immediately.
+stakes **1–4 /t26** (rolled per publish), so a fresh account can publish many cards immediately.
 When other players save your card you earn a dividend, scaled by tier — check
 with `r5c balance` / `r5c transactions`.
 

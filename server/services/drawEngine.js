@@ -1,8 +1,9 @@
 // The draw: roll a tier, serve a published card from the pool if one exists,
 // otherwise direct the client to synthesise one in that tier. Credits the yield.
 import { memoryDb } from '../config/database.js';
-import { rollTier, drawYield, saveCost, creatorDividend, TIERS } from './economy.js';
+import { rollTier, saveCostFor, creatorDividendFor, drawYieldFor, TIERS } from './economy.js';
 import { creditDrawYield } from './ledger.js';
+import crypto from 'node:crypto';
 
 // Per-card statistics exposed with every draw. Deep game: everything visible.
 export const cardStats = (card) => {
@@ -18,15 +19,17 @@ export const cardStats = (card) => {
     poolShare: totalPublished > 0 ? poolPeers / totalPublished : null,
     timesDrawn: card.times_drawn || 0,
     timesSaved: card.times_saved || 0,
-    saveCost: card.tier ? saveCost(card.tier) : null,
-    creatorDividend: card.tier ? creatorDividend(card.tier) : null,
+    saveCost: saveCostFor(card.id),
+    creatorDividend: creatorDividendFor(card.id),
     creatorId: card.creator_id
   };
 };
 
-export const draw = (userId, rand = Math.random) => {
+// `seed` is the uuid the client pre-minted for a synthetic result — the yield
+// is seeded from the id of whatever card the draw lands on, so the amount the
+// page shows for a card is the amount the ledger recorded.
+export const draw = (userId, rand = Math.random, seed = null) => {
   const tier = rollTier(rand);
-  const fullYield = drawYield(tier.key);
 
   const pool = memoryDb.getPublishedCardsByTier(tier.key);
   let card = null;
@@ -36,6 +39,8 @@ export const draw = (userId, rand = Math.random) => {
     card = memoryDb.getCardById(card.id);
   }
 
+  const yieldSeed = card ? card.id : (seed || crypto.randomUUID());
+  const fullYield = drawYieldFor(yieldSeed);
   const credited = creditDrawYield(userId, fullYield, card ? { card_id: card.id } : {});
   const user = memoryDb.getUserById(userId);
 

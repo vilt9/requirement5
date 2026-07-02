@@ -41,7 +41,7 @@ router.get('/cloud', (req, res) => {
     data: {
       totalIssued: cloud.total_issued,
       totalAbsorbed: cloud.total_absorbed,
-      inCirculation: Math.round((cloud.total_issued - cloud.total_absorbed) * 10) / 10,
+      inCirculation: Math.round((cloud.total_issued - cloud.total_absorbed) * 1e6) / 1e6,
       publishedCards: published.length,
       tierCounts,
       storage: storageInfo()

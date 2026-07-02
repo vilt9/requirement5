@@ -76,8 +76,10 @@ const PublishPanel = ({ customCard }) => {
         </Select>
         {tier && (
           <div>
-            <Dim>Appears at {tier.odds ? `1 : ${tier.odds.toLocaleString()}` : 'common'} odds ·
-            save costs {tier.saveCost} /t26 · your dividend {tier.creatorDividend} /t26 per save</Dim>
+            <Dim>Appears at {tier.odds ? `1 : ${tier.odds.toLocaleString()}` : 'common'} odds.
+            Every card rolls its own save price
+            ({config?.pricing?.saveCost ? `${config.pricing.saveCost.min}–${config.pricing.saveCost.max}` : '1.5–48'} /t26);
+            you earn {Math.round((config?.pricing?.dividendRate ?? 0.2) * 100)}% of it per save.</Dim>
           </div>
         )}
         {customCard?.tags?.length > 0 && (
@@ -87,8 +89,10 @@ const PublishPanel = ({ customCard }) => {
           </div>
         )}
         <div>
-          <Dim>Stake: {config?.publishStake} /t26, absorbed by the cloud. Pick the tier that fits the
-          card — rarer tiers pay more per save but circulate less.</Dim>
+          <Dim>Stake: {config?.pricing?.publishStake
+            ? `${config.pricing.publishStake.min}–${config.pricing.publishStake.max}`
+            : '1–4'} /t26 (rolled at publish), absorbed by the cloud. Pick the tier
+          that fits the card — rarer tiers circulate less.</Dim>
         </div>
         {error && <ErrorText>{error}</ErrorText>}
         {message && <div className="publish-success">{message}</div>}
@@ -101,7 +105,9 @@ const PublishPanel = ({ customCard }) => {
         )}
         <div>
           <PillButton onClick={publish} disabled={busy || !customCard}>
-            {busy ? 'Publishing…' : `Publish (−${config?.publishStake ?? 10} /t26)`}
+            {busy ? 'Publishing…' : `Publish (−${config?.pricing?.publishStake
+              ? `${config.pricing.publishStake.min}–${config.pricing.publishStake.max}`
+              : '1–4'} /t26)`}
           </PillButton>
         </div>
       </Stack>

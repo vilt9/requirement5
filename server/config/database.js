@@ -323,12 +323,12 @@ const memoryDb = {
   getCloud: () => ({ ...db.cloud }),
 
   cloudIssue: (amount) => {
-    db.cloud.total_issued = Math.round((db.cloud.total_issued + amount) * 10) / 10;
+    db.cloud.total_issued = Math.round((db.cloud.total_issued + amount) * 1e6) / 1e6;
     persistSoon();
   },
 
   cloudAbsorb: (amount) => {
-    db.cloud.total_absorbed = Math.round((db.cloud.total_absorbed + amount) * 10) / 10;
+    db.cloud.total_absorbed = Math.round((db.cloud.total_absorbed + amount) * 1e6) / 1e6;
     persistSoon();
   },
 

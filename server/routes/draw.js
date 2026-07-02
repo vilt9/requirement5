@@ -8,7 +8,10 @@ const router = express.Router();
 // credits the yield, returns full statistics.
 router.post('/', requireAuth, (req, res) => {
   try {
-    const result = draw(req.user.id);
+    // Optional client-minted uuid for a synthetic result — seeds the yield.
+    const seed = typeof req.body?.seed === 'string' && /^[0-9a-f-]{10,64}$/i.test(req.body.seed)
+      ? req.body.seed : null;
+    const result = draw(req.user.id, Math.random, seed);
     res.json({ success: true, data: result });
   } catch (error) {
     console.error('Draw error:', error);
