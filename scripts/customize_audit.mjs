@@ -317,37 +317,39 @@ const main = async () => {
     await colorSweepTab();
   }
 
-  // Phase 4: image uploads (design stage, image tab). Use a DIFFERENT image than
-  // setup's so the main image input registers a real change (re-uploading the
-  // same file is a no-op).
+  // Phase 4: image uploads (design stage; base on the image tab, holo on the
+  // holo tab). Use a DIFFERENT image than setup's so the input registers a
+  // real change (re-uploading the same file is a no-op).
   console.log('\n— phase 4: image uploads + library —');
   await selectStage('design');
-  await selectTab('image');
   const altImage = path.resolve(process.cwd(), '..', 'card_images', 'bed_elephant_1.png');
-  const fileInputs = await page.locator('.image-picker input[type=file]').count();
-  for (let i = 0; i < fileInputs; i++) {
+  for (const [tab, slot] of [['image', 'main'], ['holo', 'holo']]) {
+    await selectTab(tab);
+    const input = page.locator(`.image-picker-${slot} input[type=file]`);
+    if (!(await input.count())) {
+      report(`file input (${slot})`, 'find', false, `no picker on ${tab} tab`);
+      continue;
+    }
     const before = await snapshot();
-    await page.locator('.image-picker input[type=file]').nth(i).setInputFiles(altImage);
+    await input.setInputFiles(altImage);
     await page.waitForTimeout(900);
-    const after = await snapshot();
-    report(`file input [${i}]`, 'uploaded bed_elephant_1.png', before !== after);
+    report(`file input (${slot})`, 'uploaded bed_elephant_1.png', before !== (await snapshot()));
   }
-  // Uploads must land in the reusable image library, and "use as base" must
-  // change the preview (it re-applies the image + custom_image marker).
+  // Uploads must land in the reusable image library, and tapping an entry must
+  // apply it to this tab's slot (base, on the image tab).
   // The library is collapsed by default — pop it open first.
-  await page.locator('.library-toggle').click().catch(() => {});
+  await selectTab('image');
+  await page.locator('.image-picker-main .library-toggle').click().catch(() => {});
   await page.waitForTimeout(200);
-  const libCount = await page.locator('.image-library .library-item').count();
+  const libCount = await page.locator('.image-picker-main .library-item').count();
   report('image library', 'uploads appear in library', libCount > 0, `${libCount} item(s)`);
   if (libCount > 0) {
     // The newest entry IS the current base image (just uploaded), so applying it
     // is a no-op; use the oldest entry to guarantee a real change.
-    const item = page.locator('.image-library .library-item').last();
     const before = await snapshot();
-    await item.hover();
-    await item.locator('button', { hasText: 'base' }).click();
+    await page.locator('.image-picker-main .library-item .use').last().click();
     await page.waitForTimeout(600);
-    report('image library', 'use as base updates preview', before !== (await snapshot()));
+    report('image library', 'tap-to-use updates preview', before !== (await snapshot()));
   }
   await page.screenshot({ path: path.join(SHOTS, '3_after_uploads.png'), fullPage: true });
 

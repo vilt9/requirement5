@@ -61,6 +61,11 @@ const Bar = styled.nav`
   border-bottom: 1px solid var(--panel-border);
   backdrop-filter: blur(6px);
   z-index: 1000;
+
+  /* Phones: vertical space is scarce — let the nav scroll away with the page. */
+  @media (max-width: 640px) {
+    position: static;
+  }
 `;
 
 const Inner = styled.div`

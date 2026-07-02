@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import Card from '../components/Card/Card';
 import { useCards } from '../context/CardContext';
@@ -50,6 +50,25 @@ const CardCustomizer = () => {
   const [presetName, setPresetName] = useState('');
   const [selectedPresetId, setSelectedPresetId] = useState('');
   const [includeImages, setIncludeImages] = useState(false);
+  // On phones the preview scrolls away while tuning sliders; when it leaves the
+  // viewport we dock the card as a small fixed preview so feedback stays live.
+  const previewRef = useRef(null);
+  const [previewDocked, setPreviewDocked] = useState(false);
+
+  useEffect(() => {
+    const el = previewRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    // Dock when the preview is mostly scrolled away (a sliver of card is no
+    // feedback), undock once most of it is back — the gap avoids flicker.
+    const observer = new IntersectionObserver(
+      ([entry]) => setPreviewDocked(prev => (prev
+        ? entry.intersectionRatio < 0.55
+        : entry.intersectionRatio < 0.35)),
+      { threshold: [0, 0.35, 0.55, 1] }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // Initialize with a card if none exists
   useEffect(() => {
@@ -279,7 +298,10 @@ const CardCustomizer = () => {
   return (
     <CustomizerContainer className="customizer-container">
       <CustomizerLayout className="customizer-layout">
-        <CardPreviewSection className="card-preview-section">
+        <CardPreviewSection
+          ref={previewRef}
+          className={`card-preview-section${previewDocked ? ' preview-docked' : ''}`}
+        >
           {customCard && <Card cardData={customCard} />}
         </CardPreviewSection>
 
@@ -337,11 +359,12 @@ const CardCustomizer = () => {
                 {activeTab === 'image' && (
                   <>
                     <ImagePicker
-                      mainImagePreview={mainImagePreview}
-                      holoImagePreview={holoImagePreview}
-                      onMainImageChange={handleMainImageChange}
-                      onHoloImageChange={handleHoloImageChange}
-                      onUseLibraryImage={handleUseLibraryImage}
+                      slot="main"
+                      label="base image"
+                      note="The card's artwork. Everything on this tab tunes how it sits in the frame."
+                      preview={mainImagePreview}
+                      onFileChange={handleMainImageChange}
+                      onUseLibraryImage={(dataUrl) => handleUseLibraryImage(dataUrl, 'main')}
                       imageLibrary={imageLibrary}
                       onRemoveLibraryImage={removeFromLibrary}
                     />
@@ -355,6 +378,16 @@ const CardCustomizer = () => {
 
                 {activeTab === 'holo' && (
                   <>
+                    <ImagePicker
+                      slot="holo"
+                      label="holo image"
+                      note="Optional — becomes the holographic overlay. Uploading one replaces the CSS holo effects below."
+                      preview={holoImagePreview}
+                      onFileChange={handleHoloImageChange}
+                      onUseLibraryImage={(dataUrl) => handleUseLibraryImage(dataUrl, 'holo')}
+                      imageLibrary={imageLibrary}
+                      onRemoveLibraryImage={removeFromLibrary}
+                    />
                     <HoloEffectToggles
                       className="holo-effect-toggles"
                       customCard={customCard}
@@ -459,6 +492,25 @@ const CardPreviewSection = styled.div`
   justify-content: center;
   align-items: flex-start;
   padding-top: 10px;
+
+  /* Phones: once scrolled past, the card docks top-right as a small live
+     preview. The .card-scene keeps its layout box via the section's
+     min-height, so nothing jumps when it switches to fixed. */
+  @media (max-width: 768px) {
+    &.preview-docked {
+      min-height: 400px;
+    }
+    &.preview-docked .card-scene {
+      position: fixed;
+      top: 8px;
+      right: 8px;
+      z-index: 1100;
+      margin: 0;
+      transform: scale(0.3);
+      transform-origin: top right;
+      pointer-events: none;
+    }
+  }
 `;
 
 const ControlsSection = styled.div`
