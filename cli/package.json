@@ -1,0 +1,18 @@
+{
+  "name": "r5c-cli",
+  "version": "0.1.0",
+  "description": "Command-line client for Requirement5 cards (R5c) — create, publish, and render trading cards from the terminal.",
+  "type": "module",
+  "license": "LicenseRef-FSL-1.1-ALv2",
+  "bin": {
+    "r5c": "./bin/r5c.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "CLI.md"
+  ]
+}

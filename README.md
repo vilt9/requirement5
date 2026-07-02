@@ -48,6 +48,9 @@ use it for anything except building a competing product or service (see
   to local disk (`server/uploads`) or S3 when configured.
 - **Video export** — Playwright drives a chrome-free capture route through a
   deterministic tilt, then ffmpeg stitches frames into a GIF/MP4.
+- **CLI** — `r5c` (`cli/`), a zero-dependency command-line client: sign up,
+  publish complete cards from a JSON spec (artwork inlined from local files),
+  list/render/delete, check your /t26. Docs: [cli/CLI.md](cli/CLI.md).
 
 ## Run locally
 
