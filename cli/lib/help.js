@@ -65,39 +65,102 @@ TOP LEVEL
   card        object    Visual overrides, deep-merged over good defaults (below)
 
 CARD OVERRIDES (spec.card.*) — everything optional
-  backgroundColor.baseHue        0–360; drives the default color scheme
-  baseBackground                 { type: linear|radial|conic, color1..color3 (#hex),
-                                   useThird, angle 0–360, posX/posY 0–100,
-                                   fadeStart 0–25, fadeEnd 72–100,
-                                   vignette 0.1–0.55, grain 0–0.22 }
-  patternInfo                    { type: ${PATTERN_TYPES.join('|')},
-                                   opacity 0.3–0.9, numLines, lineOpacity }
-  effectParams                   { parallaxDepth 0–1 (3D shift of the artwork as
-                                   the card tilts), filterBrightness/Contrast/Saturate
-                                   (drive the Nebula/Pulse filters),
-                                   customHoloBlendMode: <blend mode> (the Veil overlay) }
-  imageEffects                   { opacity 0–1, opacityHover (while touched),
-                                   contrast 0.5–2, saturation 0–2, blendMode }
-  borderEffects                  { thickBorderEnabled (center panel), color, opacity,
-                                   colorHover, opacityHover, transitionDuration,
-                                   borderImageEnabled + imageOpacity (blurred artwork
-                                   wash on the panel), thinEdgeEnabled,
-                                   edgeColor1/2, thinEdgeColor }
-  holoEffects                    Toggle the four animated holo systems (any combination;
-                                 display names: rareHolo=Prism, rareHoloGalaxy=Nebula,
-                                 wowaHolo=Signal, rareHoloVmax=Pulse; the top-level
-                                 "holoImage" is the fifth technique, the Veil overlay):
-                                 { ${HOLO_EFFECTS.map((e) => `${e}: bool`).join(', ')} }
-  rareHoloParams                 { space 0.5–5, hue 1–50, saturation 20–100, lightness 20–80,
-                                   intensity "subtle"|"extreme", filterStrength 0.1–3,
-                                   mouseSpeed 0.1–5, blendMode, colors: rgb string[],
-                                   backgroundImage: path|URL }
-  rareHoloGalaxyParams           { space 1–10, brightness 0.1–2, contrast 0.5–3,
-                                   saturation 0.5–3, blendMode, gradientSize 100–800,
-                                   gradientHeight 200–1500, smoothTransitions 0–1,
-                                   colors, backgroundImage }
-  wowaHoloParams                 { space 1–10, angle 0–360, backgroundImage }
-  rareHoloVmaxParams             { space 1–15, angle 0–360, brightness 0.1–2, contrast 0.5–4 }
+Every key below says what it does to the pixels, so you can design blind —
+but you don't have to: \`r5c preview <id>\` shows you still frames, and
+\`r5c update <id> spec.json\` lets you iterate on the same card.
+
+  backgroundColor.baseHue   0–360   One knob for the whole color scheme: sets the
+                                    family (0 red, 120 green, 220 blue, 280 purple)
+                                    that all defaults are derived from.
+
+  baseBackground — the backdrop behind the artwork (visible where the image is
+  transparent or its opacity is lowered):
+    type            linear|radial|conic|solid   Fade shape: one direction / from a
+                                    point / sweeping around a point / flat color
+    color1..color3  #hex            Fade colors (color3 is the middle stop; set
+                                    useThird: true to include it)
+    angle           0–360           Direction of a linear fade / start of a conic sweep
+    posX, posY      0–100           Center of a radial/conic fade (% of card)
+    fadeStart/End   0–100           Where the blend begins and completes: high start =
+                                    color1 fills more; low end = harder, tighter edge
+    vignette        0.1–0.55        Darkens the corners, pulls focus to the middle
+    grain           0–0.22          Film-like noise for a printed, tactile feel
+
+  patternInfo — a faint decorative texture over the backdrop:
+    type            ${PATTERN_TYPES.join('|')}
+    opacity         0.3–0.9         How visible the texture is
+
+  effectParams — cross-cutting knobs:
+    parallaxDepth        0–1        The artwork shifts against the frame as the card
+                                    tilts, like a window into the scene. 0 = flat.
+    customHoloBlendMode  <blend>    How the Veil overlay (holoImage) mixes with the
+                                    card: color-dodge = bright shine, overlay = subtle
+    filterBrightness/Contrast/Saturate   Push the Nebula + Pulse filter looks
+
+  imageEffects — how the artwork itself is treated:
+    opacity         0–1             How solid the artwork is; lower it to let the
+                                    backdrop show through
+    opacityHover    0–1             Artwork opacity while the card is touched — set
+                                    below opacity to make the holo flare on touch
+    contrast        0.5–2           Deepens shadows, brightens highlights
+    saturation      0–2             0 = black & white, 2 = vivid
+    blendMode       <blend>         How the artwork mixes with the backdrop
+
+  borderEffects — the frame:
+    edgeColor1/2                    The glowing line sweeping around the card's edge
+                                    as it tilts, and the color it fades into
+    thickBorderEnabled              The center panel: a tinted pane over the middle
+    color / opacity                 Panel tint at rest
+    colorHover / opacityHover       Panel tint while touched
+    transitionDuration  0–2 (s)     How long the panel takes to shift on touch
+    borderImageEnabled              Lays a blurred copy of the artwork over the panel
+    imageOpacity        0–1         ...and how visible that frosted wash is
+    thinEdgeEnabled + thinEdgeColor A hairline outline at the very edge
+
+  holoEffects — the five animated holographic systems; combine freely. Site
+  display names in brackets. Toggling one on without its params block applies
+  good defaults:
+    { ${HOLO_EFFECTS.map((e) => `${e}: bool`).join(', ')} }
+    rareHolo [Prism]        rainbow bands sweeping with the tilt
+    rareHoloGalaxy [Nebula] deep-space color swirls that drift and stretch
+    wowaHolo [Signal]       one broad angular light sweep crossing the card
+    rareHoloVmax [Pulse]    hard high-contrast bands, red/pink by default
+    (holoImage at the top level is the fifth: [Veil], your image blended
+    straight over the card, shining under the pointer)
+
+  rareHoloParams [Prism]:
+    space           0.5–5           Band width: low = tight stripes, high = broad washes
+    hue             1–50            Color spread: how many colors pack into the sweep
+    saturation      20–100          Vividness: grey → neon
+    lightness       20–80           Band brightness: moody → glowing
+    intensity       "subtle"|"extreme"   extreme stacks a second, heavier rainbow pass
+    filterStrength  0.1–3           One knob for how hard the whole effect hits
+    mouseSpeed      0.1–5           Tilt response: high snaps, low glides
+    blendMode       <blend>         How the rainbow mixes with the artwork
+    colors          rgb string[]    The band colors, in order
+    backgroundImage path|URL        Replace the rainbow with your own texture
+
+  rareHoloGalaxyParams [Nebula]:
+    space              1–10         Swirl scale: fine detail → broad clouds
+    brightness         0.1–2        Lifts or dims the whole effect
+    contrast           0.5–3        Split between glow and shadow
+    saturation         0.5–3        Vividness: grey → neon
+    gradientSize       100–800      Stretches the color field sideways
+    gradientHeight     200–1500     ...and vertically, as the card tilts
+    smoothTransitions  0–1          0 = hard color edges, 1 = melted together
+    blendMode, colors, backgroundImage   as in Prism
+
+  wowaHoloParams [Signal]:
+    space           1–10            Distance between the sweeping stripes
+    angle           0–360           Direction the stripes travel
+    backgroundImage path|URL        Replace the sweep texture
+
+  rareHoloVmaxParams [Pulse]:
+    space           1–15            Distance between the bands
+    angle           0–360           Direction the bands run
+    brightness      0.1–2           Lifts or dims the whole effect
+    contrast        0.5–4           Split between light and dark bands
+    backgroundImage path|URL        Replace the band texture
 
 BLEND MODES
   ${BLEND_MODES.join(', ')}
@@ -107,8 +170,10 @@ NOTES
   - Any local image path anywhere in spec.card (e.g. rareHoloParams.backgroundImage)
     is inlined automatically if the file exists (relative to the spec file).
   - Publishing stakes 10 /t26 (new accounts start with 50). When others save your
-    card you earn a dividend scaled by tier.
+    card you earn a dividend scaled by tier. Updating a published card is free.
   - The published card lives at <api-url>/card/<id>.
+  - Design loop: publish → \`r5c preview <id> --out shots/\` → look → edit spec →
+    \`r5c update <id> spec.json\` → preview again.
 `;
 
 export const COMMAND_HELP = {
