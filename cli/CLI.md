@@ -6,8 +6,10 @@ an environment variable, and a single JSON spec file describes a complete card
 down to the last holo parameter.
 
 ```bash
-# Install (from the repo)
-cd cli && npm link        # or: npm install -g ./cli from the repo root
+# Install (pick one)
+curl -fsSL https://requirement5.com/install | sh   # no root, installs to ~/.r5c
+npm install -g r5c                                 # via npm
+cd cli && npm link                                 # from a repo checkout
 
 # One-minute card
 r5c signup --username ada_l --password 'correct-horse-9'

@@ -1,0 +1,141 @@
+#!/bin/sh
+# r5c CLI installer.
+#
+#   curl -fsSL https://requirement5.com/install | sh
+#
+# Installs the `r5c` command under ~/.r5c, a directory you own. It never needs
+# root and never writes to npm's global folder, so it cannot hit the EACCES
+# permission error that a root-owned npm prefix causes. The CLI has zero
+# dependencies, so there is no npm install step at all — just a download.
+#
+# Re-running this script upgrades an existing install in place. Your login
+# token (~/.r5c/config.json) is untouched by installs and upgrades.
+#
+# Requirements: node 18+ (to run r5c) and curl or wget (to download it).
+
+set -eu
+
+R5C_HOME="${R5C_HOME:-$HOME/.r5c}"
+CLI_DIR="$R5C_HOME/cli"
+BIN_DIR="$R5C_HOME/bin"
+LAUNCHER="$BIN_DIR/r5c"
+REGISTRY="https://registry.npmjs.org/r5c"
+
+# Preview/test override. When R5C_TARBALL_URL is set (e.g. a file:// path to a
+# locally `npm pack`ed tarball), the installer skips the npm registry lookup
+# and installs that tarball instead. R5C_VERSION names it in log output.
+# Both are unset in normal use, so production installs are unaffected.
+R5C_TARBALL_URL="${R5C_TARBALL_URL:-}"
+R5C_VERSION="${R5C_VERSION:-}"
+
+err() { printf 'r5c install: %s\n' "$1" >&2; }
+
+# 1. Node is required to run r5c.
+if ! command -v node >/dev/null 2>&1; then
+  err "Node.js was not found on your PATH."
+  err "Install Node 18+ from https://nodejs.org (or via nvm, fnm, or Homebrew), then re-run this."
+  exit 1
+fi
+
+# 2. A downloader is required to fetch the package.
+if command -v curl >/dev/null 2>&1; then
+  fetch()      { curl -fsSL "$1"; }
+  fetch_file() { curl -fsSL "$1" -o "$2"; }
+elif command -v wget >/dev/null 2>&1; then
+  fetch()      { wget -qO- "$1"; }
+  fetch_file() { wget -qO "$2" "$1"; }
+else
+  err "Need curl or wget to download r5c."
+  exit 1
+fi
+
+# 3. Resolve the tarball to install: an override URL when given, otherwise the
+#    latest version from the npm registry (node parses the JSON).
+if [ -n "$R5C_TARBALL_URL" ]; then
+  VERSION="${R5C_VERSION:-local}"
+  TARBALL_URL="$R5C_TARBALL_URL"
+  printf 'Installing r5c from %s...\n' "$R5C_TARBALL_URL"
+else
+  printf 'Resolving the latest r5c version...\n'
+  VERSION=$(fetch "$REGISTRY/latest" | node -e 'let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>{try{process.stdout.write(String(JSON.parse(s).version||""))}catch(e){}})')
+  if [ -z "${VERSION:-}" ]; then
+    err "Could not resolve the latest version from the npm registry."
+    exit 1
+  fi
+  TARBALL_URL="$REGISTRY/-/r5c-$VERSION.tgz"
+  printf 'Installing r5c %s...\n' "$VERSION"
+fi
+
+# 4. Download and unpack the package into a temp directory.
+TMP=$(mktemp -d 2>/dev/null || mktemp -d -t r5c)
+trap 'rm -rf "$TMP"' EXIT INT TERM
+
+fetch_file "$TARBALL_URL" "$TMP/r5c.tgz"
+mkdir -p "$TMP/cli"
+# npm tarballs wrap everything in a top-level package/ directory; strip it.
+tar -xzf "$TMP/r5c.tgz" -C "$TMP/cli" --strip-components=1
+
+# The CLI needs its launcher plus the lib/ modules it imports at runtime.
+# Checking both catches a tarball that shipped without lib/ (a files-array
+# regression) before we install a CLI that would crash on first run.
+if [ ! -f "$TMP/cli/bin/r5c.js" ] || [ ! -f "$TMP/cli/lib/spec.js" ]; then
+  err "The downloaded package did not contain the expected files."
+  exit 1
+fi
+
+# 5. Swap the new copy into place under ~/.r5c/cli.
+mkdir -p "$R5C_HOME"
+rm -rf "$CLI_DIR"
+mv "$TMP/cli" "$CLI_DIR"
+chmod +x "$CLI_DIR/bin/r5c.js"
+
+# 6. Link the `r5c` command into ~/.r5c/bin.
+mkdir -p "$BIN_DIR"
+ln -sf "$CLI_DIR/bin/r5c.js" "$LAUNCHER"
+
+# 7. Put ~/.r5c/bin on PATH via the shell's startup file.
+MARKER='# added by the r5c installer'
+PATH_LINE='export PATH="$HOME/.r5c/bin:$PATH"'
+
+add_to_rc() {
+  rc="$1"
+  line="$2"
+  if [ -f "$rc" ] && grep -qF "$MARKER" "$rc" 2>/dev/null; then
+    return 0
+  fi
+  printf '\n%s\n%s\n' "$MARKER" "$line" >> "$rc"
+  printf 'Added ~/.r5c/bin to PATH in %s\n' "$rc"
+}
+
+case "${SHELL:-}" in
+  */fish)
+    FISH_RC="${XDG_CONFIG_HOME:-$HOME/.config}/fish/config.fish"
+    mkdir -p "$(dirname "$FISH_RC")"
+    add_to_rc "$FISH_RC" 'set -gx PATH $HOME/.r5c/bin $PATH'
+    ;;
+  */zsh)
+    add_to_rc "$HOME/.zshrc" "$PATH_LINE"
+    ;;
+  */bash)
+    add_to_rc "$HOME/.bashrc" "$PATH_LINE"
+    [ -f "$HOME/.bash_profile" ] && add_to_rc "$HOME/.bash_profile" "$PATH_LINE"
+    ;;
+  *)
+    add_to_rc "$HOME/.profile" "$PATH_LINE"
+    ;;
+esac
+
+# 8. Report.
+case ":${PATH}:" in
+  *":$BIN_DIR:"*) ON_PATH=1 ;;
+  *)              ON_PATH=0 ;;
+esac
+
+printf '\nr5c %s installed to %s\n' "$VERSION" "$R5C_HOME"
+if [ "$ON_PATH" -eq 1 ]; then
+  printf 'Run `r5c help` to get started.\n'
+else
+  printf 'Restart your terminal, then run `r5c help` to get started.\n'
+  printf 'To use it now without restarting:\n'
+  printf '  export PATH="$HOME/.r5c/bin:$PATH"\n'
+fi

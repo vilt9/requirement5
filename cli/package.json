@@ -1,9 +1,21 @@
 {
-  "name": "r5c-cli",
+  "name": "r5c",
   "version": "0.1.0",
   "description": "Command-line client for Requirement5 cards (R5c) — create, publish, and render trading cards from the terminal.",
   "type": "module",
   "license": "LicenseRef-FSL-1.1-ALv2",
+  "homepage": "https://requirement5.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vilt9/requirement5.git",
+    "directory": "cli"
+  },
+  "keywords": [
+    "trading-cards",
+    "requirement5",
+    "cli",
+    "holographic"
+  ],
   "bin": {
     "r5c": "./bin/r5c.js"
   },
@@ -13,6 +25,7 @@
   "files": [
     "bin",
     "lib",
-    "CLI.md"
+    "CLI.md",
+    "LICENSE"
   ]
 }
