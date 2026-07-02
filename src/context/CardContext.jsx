@@ -18,6 +18,7 @@ export function CardProvider({ children }) {
   const [presets, setPresets] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [customImages, setCustomImages] = useState({});
+  const [imageLibrary, setImageLibrary] = useState([]);
 
   // Load saved cards + presets from storage on initial render
   useEffect(() => {
@@ -27,6 +28,8 @@ export function CardProvider({ children }) {
         setSavedCards(cards);
         const storedPresets = await localforage.getItem('presets') || [];
         setPresets(storedPresets);
+        const storedLibrary = await localforage.getItem('imageLibrary') || [];
+        setImageLibrary(storedLibrary);
         setIsLoading(false);
       } catch (error) {
         console.error('Error loading saved cards:', error);
@@ -110,6 +113,38 @@ export function CardProvider({ children }) {
     }
   };
 
+  // --- Image library: every uploaded image, reusable across cards ---
+  // Deduped by content, newest first, capped so IndexedDB doesn't balloon.
+  const LIBRARY_CAP = 24;
+
+  const addToLibrary = async (dataUrl) => {
+    if (!dataUrl || typeof dataUrl !== 'string') return null;
+    try {
+      const rest = imageLibrary.filter(img => img.dataUrl !== dataUrl);
+      const entry = imageLibrary.find(img => img.dataUrl === dataUrl)
+        || { id: crypto.randomUUID(), dataUrl, addedAt: new Date().toISOString() };
+      const updated = [entry, ...rest].slice(0, LIBRARY_CAP);
+      setImageLibrary(updated);
+      await localforage.setItem('imageLibrary', updated);
+      return entry;
+    } catch (error) {
+      console.error('Error adding image to library:', error);
+      return null;
+    }
+  };
+
+  const removeFromLibrary = async (id) => {
+    try {
+      const updated = imageLibrary.filter(img => img.id !== id);
+      setImageLibrary(updated);
+      await localforage.setItem('imageLibrary', updated);
+      return true;
+    } catch (error) {
+      console.error('Error removing image from library:', error);
+      return false;
+    }
+  };
+
   // --- Preset sets: named, reusable customizer defaults (client-side) ---
 
   // Save the current card's design + tags as a named preset. If a preset with the
@@ -162,7 +197,10 @@ export function CardProvider({ children }) {
         savePreset,
         deletePreset,
         saveCustomImage,
-        getCustomImages
+        getCustomImages,
+        imageLibrary,
+        addToLibrary,
+        removeFromLibrary
       }}
     >
       {children}

@@ -3,13 +3,11 @@ import styled from 'styled-components';
 import ControlSection from './ControlSection';
 import ParameterControl from './ParameterControl';
 import BlendModeSelector from './BlendModeSelector';
-import ImageUploader from './ImageUploader';
 
+// The holo overlay image is uploaded in the Start stage; this section tunes it.
 const HoloEffectControls = ({
   customCard,
   handleParamChange,
-  handleHoloImageUpload,
-  holoImagePreview,
   className
 }) => {
   if (!customCard) return null;
@@ -125,17 +123,6 @@ const HoloEffectControls = ({
           tooltipContent="Controls color intensity of the holographic effect. Higher values create more vibrant, colorful effects, while lower values create more muted, desaturated effects."
         />
       </HoloControlsGrid>
-      
-      <ImageUploadContainer>
-        <ImageUploader
-          id="holo-image-upload"
-          label="Holographic Effect Image"
-          onImageChange={handleHoloImageUpload}
-          previewSrc={holoImagePreview}
-          accept="image/*"
-          tooltipContent="Upload a custom image to use as the holographic effect pattern. Try images with bright spots, gradients, or light patterns for the best holographic appearance."
-        />
-      </ImageUploadContainer>
     </ControlSection>
   );
 };
@@ -144,18 +131,10 @@ const HoloControlsGrid = styled.div`
   display: grid;
   grid-template-columns: 1fr;
   gap: 15px;
-  margin-bottom: 20px;
-  
+
   @media (min-width: 500px) {
     grid-template-columns: 1fr 1fr;
   }
-`;
-
-const ImageUploadContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-  margin-top: 15px;
 `;
 
 export default HoloEffectControls;

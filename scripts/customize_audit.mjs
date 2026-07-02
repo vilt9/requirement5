@@ -144,7 +144,12 @@ const main = async () => {
   const tested = new Set();
   const TABS = ['image', 'holo', 'frame', 'background'];
 
-  // The controls are split across tabs now; switch tab and let its DOM mount.
+  // The customizer is staged (start → design → publish); pick the stage first.
+  const selectStage = async (key) => {
+    await page.click(`.customizer-stage[data-stage=${key}]`).catch(() => {});
+    await page.waitForTimeout(300);
+  };
+  // The controls are split across tabs (design stage); switch tab and let its DOM mount.
   const selectTab = async (key) => {
     await page.click(`.customizer-tab[data-tab=${key}]`).catch(() => {});
     await page.waitForTimeout(300);
@@ -206,6 +211,7 @@ const main = async () => {
 
   // Rarity only selects the auto holo class when NO explicit holo toggle is on, so
   // test it on the holo tab before setup enables the toggles that override it.
+  await selectStage('design');
   await selectTab('holo');
   {
     const before = await snapshot();
@@ -234,9 +240,10 @@ const main = async () => {
   // before sweeping. Otherwise tier-specific sliders look "broken".
   console.log('— setup: upload image + enable all effects —');
   const sampleImage = path.resolve(process.cwd(), '..', 'card_images', 'wolf_toys_1.png');
-  await selectTab('image');
-  const mainFile = page.locator('.controls-inner input[type=file]').first();
+  await selectStage('start');
+  const mainFile = page.locator('.start-stage input[type=file]').first();
   if (await mainFile.count()) { await mainFile.setInputFiles(sampleImage); await page.waitForTimeout(800); }
+  await selectStage('design');
   await selectTab('holo');
   for (const name of ['Rare Holo Galaxy', 'Rare Holo VMAX', 'Wowa Holo', 'Rare Holo']) {
     await enableToggle(name);
@@ -310,34 +317,38 @@ const main = async () => {
     await colorSweepTab();
   }
 
-  // Phase 4: image uploads (image tab). Use a DIFFERENT image than setup's so the
+  // Phase 4: image uploads (start stage). Use a DIFFERENT image than setup's so the
   // main image input registers a real change (re-uploading the same file is a no-op).
-  console.log('\n— phase 4: image uploads —');
-  await selectTab('image');
+  console.log('\n— phase 4: image uploads + library —');
+  await selectStage('start');
   const altImage = path.resolve(process.cwd(), '..', 'card_images', 'bed_elephant_1.png');
-  const fileInputs = await page.locator('.controls-inner input[type=file]').count();
+  const fileInputs = await page.locator('.start-stage input[type=file]').count();
   for (let i = 0; i < fileInputs; i++) {
     const before = await snapshot();
-    await page.locator('.controls-inner input[type=file]').nth(i).setInputFiles(altImage);
+    await page.locator('.start-stage input[type=file]').nth(i).setInputFiles(altImage);
     await page.waitForTimeout(900);
     const after = await snapshot();
     report(`file input [${i}]`, 'uploaded bed_elephant_1.png', before !== after);
   }
+  // Uploads must land in the reusable image library, and "use as base" must
+  // change the preview (it re-applies the image + custom_image marker).
+  const libCount = await page.locator('.image-library .library-item').count();
+  report('image library', 'uploads appear in library', libCount > 0, `${libCount} item(s)`);
+  if (libCount > 0) {
+    // The newest entry IS the current base image (just uploaded), so applying it
+    // is a no-op; use the oldest entry to guarantee a real change.
+    const item = page.locator('.image-library .library-item').last();
+    const before = await snapshot();
+    await item.hover();
+    await item.locator('button', { hasText: 'base' }).click();
+    await page.waitForTimeout(600);
+    report('image library', 'use as base updates preview', before !== (await snapshot()));
+  }
   await page.screenshot({ path: path.join(SHOTS, '3_after_uploads.png'), fullPage: true });
 
-  // Phase 5: save to server
-  console.log('\n— phase 5: save + publish —');
-  const saveButton = page.locator('.controls-footer button', { hasText: /save/i }).first();
-  if (await saveButton.count()) {
-    await saveButton.click();
-    const feedback = await page.waitForSelector('text=/saved successfully|error/i', { timeout: 8000 }).catch(() => null);
-    const text = feedback ? (await feedback.textContent()).trim() : 'no feedback appeared';
-    report('save card button', 'clicked', !!feedback && /success/i.test(text), text.slice(0, 60));
-  } else {
-    report('save card button', 'find', false, 'not found');
-  }
-
-  // Phase 6: publish flow
+  // Phase 5/6: publish flow (publish stage)
+  console.log('\n— phase 5: publish —');
+  await selectStage('publish');
   const nameInput = page.locator('input[placeholder="Card name"]');
   if (await nameInput.count()) {
     await nameInput.fill('Audit card');
@@ -354,8 +365,10 @@ const main = async () => {
   }
   await page.screenshot({ path: path.join(SHOTS, '4_final.png'), fullPage: true });
 
-  // Phase 7: tags + preset sets
+  // Phase 7: tags + preset sets. Tags + "save set" live in the publish stage;
+  // "load a set" lives in the start stage.
   console.log('\n— phase 7: tags + presets —');
+  await selectStage('publish');
   const tagInput = page.locator('.tag-section input');
   if (await tagInput.count()) {
     await tagInput.fill('audittag');
@@ -366,6 +379,7 @@ const main = async () => {
     await page.locator('.preset-name').fill('Audit set');
     await page.locator('.preset-save').click();
     await page.waitForTimeout(300);
+    await selectStage('start');
     const optionExists = await page.locator('.preset-select option', { hasText: 'Audit set' }).count();
     report('preset save', 'save "Audit set"', optionExists > 0, optionExists > 0 ? 'in dropdown' : 'missing');
 
@@ -374,6 +388,7 @@ const main = async () => {
     await page.waitForTimeout(500);
     await page.selectOption('.preset-select', { label: 'Audit set' }).catch(() => {});
     await page.waitForTimeout(300);
+    await selectStage('publish');
     const restored = await page.locator('.tag-section').locator('text=#audittag').count();
     report('preset load', 'restores tags after reload', restored > 0, restored > 0 ? '#audittag restored' : 'tags not restored');
   } else {

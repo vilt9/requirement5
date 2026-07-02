@@ -2,48 +2,54 @@ import { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import Card from '../components/Card/Card';
 import { useCards } from '../context/CardContext';
-// Import our new components
 import ControlSection from '../components/CardCustomizer/ControlSection';
-import ImageUploader from '../components/CardCustomizer/ImageUploader';
 import ParameterControl from '../components/CardCustomizer/ParameterControl';
 import HoloEffectControls from '../components/CardCustomizer/HoloEffectControls';
 import HoloEffectToggles from '../components/CardCustomizer/HoloEffectToggles';
 import ImageEffectControls from '../components/CardCustomizer/ImageEffectControls';
 import EdgeHighlightControls from '../components/CardCustomizer/EdgeHighlightControls';
 import CentralPanelControls from '../components/CardCustomizer/CentralPanelControls';
-import PublishPanel from '../components/PublishPanel';
-import ColorPicker from '../components/CardCustomizer/ColorPicker';
-import BlendModeSelector from '../components/CardCustomizer/BlendModeSelector';
 import BaseBackgroundControls from '../components/CardCustomizer/BaseBackgroundControls';
-import { generateBaseBackground } from '../utils/cardGenerator';
+import StartStage from '../components/CardCustomizer/StartStage';
+import PublishStage from '../components/CardCustomizer/PublishStage';
+import { generateBaseBackground, generateCardAttributes } from '../utils/cardGenerator';
 import { applyPreset } from '../utils/presets';
-import { TagInput, Select, TextInput, PillButton, Dim } from '../components/UI';
+import { Dim } from '../components/UI';
 
-// Each tab groups the controls for one part of the card, so it's clear what
-// you're editing instead of scrolling one long list.
+// The creation flow runs in three stages, mirroring how a card actually comes
+// together: pick images → design → tag and publish. The stepper is free
+// navigation, not a locked wizard — designing means going back and forth.
+const STAGES = [
+  { key: 'start', label: 'Start' },
+  { key: 'design', label: 'Design' },
+  { key: 'publish', label: 'Publish' },
+];
+
+// Design tabs, ordered by how obviously they change the card: the artwork
+// itself, then the holo systems, then the backdrop, then the frame details.
 const TABS = [
   { key: 'image', label: 'Image' },
   { key: 'holo', label: 'Holographic' },
-  { key: 'frame', label: 'Frame' },
   { key: 'background', label: 'Background' },
+  { key: 'frame', label: 'Frame' },
 ];
 
 const CardCustomizer = () => {
   const {
     currentCard, generateNewCard, updateCustomCard, saveCustomImage, customImages,
-    presets, savePreset, deletePreset
+    presets, savePreset, deletePreset,
+    imageLibrary, addToLibrary, removeFromLibrary
   } = useCards();
   const [customCard, setCustomCard] = useState(null);
+  const [stage, setStage] = useState('start');
   const [activeTab, setActiveTab] = useState('image');
-  const [mainImageFile, setMainImageFile] = useState(null);
-  const [holoImageFile, setHoloImageFile] = useState(null);
   const [mainImagePreview, setMainImagePreview] = useState(null);
   const [holoImagePreview, setHoloImagePreview] = useState(null);
   const [feedback, setFeedback] = useState(null);
   const [presetName, setPresetName] = useState('');
   const [selectedPresetId, setSelectedPresetId] = useState('');
   const [includeImages, setIncludeImages] = useState(false);
-  
+
   // Initialize with a card if none exists
   useEffect(() => {
     if (!currentCard) {
@@ -67,57 +73,93 @@ const CardCustomizer = () => {
       setCustomCard(initializedCard);
     }
   }, [currentCard]);
-  
+
   // Load custom images if they exist
   useEffect(() => {
     if (customImages) {
-      if (customImages.mainImage) {
-        setMainImagePreview(customImages.mainImage);
-      }
-      if (customImages.holoImage) {
-        setHoloImagePreview(customImages.holoImage);
-      }
+      if (customImages.mainImage) setMainImagePreview(customImages.mainImage);
+      if (customImages.holoImage) setHoloImagePreview(customImages.holoImage);
     }
   }, [customImages]);
-  
-  // Handle main image file selection
-  const handleMainImageChange = (e) => {
+
+  const flash = (text) => {
+    setFeedback(text);
+    setTimeout(() => setFeedback(null), 4000);
+  };
+
+  // ---- images (Start stage; also fed by the library) ----
+
+  const applyMainImage = (imageDataUrl) => {
+    setMainImagePreview(imageDataUrl);
+    if (customCard) {
+      setCustomCard({
+        ...customCard,
+        customImageUrl: imageDataUrl,
+        imagePath: 'custom_image' // marker so Card uses customImageUrl
+      });
+      saveCustomImage('mainImage', imageDataUrl);
+    }
+  };
+
+  const applyHoloImage = (imageDataUrl) => {
+    setHoloImagePreview(imageDataUrl);
+    if (customCard) {
+      setCustomCard({
+        ...customCard,
+        customHoloImageUrl: imageDataUrl,
+        // Force a high enough rarity to ensure the holo layer is visible.
+        rarity: Math.max(customCard.rarity, 0.7),
+        // A custom holo image replaces the CSS-based holo systems.
+        holoEffects: {
+          rareHolo: false,
+          rareHoloGalaxy: false,
+          wowaHolo: false,
+          rareHoloVmax: false
+        }
+      });
+      saveCustomImage('holoImage', imageDataUrl);
+    }
+  };
+
+  const readFileAsDataUrl = (e, apply) => {
     const file = e.target.files[0];
     if (!file) return;
-    
-    setMainImageFile(file);
-    
-    // Create a preview URL
     const reader = new FileReader();
     reader.onloadend = () => {
-      const imageDataUrl = reader.result;
-      setMainImagePreview(imageDataUrl);
-      
-      // Update card with new image
-      if (customCard) {
-        // For custom images, we need to use a special format that Card component will recognize
-        // Instead of setting imagePath directly, we'll create a custom image object
-        // that the Card component can handle properly
-        const updatedCard = { 
-          ...customCard, 
-          customImageUrl: imageDataUrl, // Add the data URL directly to the card
-          imagePath: 'custom_image' // Set a marker so the Card component can use the customImageUrl
-        };
-        setCustomCard(updatedCard);
-        saveCustomImage('mainImage', imageDataUrl);
-      }
+      apply(reader.result);
+      addToLibrary(reader.result);
     };
     reader.readAsDataURL(file);
   };
-  
-  // Handle parameter changes with sliders or direct input
+
+  const handleMainImageChange = (e) => readFileAsDataUrl(e, applyMainImage);
+  const handleHoloImageChange = (e) => readFileAsDataUrl(e, applyHoloImage);
+
+  const handleUseLibraryImage = (dataUrl, slot) => {
+    if (slot === 'holo') applyHoloImage(dataUrl);
+    else applyMainImage(dataUrl);
+  };
+
+  // Roll a fresh design (colours, background, effects) but keep the images —
+  // starting over shouldn't cost you your uploads.
+  const handleRandomizeDesign = () => {
+    const fresh = generateCardAttributes();
+    setCustomCard({
+      ...fresh,
+      tags: customCard?.tags || [],
+      ...(mainImagePreview ? { customImageUrl: mainImagePreview, imagePath: 'custom_image' } : {}),
+      ...(holoImagePreview ? { customHoloImageUrl: holoImagePreview } : {})
+    });
+    flash('Rolled a fresh design (images kept).');
+  };
+
   // Roll a fresh coherent base background (palette + fade + texture) in one click.
   const handleRandomizeBackground = () => {
     if (!customCard) return;
     setCustomCard({ ...customCard, baseBackground: generateBaseBackground() });
   };
 
-  // Tags edited in the footer; stored on the card so they travel with save/publish.
+  // Tags edited in the publish stage; stored on the card so they travel with save/publish.
   const setTags = (tags) => {
     if (!customCard) return;
     setCustomCard({ ...customCard, tags });
@@ -136,8 +178,7 @@ const CardCustomizer = () => {
     // If the set carried images, reflect them in the upload previews too.
     if (preset.images?.customImageUrl) setMainImagePreview(preset.images.customImageUrl);
     if (preset.images?.customHoloImageUrl) setHoloImagePreview(preset.images.customHoloImageUrl);
-    setFeedback(`Loaded set "${preset.name}"${preset.images ? ' (with images)' : ''}.`);
-    setTimeout(() => setFeedback(null), 4000);
+    flash(`Loaded set "${preset.name}"${preset.images ? ' (with images)' : ''}.`);
   };
 
   // Save the current design + tags as a named set (optionally with the images).
@@ -148,37 +189,28 @@ const CardCustomizer = () => {
     if (preset) {
       setSelectedPresetId(preset.id);
       setPresetName('');
-      setFeedback(`Saved set "${preset.name}"${includeImages ? ' with images' : ''}.`);
-      setTimeout(() => setFeedback(null), 4000);
+      flash(`Saved set "${preset.name}"${includeImages ? ' with images' : ''}.`);
     }
-  };
-
-  // Delete the currently selected set.
-  const handleDeletePreset = async () => {
-    if (!selectedPresetId) return;
-    await deletePreset(selectedPresetId);
-    setSelectedPresetId('');
   };
 
   const handleParamChange = (param, value, isNumeric = true) => {
     if (!customCard) return;
-    
-    
+
     let updatedValue = value;
     if (isNumeric) {
       updatedValue = parseFloat(value);
       if (isNaN(updatedValue)) return;
     }
-    
+
     // Create a deep copy of the card to avoid reference issues
     const updatedCard = JSON.parse(JSON.stringify(customCard));
-    
+
     // Handle nested properties like effectParams.shineIntensity
     if (param.includes('.')) {
       const [parent, child] = param.split('.');
       if (!updatedCard[parent]) updatedCard[parent] = {};
       updatedCard[parent][child] = updatedValue;
-      
+
       // If we're turning ON a holo effect, initialize its default parameters
       if (parent === 'holoEffects' && child === 'rareHoloGalaxy' && updatedValue === true) {
         updatedCard.rareHoloGalaxyParams = {
@@ -206,7 +238,7 @@ const CardCustomizer = () => {
           ]
         };
       }
-      
+
       // If we're turning ON Rare Holo effect, initialize its default parameters
       if (parent === 'holoEffects' && child === 'rareHolo' && updatedValue === true) {
         updatedCard.rareHoloParams = {
@@ -237,216 +269,198 @@ const CardCustomizer = () => {
     } else {
       updatedCard[param] = updatedValue;
     }
-    
+
     setCustomCard(updatedCard);
   };
-  
-  // Handle holo image upload
-  const handleHoloImageUpload = (e) => {
-    
-    const file = e.target.files[0];
-    if (!file) {
-      return;
-    }
-    
-    
-    // Create a preview URL
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const holoImageDataUrl = reader.result;
-      setHoloImagePreview(holoImageDataUrl);
-      
-      // Update card with new holo image
-      if (customCard) {
-        // Add the custom holo image to the card data
-        const updatedCard = { 
-          ...customCard, 
-          customHoloImageUrl: holoImageDataUrl,
-          // Force a high enough rarity to ensure holographic effect is visible
-          rarity: Math.max(customCard.rarity, 0.7),
-          // IMPORTANT: Disable ALL CSS-based holo effects when using custom image
-                  holoEffects: {
-          rareHolo: false,
-          rareHoloGalaxy: false,
-          wowaHolo: false,
-          rareHoloVmax: false
-        }
-        };
-        
-        
-        setCustomCard(updatedCard);
-        saveCustomImage('holoImage', holoImageDataUrl);
-      }
-    };
-    reader.readAsDataURL(file);
-  };
-  
+
+  const stageIndex = STAGES.findIndex(s => s.key === stage);
+
   return (
     <CustomizerContainer className="customizer-container">
-      <h1 className="customizer-title">Card Customizer</h1>
+      <Header>
+        <div className="title">Create a card</div>
+        <Dim>Start with images, design the effects, then tag and publish.</Dim>
+      </Header>
+
       <CustomizerLayout className="customizer-layout">
         <CardPreviewSection className="card-preview-section">
-          {customCard && (
+          {customCard && <Card cardData={customCard} />}
+        </CardPreviewSection>
+
+        <ControlsSection className="controls-section">
+          {/* The three-stage stepper. Click any stage; nothing is locked. */}
+          <Stepper className="customizer-stepper">
+            {STAGES.map((s, i) => (
+              <StepButton
+                key={s.key}
+                type="button"
+                className="customizer-stage"
+                data-stage={s.key}
+                $active={stage === s.key}
+                $done={i < stageIndex}
+                onClick={() => setStage(s.key)}
+              >
+                <span className="num">{i + 1}</span> {s.label}
+              </StepButton>
+            ))}
+          </Stepper>
+
+          {stage === 'start' && (
+            <StageBody>
+              <StartStage
+                mainImagePreview={mainImagePreview}
+                holoImagePreview={holoImagePreview}
+                onMainImageChange={handleMainImageChange}
+                onHoloImageChange={handleHoloImageChange}
+                onUseLibraryImage={handleUseLibraryImage}
+                imageLibrary={imageLibrary}
+                onRemoveLibraryImage={removeFromLibrary}
+                presets={presets}
+                selectedPresetId={selectedPresetId}
+                onLoadPreset={handleLoadPreset}
+                onDeletePreset={async () => { await deletePreset(selectedPresetId); setSelectedPresetId(''); }}
+                onRandomizeDesign={handleRandomizeDesign}
+                onNext={() => setStage('design')}
+              />
+              {feedback && <Dim className="customizer-feedback">{feedback}</Dim>}
+            </StageBody>
+          )}
+
+          {stage === 'design' && (
             <>
-              <Card cardData={customCard} />
+              {/* Current images, one glance + one click back to swap them. */}
+              <CurrentImages className="current-images">
+                <button type="button" onClick={() => setStage('start')} title="Change images (back to Start)">
+                  {mainImagePreview
+                    ? <img src={mainImagePreview} alt="base" />
+                    : <span className="ph">no base</span>}
+                </button>
+                <button type="button" onClick={() => setStage('start')} title="Change images (back to Start)">
+                  {holoImagePreview
+                    ? <img src={holoImagePreview} alt="holo" />
+                    : <span className="ph">no holo</span>}
+                </button>
+                <Dim>images — click to change</Dim>
+              </CurrentImages>
+
+              {/* Tabs: pick which part of the card to customize. */}
+              <TabBar className="customizer-tabs">
+                {TABS.map((tab) => (
+                  <TabButton
+                    key={tab.key}
+                    type="button"
+                    className="customizer-tab"
+                    data-tab={tab.key}
+                    $active={activeTab === tab.key}
+                    onClick={() => setActiveTab(tab.key)}
+                  >
+                    {tab.label}
+                  </TabButton>
+                ))}
+              </TabBar>
+
+              <ControlsInner className="controls-inner">
+                {activeTab === 'image' && (
+                  <ImageEffectControls
+                    className="image-effect-controls"
+                    customCard={customCard}
+                    handleParamChange={handleParamChange}
+                  />
+                )}
+
+                {activeTab === 'holo' && (
+                  <>
+                    <HoloEffectToggles
+                      className="holo-effect-toggles"
+                      customCard={customCard}
+                      handleParamChange={handleParamChange}
+                    />
+                    <HoloEffectControls
+                      customCard={customCard}
+                      handleParamChange={handleParamChange}
+                    />
+                  </>
+                )}
+
+                {activeTab === 'background' && (
+                  <BaseBackgroundControls
+                    customCard={customCard}
+                    handleParamChange={handleParamChange}
+                    onRandomize={handleRandomizeBackground}
+                  />
+                )}
+
+                {activeTab === 'frame' && (
+                  <>
+                    <EdgeHighlightControls
+                      customCard={customCard}
+                      handleParamChange={handleParamChange}
+                    />
+                    <CentralPanelControls
+                      customCard={customCard}
+                      handleParamChange={handleParamChange}
+                    />
+                    <ControlSection title="Border Image" className="additional-card-settings">
+                      <ControlsGrid>
+                        <ParameterControl
+                          className="border-image-opacity-control"
+                          label="Border Image Opacity"
+                          param="borderEffects.imageOpacity"
+                          value={customCard?.borderEffects?.imageOpacity ?? 0.5}
+                          onChange={handleParamChange}
+                        />
+                      </ControlsGrid>
+                    </ControlSection>
+                  </>
+                )}
+              </ControlsInner>
+
+              <StageFooter className="controls-footer">
+                {feedback && <Dim className="customizer-feedback">{feedback}</Dim>}
+                <NextButton type="button" className="stage-next" onClick={() => setStage('publish')}>
+                  Next: publish →
+                </NextButton>
+              </StageFooter>
             </>
           )}
-        </CardPreviewSection>
-        
-        <ControlsSection className="controls-section">
-          {/* Preset sets: load a saved starting point, or save the current look as one. */}
-          <PresetBar className="preset-bar">
-            <Select
-              className="preset-select"
-              value={selectedPresetId}
-              onChange={(e) => handleLoadPreset(e.target.value)}
-            >
-              <option value="">Load a set…</option>
-              {presets.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </Select>
-            {selectedPresetId && (
-              <PillButton
-                $secondary
-                type="button"
-                className="preset-delete"
-                onClick={handleDeletePreset}
-                title="Delete this set"
-              >✕</PillButton>
-            )}
-            <TextInput
-              className="preset-name"
-              placeholder="name this set"
-              value={presetName}
-              onChange={(e) => setPresetName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleSavePreset(); }}
-            />
-            <ImgToggle className="preset-include-images" title="Also store the base & holo images in this set">
-              <input
-                type="checkbox"
-                checked={includeImages}
-                onChange={(e) => setIncludeImages(e.target.checked)}
-              />
-              include images
-            </ImgToggle>
-            <PillButton type="button" className="preset-save" onClick={handleSavePreset}>
-              Save set
-            </PillButton>
-          </PresetBar>
-          <PresetNote className="preset-note">
-            A "set" saves the current base settings — colours, effects, background and
-            default tags — as a reusable preset/default to start new cards from. Tick
-            "include images" to also store the uploaded base and holo images so you can
-            reuse them.
-          </PresetNote>
 
-          {/* Tabs: pick which part of the card to customize. */}
-          <TabBar className="customizer-tabs">
-            {TABS.map((tab) => (
-              <TabButton
-                key={tab.key}
-                type="button"
-                className="customizer-tab"
-                data-tab={tab.key}
-                $active={activeTab === tab.key}
-                onClick={() => setActiveTab(tab.key)}
-              >
-                {tab.label}
-              </TabButton>
-            ))}
-          </TabBar>
-
-          <ControlsInner className="controls-inner">
-            {activeTab === 'image' && (
-              <ImageEffectControls
-                className="image-effect-controls"
+          {stage === 'publish' && (
+            <StageBody className="controls-footer">
+              <PublishStage
                 customCard={customCard}
-                handleParamChange={handleParamChange}
-                handleMainImageChange={handleMainImageChange}
-                mainImagePreview={mainImagePreview}
+                onTagsChange={setTags}
+                presetName={presetName}
+                onPresetNameChange={setPresetName}
+                includeImages={includeImages}
+                onIncludeImagesChange={setIncludeImages}
+                onSavePreset={handleSavePreset}
+                feedback={feedback}
               />
-            )}
-
-            {activeTab === 'holo' && (
-              <>
-                <HoloEffectToggles
-                  className="holo-effect-toggles"
-                  customCard={customCard}
-                  handleParamChange={handleParamChange}
-                />
-                <HoloEffectControls
-                  customCard={customCard}
-                  handleParamChange={handleParamChange}
-                  handleHoloImageUpload={handleHoloImageUpload}
-                  holoImagePreview={holoImagePreview}
-                />
-              </>
-            )}
-
-            {activeTab === 'frame' && (
-              <>
-                <EdgeHighlightControls
-                  customCard={customCard}
-                  handleParamChange={handleParamChange}
-                />
-                <CentralPanelControls
-                  customCard={customCard}
-                  handleParamChange={handleParamChange}
-                />
-                <ControlSection title="Border Image" className="additional-card-settings">
-                  <ControlsGrid>
-                    <ParameterControl
-                      className="border-image-opacity-control"
-                      label="Border Image Opacity"
-                      param="borderEffects.imageOpacity"
-                      value={customCard?.borderEffects?.imageOpacity ?? 0.5}
-                      onChange={handleParamChange}
-                    />
-                  </ControlsGrid>
-                </ControlSection>
-              </>
-            )}
-
-            {activeTab === 'background' && (
-              <BaseBackgroundControls
-                customCard={customCard}
-                handleParamChange={handleParamChange}
-                onRandomize={handleRandomizeBackground}
-              />
-            )}
-          </ControlsInner>
-
-          {/* Save + publish stay available from every tab. */}
-          <ControlsFooter className="controls-footer">
-            <TagSection className="tag-section">
-              <TagLabel>Tags</TagLabel>
-              <Dim style={{ fontSize: 10 }}>Saved with the card; shown across the pool and your collection.</Dim>
-              <TagInput value={customCard?.tags || []} onChange={setTags} />
-            </TagSection>
-            {feedback && <Dim className="customizer-feedback">{feedback}</Dim>}
-            <PublishPanel customCard={customCard} />
-          </ControlsFooter>
+            </StageBody>
+          )}
         </ControlsSection>
       </CustomizerLayout>
     </CustomizerContainer>
   );
 };
 
-// Only keep the minimal styled components we need for layout
+// Page chrome in the same register as the card pages: left-aligned,
+// 13px mono, amber on black.
 const CustomizerContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
   width: 100%;
-  padding: 20px;
-  
-  h1 {
-    font-family: var(--font-sans);
-    margin-bottom: 20px;
-    font-size: 24px;
-    color: var(--white);
-  }
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px 15px 64px;
+`;
+
+const Header = styled.div`
+  text-align: left;
+  margin-bottom: 14px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+
+  .title { color: var(--amber-text); }
 `;
 
 const CustomizerLayout = styled.div`
@@ -454,8 +468,7 @@ const CustomizerLayout = styled.div`
   grid-template-columns: 1fr 1fr;
   gap: 20px;
   width: 100%;
-  max-width: 1200px;
-  
+
   @media (max-width: 768px) {
     grid-template-columns: 1fr;
   }
@@ -464,70 +477,84 @@ const CustomizerLayout = styled.div`
 const CardPreviewSection = styled.div`
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
+  padding-top: 10px;
 `;
 
 const ControlsSection = styled.div`
   background: var(--panel);
   border: 1px solid var(--panel-border);
   border-radius: 8px;
-  padding: 16px 20px 20px;
+  padding: 14px 16px 16px;
   color: var(--amber-text);
   font-family: var(--font-mono);
   position: relative;
-  max-height: 600px;
+  max-height: 640px;
   display: flex;
   flex-direction: column;
+  /* Body copy reads left-aligned (the app root centers text globally). */
+  text-align: left;
 `;
 
-const PresetBar = styled.div`
+const Stepper = styled.div`
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 6px;
-  flex-shrink: 0;
-
-  .preset-select { flex: 1; min-width: 120px; }
-  .preset-name { flex: 1; min-width: 120px; }
-  .preset-delete { padding: 6px 10px; }
-  .preset-save { white-space: nowrap; }
-`;
-
-const ImgToggle = styled.label`
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  white-space: nowrap;
-  font-size: 11px;
-  color: var(--amber-text);
-  cursor: pointer;
-
-  input { accent-color: var(--gold); cursor: pointer; }
-`;
-
-const PresetNote = styled.p`
-  margin: 0 0 12px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--panel-border);
-  font-size: 10px;
-  line-height: 1.45;
-  color: var(--amber-dim);
-  flex-shrink: 0;
-`;
-
-const TagSection = styled.div`
-  display: flex;
-  flex-direction: column;
   gap: 4px;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
+  flex-shrink: 0;
 `;
 
-const TagLabel = styled.div`
-  font-family: var(--font-sans);
-  font-weight: 600;
-  color: var(--white);
-  letter-spacing: -0.01em;
+const StepButton = styled.button`
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 8px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid ${({ $active }) => ($active ? 'var(--gold)' : 'var(--panel-border)')};
+  background: ${({ $active }) => ($active ? 'var(--panel-hover)' : 'var(--field-bg)')};
+  color: ${({ $active, $done }) => ($active ? 'var(--gold-bright)' : $done ? 'var(--amber-text)' : 'var(--amber-dim)')};
+  transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+
+  .num {
+    display: inline-block;
+    margin-right: 3px;
+    opacity: 0.7;
+  }
+
+  &:hover {
+    color: var(--white);
+    border-color: var(--gold);
+  }
+`;
+
+const StageBody = styled.div`
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  padding-right: 10px;
+`;
+
+const CurrentImages = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-shrink: 0;
+  font-size: 11px;
+
+  button {
+    width: 34px;
+    height: 44px;
+    padding: 0;
+    border-radius: 4px;
+    border: 1px solid var(--panel-border);
+    background: var(--field-bg);
+    overflow: hidden;
+    cursor: pointer;
+    &:hover { border-color: var(--gold); }
+    img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .ph { font-size: 8px; color: var(--amber-dim); font-family: var(--font-mono); }
+  }
 `;
 
 const TabBar = styled.div`
@@ -539,11 +566,9 @@ const TabBar = styled.div`
 
 const TabButton = styled.button`
   flex: 1;
-  font-family: var(--font-sans);
-  font-weight: ${({ $active }) => ($active ? 700 : 500)};
-  font-size: 11px;
-  letter-spacing: -0.01em;
-  padding: 8px 6px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 7px 6px;
   border-radius: 4px;
   cursor: pointer;
   border: 1px solid ${({ $active }) => ($active ? 'var(--gold)' : 'var(--panel-border)')};
@@ -564,18 +589,37 @@ const ControlsInner = styled.div`
   padding-right: 10px; /* Add some padding for the scrollbar */
 `;
 
-const ControlsFooter = styled.div`
+const StageFooter = styled.div`
   flex-shrink: 0;
-  margin-top: 14px;
-  padding-top: 14px;
+  margin-top: 12px;
+  padding-top: 12px;
   border-top: 1px solid var(--panel-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+`;
+
+const NextButton = styled.button`
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 12px;
+  padding: 7px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  border: 1px solid var(--gold);
+  background: var(--gold);
+  color: #140d03;
+  transition: background 0.15s;
+  &:hover { background: var(--gold-bright); }
 `;
 
 const ControlsGrid = styled.div`
   display: grid;
   grid-template-columns: 1fr;
   gap: 15px;
-  
+
   @media (min-width: 500px) {
     grid-template-columns: 1fr 1fr;
   }
