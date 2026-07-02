@@ -37,15 +37,13 @@ const TABS = [
 
 const CardCustomizer = () => {
   const {
-    currentCard, generateNewCard, updateCustomCard, saveCustomImage, customImages,
+    currentCard, generateNewCard, updateCustomCard,
     presets, savePreset, deletePreset,
     imageLibrary, addToLibrary, removeFromLibrary
   } = useCards();
   const [customCard, setCustomCard] = useState(null);
   const [stage, setStage] = useState('start');
   const [activeTab, setActiveTab] = useState('image');
-  const [mainImagePreview, setMainImagePreview] = useState(null);
-  const [holoImagePreview, setHoloImagePreview] = useState(null);
   const [feedback, setFeedback] = useState(null);
   const [presetName, setPresetName] = useState('');
   const [selectedPresetId, setSelectedPresetId] = useState('');
@@ -54,6 +52,26 @@ const CardCustomizer = () => {
   // viewport we dock the card as a small fixed preview so feedback stays live.
   const previewRef = useRef(null);
   const [previewDocked, setPreviewDocked] = useState(false);
+  // Preview motion: hover can't be held on touch screens, so the card can run
+  // a simulated hover. 'auto' (default) alternates moving and resting so you
+  // see both states; 'on' keeps it moving; 'off' rests it.
+  const [motionMode, setMotionMode] = useState('auto');
+  const [tourPhase, setTourPhase] = useState(true);
+
+  useEffect(() => {
+    if (motionMode !== 'auto') return;
+    let cancelled = false;
+    let timer;
+    const cycle = (on) => {
+      if (cancelled) return;
+      setTourPhase(on);
+      timer = setTimeout(() => cycle(!on), on ? 6000 : 3000);
+    };
+    cycle(true);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [motionMode]);
+
+  const autoTour = motionMode === 'on' || (motionMode === 'auto' && tourPhase);
 
   useEffect(() => {
     const el = previewRef.current;
@@ -94,13 +112,11 @@ const CardCustomizer = () => {
     }
   }, [currentCard]);
 
-  // Load custom images if they exist
-  useEffect(() => {
-    if (customImages) {
-      if (customImages.mainImage) setMainImagePreview(customImages.mainImage);
-      if (customImages.holoImage) setHoloImagePreview(customImages.holoImage);
-    }
-  }, [customImages]);
+  // The upload previews ARE the card's images — derived, never separately
+  // stored. A fresh card starts with empty slots; a set loaded with images
+  // fills them; the library is where past uploads live.
+  const mainImagePreview = customCard?.customImageUrl || null;
+  const holoImagePreview = customCard?.customHoloImageUrl || null;
 
   const flash = (text) => {
     setFeedback(text);
@@ -110,35 +126,29 @@ const CardCustomizer = () => {
   // ---- images (Start stage; also fed by the library) ----
 
   const applyMainImage = (imageDataUrl) => {
-    setMainImagePreview(imageDataUrl);
-    if (customCard) {
-      setCustomCard({
-        ...customCard,
-        customImageUrl: imageDataUrl,
-        imagePath: 'custom_image' // marker so Card uses customImageUrl
-      });
-      saveCustomImage('mainImage', imageDataUrl);
-    }
+    if (!customCard) return;
+    setCustomCard({
+      ...customCard,
+      customImageUrl: imageDataUrl,
+      imagePath: 'custom_image' // marker so Card uses customImageUrl
+    });
   };
 
   const applyHoloImage = (imageDataUrl) => {
-    setHoloImagePreview(imageDataUrl);
-    if (customCard) {
-      setCustomCard({
-        ...customCard,
-        customHoloImageUrl: imageDataUrl,
-        // Force a high enough rarity to ensure the holo layer is visible.
-        rarity: Math.max(customCard.rarity, 0.7),
-        // A custom holo image replaces the CSS-based holo systems.
-        holoEffects: {
-          rareHolo: false,
-          rareHoloGalaxy: false,
-          wowaHolo: false,
-          rareHoloVmax: false
-        }
-      });
-      saveCustomImage('holoImage', imageDataUrl);
-    }
+    if (!customCard) return;
+    setCustomCard({
+      ...customCard,
+      customHoloImageUrl: imageDataUrl,
+      // Force a high enough rarity to ensure the holo layer is visible.
+      rarity: Math.max(customCard.rarity, 0.7),
+      // A custom holo image replaces the CSS-based holo systems.
+      holoEffects: {
+        rareHolo: false,
+        rareHoloGalaxy: false,
+        wowaHolo: false,
+        rareHoloVmax: false
+      }
+    });
   };
 
   const readFileAsDataUrl = (e, apply) => {
@@ -195,9 +205,6 @@ const CardCustomizer = () => {
     const next = applyPreset(customCard, preset);
     setCustomCard(next);
     updateCustomCard(next);
-    // If the set carried images, reflect them in the upload previews too.
-    if (preset.images?.customImageUrl) setMainImagePreview(preset.images.customImageUrl);
-    if (preset.images?.customHoloImageUrl) setHoloImagePreview(preset.images.customHoloImageUrl);
     flash(`Loaded set "${preset.name}"${preset.images ? ' (with images)' : ''}.`);
   };
 
@@ -302,7 +309,19 @@ const CardCustomizer = () => {
           ref={previewRef}
           className={`card-preview-section${previewDocked ? ' preview-docked' : ''}`}
         >
-          {customCard && <Card cardData={customCard} />}
+          {customCard && <Card cardData={customCard} autoTour={autoTour} />}
+          <PreviewTools className="preview-tools">
+            <span className="lab">motion</span>
+            {['auto', 'on', 'off'].map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                data-motion={mode}
+                className={motionMode === mode ? 'active' : ''}
+                onClick={() => setMotionMode(mode)}
+              >{mode}</button>
+            ))}
+          </PreviewTools>
         </CardPreviewSection>
 
         <ControlsSection className="controls-section">
@@ -489,8 +508,10 @@ const CustomizerLayout = styled.div`
 
 const CardPreviewSection = styled.div`
   display: flex;
-  justify-content: center;
-  align-items: flex-start;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 4px;
   padding-top: 10px;
 
   /* Phones: once scrolled past, the card docks top-right as a small live
@@ -510,6 +531,38 @@ const CardPreviewSection = styled.div`
       transform-origin: top right;
       pointer-events: none;
     }
+    /* The motion toggle rides along under the docked mini card. */
+    &.preview-docked .preview-tools {
+      position: fixed;
+      top: 140px;
+      right: 8px;
+      z-index: 1100;
+    }
+  }
+`;
+
+const PreviewTools = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+
+  .lab { color: var(--amber-dim); margin-right: 2px; }
+
+  button {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 10px;
+    border: 1px solid var(--panel-border);
+    background: var(--field-bg);
+    color: var(--amber-dim);
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+
+    &:hover { color: var(--white); border-color: var(--gold); }
+    &.active { color: var(--gold-bright); border-color: var(--gold); }
   }
 `;
 

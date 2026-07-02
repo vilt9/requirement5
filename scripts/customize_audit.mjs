@@ -54,6 +54,10 @@ const main = async () => {
   await page.goto(`${APP_URL}/customize`, { waitUntil: 'networkidle' });
   await page.waitForSelector('.card-preview-section', { timeout: 10000 });
   await page.waitForTimeout(800);
+  // The preview's auto motion continuously mutates the card's inline styles,
+  // which would make every before/after snapshot diff spuriously — rest it.
+  await page.locator('.preview-tools button[data-motion=off]').click().catch(() => {});
+  await page.waitForTimeout(300);
   await page.screenshot({ path: path.join(SHOTS, '0_initial.png'), fullPage: true });
 
   // Snapshot of the preview card: inline styles + generated classes change when params do.

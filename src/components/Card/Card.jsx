@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import * as S from './Card.styles';
 import PropTypes from 'prop-types';
-import { motion } from 'framer-motion';
 import { getHolographicEffectClass } from '../../utils/cardGenerator';
 import CustomHoloEffect from './CustomHoloEffect';
 
@@ -23,13 +22,14 @@ const buildBaseBackground = (bg) => {
   return `linear-gradient(${angle}deg, ${stops})`;
 };
 
-const Card = ({ cardData, isInteractive = true, onClick }) => {
+const Card = ({ cardData, isInteractive = true, onClick, autoTour = false }) => {
   const [isFlipped, setIsFlipped] = useState(false);
   const [isMoving, setIsMoving] = useState(false);
   const [failedSrc, setFailedSrc] = useState(null); // hides an image that 404s, per-src, so it can't flicker
-  const [mousePosition, setMousePosition] = useState({ x: 50, y: 50, rotateX: 0, rotateY: 0, hyp: 0, angle: 0 });
   const cardRef = useRef(null);
   const cardSceneRef = useRef(null);
+  // True while a real pointer is over the card — the auto tour yields to it.
+  const pointerActiveRef = useRef(false);
   
   // Helper function to set CSS variables on both CardScene and CardContainer
   // IMPORTANT: CSS variables set on both elements to ensure inheritance works in Chrome
@@ -140,35 +140,34 @@ const Card = ({ cardData, isInteractive = true, onClick }) => {
     cardRef.current.style.transform = transform;
     
     // Update React state for other component behaviors
-    setMousePosition({ x, y, rotateX, rotateY, hyp, angle });
     setIsMoving(true);
   };
   
   // Handle mouse enter to activate effects
   const handleMouseEnter = () => {
+    pointerActiveRef.current = true;
     if (!isInteractive || !cardRef.current) return;
-    
-    
+
+
     // Add moving class and remove floating class
     cardRef.current.classList.add('moving');
     cardRef.current.classList.remove('floating');
-    
+
     setIsMoving(true);
   };
-  
-  // Handle mouse leave to deactivate effects
-  const handleMouseLeave = () => {
+
+  // Return the card to its rest state (classes, transform, CSS vars).
+  const resetToRest = () => {
     if (!isInteractive || !cardRef.current) return;
-    
-    
+
     // Add floating class and remove moving class
     cardRef.current.classList.remove('moving');
     cardRef.current.classList.add('floating');
-    
+
     // Reset transform directly
     const transform = isFlipped ? 'rotateY(180deg)' : '';
     cardRef.current.style.transform = transform;
-    
+
     // Reset CSS properties to center
     setCardCSSVariables({
       mx: '50%',
@@ -179,10 +178,17 @@ const Card = ({ cardData, isInteractive = true, onClick }) => {
       'tilt-x': '0',
       'tilt-y': '0'
     });
-    
+
     // Update React state
     setIsMoving(false);
-    setMousePosition({ x: 50, y: 50, rotateX: 0, rotateY: 0, hyp: 0, angle: 0 });
+  };
+
+  // Handle mouse leave to deactivate effects
+  const handleMouseLeave = () => {
+    pointerActiveRef.current = false;
+    // The tour owns the card while active — don't snap back to rest.
+    if (autoTour) return;
+    resetToRest();
   };
   
   // Handle card click for flip
@@ -314,7 +320,42 @@ const Card = ({ cardData, isInteractive = true, onClick }) => {
     setCardCSSVariables(vars);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cardData, holoEffects, customHoloImageUrl]);
-  
+
+  // Auto tour: a synthetic pointer orbits the card, driving the exact same
+  // tilt/shine math as a real hover — this is how touch screens (no hover)
+  // get to see the holographic effects move. A real pointer pauses it.
+  useEffect(() => {
+    if (!autoTour || !isInteractive || !cardRef.current) return;
+    const card = cardRef.current;
+    card.classList.add('moving');
+    card.classList.remove('floating');
+    setIsMoving(true);
+
+    let raf;
+    const started = performance.now();
+    const tick = (t) => {
+      raf = requestAnimationFrame(tick);
+      if (pointerActiveRef.current || !cardRef.current) return;
+      const rect = cardRef.current.getBoundingClientRect();
+      // A slow lissajous sweep — covers corners and edges, never repeats
+      // exactly, and stays gentle enough to read the card.
+      const phase = ((t - started) / 7000) * Math.PI * 2;
+      const nx = Math.sin(phase) * 0.6;
+      const ny = Math.cos(phase * 0.8) * 0.45;
+      handleMouseMove({
+        clientX: rect.left + rect.width / 2 + nx * (rect.width / 2),
+        clientY: rect.top + rect.height / 2 + ny * (rect.height / 2)
+      });
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      // Hand the card back to rest unless a real pointer holds it.
+      if (!pointerActiveRef.current) resetToRest();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoTour, isInteractive]);
+
   // Early return if no card data
   if (!cardData) return null;
   
