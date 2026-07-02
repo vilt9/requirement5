@@ -39,7 +39,7 @@ describe('card CRUD', () => {
 
   test('POST / creates a card owned by the authenticated user (never anonymous)', async () => {
     const card = await makeCard();
-    expect(card.id).toMatch(/^card_\d+$/);
+    expect(card.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
     expect(card.name).toBe('Test card');
     expect(card.creator_id).toBe(userId);
     expect(card.creator_id).not.toBe('anonymous');

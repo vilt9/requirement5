@@ -42,7 +42,6 @@ export const hydrate = async (db) => {
 
   const singles = (await pool.query('SELECT key, data FROM singletons')).rows;
   for (const { key, data } of singles) {
-    if (key === 'counters') db.counters = { ...db.counters, ...data };
     if (key === 'cloud') db.cloud = { ...db.cloud, ...data };
   }
 };
@@ -85,9 +84,9 @@ export const flush = async ({ db, dirty, removed, truncate }) => {
     }
 
     await client.query(
-      `INSERT INTO singletons (key, data) VALUES ('counters', $1::jsonb), ('cloud', $2::jsonb)
+      `INSERT INTO singletons (key, data) VALUES ('cloud', $1::jsonb)
        ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data`,
-      [JSON.stringify(db.counters), JSON.stringify(db.cloud)]
+      [JSON.stringify(db.cloud)]
     );
 
     await client.query('COMMIT');

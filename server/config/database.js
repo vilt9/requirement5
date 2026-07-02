@@ -6,6 +6,7 @@
 // Reads never hit the backend, so no call site changed when Postgres was added.
 import fs from 'fs';
 import path from 'path';
+import crypto from 'node:crypto';
 import {
   connect as pgConnect,
   ping as pgPing,
@@ -27,7 +28,6 @@ const db = {
   users: [],
   transactions: [],
   saves: [],
-  counters: { card: 1, user: 1, txn: 1, save: 1 },
   // The cloud (system treasury). total_issued counts grants + yields,
   // total_absorbed counts save remainders + publish stakes.
   cloud: { total_issued: 0, total_absorbed: 0 }
@@ -117,7 +117,6 @@ const load = () => {
     for (const key of ['cards', 'users', 'transactions', 'saves']) {
       if (Array.isArray(loaded[key])) db[key] = loaded[key];
     }
-    if (loaded.counters) db.counters = { ...db.counters, ...loaded.counters };
     if (loaded.cloud) db.cloud = { ...db.cloud, ...loaded.cloud };
   } catch (error) {
     console.error('Failed to load database file, starting empty:', error);
@@ -143,7 +142,7 @@ const memoryDb = {
       times_drawn: card.times_drawn || 0,
       times_saved: card.times_saved || 0,
       ...card,
-      id: card.id || `card_${db.counters.card++}`,
+      id: card.id || crypto.randomUUID(),
       created_at: card.created_at || now(),
       updated_at: card.updated_at || now(),
       creator_id: card.creator_id || 'anonymous',
@@ -246,7 +245,7 @@ const memoryDb = {
   createUser: (user) => {
     const newUser = {
       ...user,
-      id: user.id || `user_${db.counters.user++}`,
+      id: user.id || crypto.randomUUID(),
       balance: user.balance || 0,
       yield_today: 0,
       yield_day: null,
@@ -278,7 +277,7 @@ const memoryDb = {
   createTransaction: (txn) => {
     const newTxn = {
       ...txn,
-      id: `txn_${db.counters.txn++}`,
+      id: crypto.randomUUID(),
       created_at: now()
     };
     db.transactions.push(newTxn);
@@ -294,7 +293,7 @@ const memoryDb = {
   createSave: (save) => {
     const newSave = {
       ...save,
-      id: `save_${db.counters.save++}`,
+      id: crypto.randomUUID(),
       created_at: now()
     };
     db.saves.push(newSave);
@@ -339,7 +338,6 @@ const memoryDb = {
     db.users.length = 0;
     db.transactions.length = 0;
     db.saves.length = 0;
-    db.counters = { card: 1, user: 1, txn: 1, save: 1 };
     db.cloud = { total_issued: 0, total_absorbed: 0 };
     if (USE_PG) {
       truncateRequested = true;
