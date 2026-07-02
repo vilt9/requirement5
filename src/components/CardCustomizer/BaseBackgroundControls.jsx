@@ -26,7 +26,8 @@ const BaseBackgroundControls = ({ customCard, handleParamChange, onRandomize }) 
   if (!customCard) return null;
   const bg = { ...DEFAULTS, ...(customCard.baseBackground || {}) };
 
-  // ColorPicker emits (param, value) with no numeric flag; force isNumeric=false.
+  // ColorPicker already flags its values non-numeric; this wrapper is kept
+  // only to pin isNumeric=false explicitly.
   const setColor = (param, value) => handleParamChange(param, value, false);
   const isRadialOrConic = bg.type === 'radial' || bg.type === 'conic';
   const isSolid = bg.type === 'solid';

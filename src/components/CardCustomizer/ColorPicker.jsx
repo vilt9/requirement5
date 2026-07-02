@@ -17,9 +17,11 @@ const ColorPicker = ({
   const swatchRef = useRef(null);
 
   const handleColorChange = (color) => {
-    // Support for rgba values from the picker
+    // Support for rgba values from the picker. The third arg marks the value
+    // as non-numeric — handleParamChange defaults to parseFloat, which would
+    // silently drop a colour string.
     const newColor = `rgba(${color.rgb.r}, ${color.rgb.g}, ${color.rgb.b}, ${color.rgb.a})`;
-    onChange(param, newColor);
+    onChange(param, newColor, false);
   };
 
   const handleSwatchClick = () => {
@@ -62,7 +64,7 @@ const ColorPicker = ({
         <ColorInput
           type="text"
           value={value}
-          onChange={(e) => onChange(param, e.target.value)}
+          onChange={(e) => onChange(param, e.target.value, false)}
         />
       </ColorPickerControls>
 
