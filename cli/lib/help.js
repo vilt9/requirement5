@@ -81,7 +81,10 @@ CARD OVERRIDES (spec.card.*) — everything optional
                                    glowColor, opacity, contrast, saturation }
   borderEffects                  { thickBorderEnabled, thinEdgeEnabled, borderImageEnabled,
                                    borderColor, borderOpacity, edgeColor1/2, thinEdgeColor }
-  holoEffects                    Toggle the four holo systems (any combination):
+  holoEffects                    Toggle the four animated holo systems (any combination;
+                                 display names: rareHolo=Prism, rareHoloGalaxy=Nebula,
+                                 wowaHolo=Signal, rareHoloVmax=Pulse; the top-level
+                                 "holoImage" is the fifth technique, the Veil overlay):
                                  { ${HOLO_EFFECTS.map((e) => `${e}: bool`).join(', ')} }
   rareHoloParams                 { space 0.5–5, hue 1–50, saturation 20–100, lightness 20–80,
                                    intensity "subtle"|"extreme", filterStrength 0.1–3,

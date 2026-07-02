@@ -7,6 +7,7 @@ import BlendModeSelector from './BlendModeSelector';
 import ColorPaletteEditor from './ColorPaletteEditor';
 import HoloImageInput from './HoloImageInput';
 import { Dim } from '../UI';
+import { HOLO_NAMES } from '../../utils/holoNames';
 
 const HoloEffectToggles = ({
   customCard,
@@ -109,43 +110,59 @@ const HoloEffectToggles = ({
       <TogglesContainer>
         <Dim style={{ fontSize: 11, lineHeight: 1.5 }}>
           Five ways to make a card holographic — combine them freely, and any
-          image from your library can drive any of them. The overlay blends
-          your image straight over the card; the four systems below animate
-          their texture as the card tilts, each with its own character. A
-          system without an image uses its built-in gradient.
+          image from your library can drive any of them. {HOLO_NAMES.overlay}{' '}
+          blends your image straight over the card; the four systems below
+          animate their texture as the card tilts, each with its own
+          character. A system without an image uses its built-in gradient.
         </Dim>
 
-        {/* Overlay: the simplest technique — image + blend mode, no machinery. */}
+        {/* Veil: the simplest technique — image + blend mode, no machinery. */}
         <ToggleGroup className="holo-overlay-group">
           <OverlayHead>
-            <span className="name">Overlay image</span>
+            <span className="name">{HOLO_NAMES.overlay}</span>
             <Dim style={{ fontSize: 10 }}>
-              Blended straight over the card, shining with the pointer. Its
-              blend mode is under Holographic Effect below.
+              Your image blended straight over the card, shining with the pointer.
             </Dim>
           </OverlayHead>
           <HoloImageInput
             id="holo-image-upload"
-            label="overlay image"
+            label={`${HOLO_NAMES.overlay} image`}
             value={overlayImage || null}
             onSelect={onOverlaySelect}
             onClear={onOverlayClear}
             imageLibrary={imageLibrary}
           />
+          {overlayImage && (
+            <BlendModeSelector
+              label="Blend Mode"
+              param="effectParams.customHoloBlendMode"
+              value={customCard.effectParams?.customHoloBlendMode || 'color-dodge'}
+              onChange={handleParamChange}
+              tooltipContent={`How the ${HOLO_NAMES.overlay} image blends with the card. 'color-dodge' for bright shine, 'overlay' for subtle, 'hard-light' for vivid.`}
+            />
+          )}
         </ToggleGroup>
 
-        {/* Rare Holo Toggle and Controls */}
+        {/* Prism (rareHolo) */}
         <ToggleGroup>
           <ToggleSwitch
-            label="Rare Holo"
+            label={HOLO_NAMES.rareHolo}
             param="holoEffects.rareHolo"
             checked={holoEffects.rareHolo}
             onChange={handleParamChange}
-            tooltipContent="Toggles the classic rare holo effect with rainbow gradient patterns and soft-light blend mode."
+            tooltipContent={`${HOLO_NAMES.rareHolo}: rainbow gradient bands sweeping with the tilt, soft-light blended.`}
           />
-          
+
           {holoEffects.rareHolo && (
             <EffectControls>
+              <HoloImageInput
+                id="rare-holo-background-upload"
+                label="texture image (replaces the rainbow gradient)"
+                value={rareHoloParams.backgroundImage || null}
+                onSelect={(url) => setEffectImage('rareHolo', url)}
+                onClear={() => setEffectImage('rareHolo', null)}
+                imageLibrary={imageLibrary}
+              />
               <ParameterControl
                 label="Color Spacing (%)"
                 param="rareHoloParams.space"
@@ -243,30 +260,30 @@ const HoloEffectToggles = ({
                 tooltipContent="Customize the colors in the rainbow gradient. Add, remove, or reorder colors to create your own unique rainbow effect."
               />
               
-              <HoloImageInput
-                id="rare-holo-background-upload"
-                label="texture image (replaces the rainbow gradient)"
-                value={rareHoloParams.backgroundImage || null}
-                onSelect={(url) => setEffectImage('rareHolo', url)}
-                onClear={() => setEffectImage('rareHolo', null)}
-                imageLibrary={imageLibrary}
-              />
             </EffectControls>
           )}
         </ToggleGroup>
 
-        {/* Rare Holo Galaxy Toggle and Controls */}
+        {/* Nebula (rareHoloGalaxy) */}
         <ToggleGroup>
           <ToggleSwitch
-            label="Rare Holo Galaxy"
+            label={HOLO_NAMES.rareHoloGalaxy}
             param="holoEffects.rareHoloGalaxy"
             checked={holoEffects.rareHoloGalaxy}
             onChange={handleParamChange}
-            tooltipContent="Toggles the galaxy holo effect with space-themed background and color-dodge blend mode."
+            tooltipContent={`${HOLO_NAMES.rareHoloGalaxy}: a deep-space gradient that stretches and drifts with the tilt, color-dodge blended.`}
           />
-          
+
           {holoEffects.rareHoloGalaxy && (
             <EffectControls>
+              <HoloImageInput
+                id="rare-holo-galaxy-background-upload"
+                label="texture image (replaces the galaxy background)"
+                value={rareHoloGalaxyParams.backgroundImage || null}
+                onSelect={(url) => setEffectImage('rareHoloGalaxy', url)}
+                onClear={() => setEffectImage('rareHoloGalaxy', null)}
+                imageLibrary={imageLibrary}
+              />
               <ParameterControl
                 label="Color Spacing (%)"
                 param="rareHoloGalaxyParams.space"
@@ -362,30 +379,30 @@ const HoloEffectToggles = ({
                 tooltipContent="Customize the colors in the galaxy gradient. Add, remove, or reorder colors to create your own unique galaxy effect."
               />
               
-              <HoloImageInput
-                id="rare-holo-galaxy-background-upload"
-                label="texture image (replaces the galaxy background)"
-                value={rareHoloGalaxyParams.backgroundImage || null}
-                onSelect={(url) => setEffectImage('rareHoloGalaxy', url)}
-                onClear={() => setEffectImage('rareHoloGalaxy', null)}
-                imageLibrary={imageLibrary}
-              />
             </EffectControls>
           )}
         </ToggleGroup>
 
-        {/* Wowa Holo Toggle and Controls */}
+        {/* Signal (wowaHolo) */}
         <ToggleGroup>
           <ToggleSwitch
-            label="Wowa Holo"
+            label={HOLO_NAMES.wowaHolo}
             param="holoEffects.wowaHolo"
             checked={holoEffects.wowaHolo}
             onChange={handleParamChange}
-            tooltipContent="Toggles the wowa holo effect with illusion background and soft-light blend mode."
+            tooltipContent={`${HOLO_NAMES.wowaHolo}: a broad angular sweep crossing the card, soft-light blended.`}
           />
-          
+
           {holoEffects.wowaHolo && (
             <EffectControls>
+              <HoloImageInput
+                id="wowa-holo-background-upload"
+                label="texture image (replaces the illusion background)"
+                value={wowaHoloParams.backgroundImage || null}
+                onSelect={(url) => setEffectImage('wowaHolo', url)}
+                onClear={() => setEffectImage('wowaHolo', null)}
+                imageLibrary={imageLibrary}
+              />
               <ParameterControl
                 label="Color Spacing (%)"
                 param="wowaHoloParams.space"
@@ -430,30 +447,30 @@ const HoloEffectToggles = ({
                 tooltipContent="Controls the contrast of the wowa pattern."
               />
               
-              <HoloImageInput
-                id="wowa-holo-background-upload"
-                label="texture image (replaces the illusion background)"
-                value={wowaHoloParams.backgroundImage || null}
-                onSelect={(url) => setEffectImage('wowaHolo', url)}
-                onClear={() => setEffectImage('wowaHolo', null)}
-                imageLibrary={imageLibrary}
-              />
             </EffectControls>
           )}
         </ToggleGroup>
 
-        {/* Rare Holo VMAX Toggle and Controls */}
+        {/* Pulse (rareHoloVmax) */}
         <ToggleGroup>
           <ToggleSwitch
-            label="Rare Holo VMAX"
+            label={HOLO_NAMES.rareHoloVmax}
             param="holoEffects.rareHoloVmax"
             checked={holoEffects.rareHoloVmax}
             onChange={handleParamChange}
-            tooltipContent="Toggles the VMAX holo effect with red/pink gradient and color-dodge blend mode."
+            tooltipContent={`${HOLO_NAMES.rareHoloVmax}: high-contrast red/pink bands, color-dodge blended.`}
           />
-          
+
           {holoEffects.rareHoloVmax && (
             <EffectControls>
+              <HoloImageInput
+                id="rare-holo-vmax-background-upload"
+                label="texture image (replaces the red/pink gradient)"
+                value={rareHoloVmaxParams.backgroundImage || null}
+                onSelect={(url) => setEffectImage('rareHoloVmax', url)}
+                onClear={() => setEffectImage('rareHoloVmax', null)}
+                imageLibrary={imageLibrary}
+              />
               <ParameterControl
                 label="Color Spacing (%)"
                 param="rareHoloVmaxParams.space"
@@ -498,14 +515,6 @@ const HoloEffectToggles = ({
                 tooltipContent="Controls the contrast of the VMAX pattern."
               />
               
-              <HoloImageInput
-                id="rare-holo-vmax-background-upload"
-                label="texture image (replaces the red/pink gradient)"
-                value={rareHoloVmaxParams.backgroundImage || null}
-                onSelect={(url) => setEffectImage('rareHoloVmax', url)}
-                onClear={() => setEffectImage('rareHoloVmax', null)}
-                imageLibrary={imageLibrary}
-              />
             </EffectControls>
           )}
         </ToggleGroup>

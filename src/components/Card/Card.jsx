@@ -22,7 +22,7 @@ const buildBaseBackground = (bg) => {
   return `linear-gradient(${angle}deg, ${stops})`;
 };
 
-const Card = ({ cardData, isInteractive = true, onClick, autoTour = false }) => {
+const Card = ({ cardData, isInteractive = true, onClick, autoTour = false, touched = true }) => {
   const [isFlipped, setIsFlipped] = useState(false);
   const [isMoving, setIsMoving] = useState(false);
   const [failedSrc, setFailedSrc] = useState(null); // hides an image that 404s, per-src, so it can't flicker
@@ -79,8 +79,10 @@ const Card = ({ cardData, isInteractive = true, onClick, autoTour = false }) => 
   
   const holoShineClass = getActiveHoloClass();
   
-  // Handle mouse movement for interactive card effects
-  const handleMouseMove = (e) => {
+  // Drive the tilt + shine math from a pointer position (real or synthetic).
+  // Pure geometry — does not touch the moving/floating state, so the tour can
+  // keep the card in motion while the effects are gated separately.
+  const drivePointer = (e) => {
     if (!isInteractive || !cardRef.current) return;
     
     const rect = cardRef.current.getBoundingClientRect();
@@ -138,11 +140,15 @@ const Card = ({ cardData, isInteractive = true, onClick, autoTour = false }) => 
       ${isFlipped ? 'rotateY(180deg)' : ''}
     `;
     cardRef.current.style.transform = transform;
-    
-    // Update React state for other component behaviors
+  };
+
+  // Handle mouse movement for interactive card effects
+  const handleMouseMove = (e) => {
+    if (!isInteractive || !cardRef.current) return;
+    drivePointer(e);
     setIsMoving(true);
   };
-  
+
   // Handle mouse enter to activate effects
   const handleMouseEnter = () => {
     pointerActiveRef.current = true;
@@ -186,8 +192,16 @@ const Card = ({ cardData, isInteractive = true, onClick, autoTour = false }) => 
   // Handle mouse leave to deactivate effects
   const handleMouseLeave = () => {
     pointerActiveRef.current = false;
-    // The tour owns the card while active — don't snap back to rest.
-    if (autoTour) return;
+    // The tour owns the card while active — hand back to its touched state
+    // instead of snapping to rest.
+    if (autoTour) {
+      if (cardRef.current) {
+        cardRef.current.classList.toggle('moving', touched);
+        cardRef.current.classList.remove('floating');
+        setIsMoving(touched);
+      }
+      return;
+    }
     resetToRest();
   };
   
@@ -321,16 +335,13 @@ const Card = ({ cardData, isInteractive = true, onClick, autoTour = false }) => 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cardData, holoEffects, customHoloImageUrl]);
 
-  // Auto tour: a synthetic pointer orbits the card, driving the exact same
-  // tilt/shine math as a real hover — this is how touch screens (no hover)
-  // get to see the holographic effects move. A real pointer pauses it.
+  // Auto tour: a synthetic pointer orbits the card CONTINUOUSLY, driving the
+  // exact same tilt math as a real hover — the card never sits dead. The
+  // separate `touched` prop gates the effect layers (below), so the state
+  // change is a fade of the holo, not a stop of the motion. A real pointer
+  // pauses the synthetic one.
   useEffect(() => {
     if (!autoTour || !isInteractive || !cardRef.current) return;
-    const card = cardRef.current;
-    card.classList.add('moving');
-    card.classList.remove('floating');
-    setIsMoving(true);
-
     let raf;
     const started = performance.now();
     const tick = (t) => {
@@ -342,7 +353,7 @@ const Card = ({ cardData, isInteractive = true, onClick, autoTour = false }) => 
       const phase = ((t - started) / 7000) * Math.PI * 2;
       const nx = Math.sin(phase) * 0.6;
       const ny = Math.cos(phase * 0.8) * 0.45;
-      handleMouseMove({
+      drivePointer({
         clientX: rect.left + rect.width / 2 + nx * (rect.width / 2),
         clientY: rect.top + rect.height / 2 + ny * (rect.height / 2)
       });
@@ -355,6 +366,16 @@ const Card = ({ cardData, isInteractive = true, onClick, autoTour = false }) => 
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoTour, isInteractive]);
+
+  // While touring, `touched` shows or hides the hover-gated effect layers.
+  // The floating class stays off either way — the orbit owns the transform.
+  useEffect(() => {
+    if (!autoTour || !isInteractive || !cardRef.current) return;
+    if (pointerActiveRef.current) return; // a real pointer owns the state
+    cardRef.current.classList.toggle('moving', touched);
+    cardRef.current.classList.remove('floating');
+    setIsMoving(touched);
+  }, [touched, autoTour, isInteractive]);
 
   // Early return if no card data
   if (!cardData) return null;

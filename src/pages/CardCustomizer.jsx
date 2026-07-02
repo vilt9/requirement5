@@ -305,7 +305,7 @@ const CardCustomizer = () => {
           ref={previewRef}
           className={`card-preview-section${previewDocked ? ' preview-docked' : ''}`}
         >
-          {customCard && <Card cardData={customCard} autoTour={touched} />}
+          {customCard && <Card cardData={customCard} autoTour touched={touched} />}
           <PreviewTools className="preview-tools">
             <button
               type="button"

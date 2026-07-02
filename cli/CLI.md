@@ -150,12 +150,15 @@ The systems, briefly:
   glow, contrast, saturation.
 - **`borderEffects`** — thick border, thin edge line, and border-image layers
   with independent colors/opacities.
-- **`holoEffects`** — toggles for the four holographic systems (combine
-  freely): `rareHolo` (classic rainbow sheen), `rareHoloGalaxy` (galaxy
-  swirl), `wowaHolo` (broad angular sweep), `rareHoloVmax` (high-contrast
-  bands). Each has a `<name>Params` block; enabling an effect without params
-  applies its defaults. Params accept a `backgroundImage` — a local path works
-  and is inlined automatically.
+- **`holoEffects`** — toggles for the four animated holographic systems
+  (combine freely). Site display names in brackets: `rareHolo` [Prism —
+  rainbow bands], `rareHoloGalaxy` [Nebula — galaxy swirl], `wowaHolo`
+  [Signal — broad angular sweep], `rareHoloVmax` [Pulse — high-contrast
+  bands]. The top-level `holoImage` is the fifth technique [Veil]: your image
+  blended straight over the card; it stacks with the systems. Each system has
+  a `<name>Params` block; enabling an effect without params applies its
+  defaults. Params accept a `backgroundImage` — a local path works and is
+  inlined automatically.
 
 Blend modes anywhere a `blendMode` appears: `normal`, `color-dodge`,
 `color-burn`, `soft-light`, `hard-light`, `screen`, `overlay`, `multiply`,

@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { api, ApiError, apiBase } from '../utils/api';
 import { poolCardToCardData, asOdds } from '../utils/poolCard';
 import { scoreCard } from '../utils/cardGenerator';
+import { HOLO_NAMES } from '../utils/holoNames';
 import { useScrollBloom } from '../utils/useScrollBloom';
 import AboutR5c from '../components/AboutR5c';
 import { Page, Panel, PillButton, Dim, TagList } from '../components/UI';
@@ -166,10 +167,9 @@ const ShareCard = () => {
     const n = typeof v === 'number' ? v : parseFloat(v);
     return Number.isFinite(n) ? Number(n.toFixed(d)) : null;
   };
-  const HOLO_NAMES = { rareHolo: 'Holo', rareHoloGalaxy: 'Galaxy', wowaHolo: 'Wowa', rareHoloVmax: 'Vmax' };
   const activeHolo = Object.entries(cc.holoEffects || {}).filter(([, v]) => v).map(([k]) => HOLO_NAMES[k] || k);
   const holoLabel = cc.customHoloImageUrl
-    ? (activeHolo.length ? `Custom image + ${activeHolo.join(', ')}` : 'Custom image')
+    ? (activeHolo.length ? `${HOLO_NAMES.overlay} + ${activeHolo.join(', ')}` : HOLO_NAMES.overlay)
     : (activeHolo.length ? activeHolo.join(', ') : 'None');
   const palette = [bg.cssVars?.['--color-1'], bg.cssVars?.['--color-2'], bg.cssVars?.['--color-3']].filter(Boolean);
   const borderParts = [be.thickBorderEnabled && 'thick', be.thinEdgeEnabled && 'thin edge'].filter(Boolean);

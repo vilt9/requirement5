@@ -240,8 +240,8 @@ const main = async () => {
     });
     if (moved !== false) {
       await page.waitForTimeout(250);
-      report('range · Rarity (Affects Holo Visibility)', `set to ${moved} (no toggles)`, before !== (await snapshot()));
-      tested.add('range|Rarity (Affects Holo Visibility)');
+      report('range · Rarity (Base Shimmer)', `set to ${moved} (no toggles)`, before !== (await snapshot()));
+      tested.add('range|Rarity (Base Shimmer)');
     }
   }
 
@@ -255,7 +255,7 @@ const main = async () => {
   const mainFile = page.locator('.image-picker input[type=file]').first();
   if (await mainFile.count()) { await mainFile.setInputFiles(sampleImage); await page.waitForTimeout(800); }
   await selectTab('holo');
-  for (const name of ['Rare Holo Galaxy', 'Rare Holo VMAX', 'Wowa Holo', 'Rare Holo']) {
+  for (const name of ['Nebula', 'Pulse', 'Signal', 'Prism']) {
     await enableToggle(name);
     await page.waitForTimeout(150);
   }
