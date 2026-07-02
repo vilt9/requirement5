@@ -42,7 +42,7 @@ const Card = ({ cardData, isInteractive = true, onClick, autoTour = false, touch
   );
   const trackRef = useRef(null);
   const dotRef = useRef(null);
-  const scrubRef = useRef({ p: 0, dir: 1, dragging: false, resumeAt: 0, shiny: false });
+  const scrubRef = useRef({ p: 0, dragging: false, resumeAt: 0, shiny: false });
   
   // Helper function to set CSS variables on both CardScene and CardContainer
   // IMPORTANT: CSS variables set on both elements to ensure inheritance works in Chrome
@@ -393,9 +393,12 @@ const Card = ({ cardData, isInteractive = true, onClick, autoTour = false, touch
   }, [touched, autoTour, scrubOn, isInteractive]);
 
   // Scrub mode: one loop drives everything from the track position p (0..1).
-  // p maps continuously to the card's pose, so crossing into or out of the
-  // shiny zone never jumps — the same p is always the same tilt, only the
-  // effect layers fade in/out (the .moving transitions handle the fade).
+  // The full track is TWO complete orbits of the card — first quarter = half a
+  // turn, middle half = a full turn, last quarter = half a turn — so p=0 and
+  // p=1 are the SAME pose and the auto loop wraps seamlessly: the card just
+  // keeps rotating, the dot re-enters at the top. The motion is identical
+  // everywhere on the track; crossing the shiny zone only fades the holo
+  // layers in/out (the .moving transitions handle the fade).
   useEffect(() => {
     if (!scrubOn || !isInteractive || !cardRef.current) return;
     cardRef.current.classList.remove('floating');
@@ -405,9 +408,9 @@ const Card = ({ cardData, isInteractive = true, onClick, autoTour = false, touch
       const s = scrubRef.current;
       if (!cardRef.current) return;
       const rect = cardRef.current.getBoundingClientRect();
-      const phase = s.p * Math.PI * 2;
-      const nx = Math.sin(phase) * 0.6;
-      const ny = Math.cos(phase * 0.8) * 0.45;
+      const angle = s.p * Math.PI * 4; // two full orbits over the run
+      const nx = Math.sin(angle) * 0.6;
+      const ny = Math.cos(angle) * 0.45;
       drivePointer({
         clientX: rect.left + rect.width / 2 + nx * (rect.width / 2),
         clientY: rect.top + rect.height / 2 + ny * (rect.height / 2)
@@ -425,12 +428,10 @@ const Card = ({ cardData, isInteractive = true, onClick, autoTour = false, touch
       const dt = Math.min(100, t - last); // tab-throttled frames don't leap
       last = t;
       const s = scrubRef.current;
-      // Auto loop: ping-pong the dot down and back (paused while dragging,
+      // Auto loop: the dot runs top→bottom and wraps (paused while dragging,
       // and for a beat after release so the user's chosen pose holds).
       if (!s.dragging && t >= s.resumeAt) {
-        s.p += (s.dir * dt) / 7000;
-        if (s.p >= 1) { s.p = 1; s.dir = -1; }
-        else if (s.p <= 0) { s.p = 0; s.dir = 1; }
+        s.p = (s.p + dt / 12000) % 1;
       }
       apply();
     };
@@ -444,9 +445,7 @@ const Card = ({ cardData, isInteractive = true, onClick, autoTour = false, touch
     if (!trackRef.current) return;
     const rect = trackRef.current.getBoundingClientRect();
     const s = scrubRef.current;
-    const p = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
-    if (p !== s.p) s.dir = p > s.p ? 1 : -1; // resume travelling the way the user was going
-    s.p = p;
+    s.p = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
   };
   const onScrubDown = (e) => {
     e.preventDefault();
