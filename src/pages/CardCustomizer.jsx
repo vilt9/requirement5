@@ -52,26 +52,32 @@ const CardCustomizer = () => {
   // viewport we dock the card as a small fixed preview so feedback stays live.
   const previewRef = useRef(null);
   const [previewDocked, setPreviewDocked] = useState(false);
-  // Preview motion: hover can't be held on touch screens, so the card can run
-  // a simulated hover. 'auto' (default) alternates moving and resting so you
-  // see both states; 'on' keeps it moving; 'off' rests it.
-  const [motionMode, setMotionMode] = useState('auto');
-  const [tourPhase, setTourPhase] = useState(true);
+  // A card has two states: resting (floating, effects quiet) and touched
+  // (hovered/held — tilt and holo alive). Desktop shows both naturally via
+  // the mouse; touch screens can't hold a hover, so the preview cycles
+  // between the states on its own. The "touch" chip shows which state is
+  // playing; tapping it pins touched on, then off, then back to auto.
+  const [touchOverride, setTouchOverride] = useState(null); // null=auto, true/false=pinned
+  const [touchPhase, setTouchPhase] = useState(true);
 
   useEffect(() => {
-    if (motionMode !== 'auto') return;
+    if (touchOverride !== null) return;
     let cancelled = false;
     let timer;
     const cycle = (on) => {
       if (cancelled) return;
-      setTourPhase(on);
+      setTouchPhase(on);
       timer = setTimeout(() => cycle(!on), on ? 6000 : 3000);
     };
     cycle(true);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [motionMode]);
+  }, [touchOverride]);
 
-  const autoTour = motionMode === 'on' || (motionMode === 'auto' && tourPhase);
+  const touched = touchOverride ?? touchPhase;
+  const touchMode = touchOverride === null ? 'auto' : touchOverride ? 'on' : 'off';
+  const cycleTouch = () => setTouchOverride(
+    touchOverride === null ? true : touchOverride ? false : null
+  );
 
   useEffect(() => {
     const el = previewRef.current;
@@ -309,18 +315,21 @@ const CardCustomizer = () => {
           ref={previewRef}
           className={`card-preview-section${previewDocked ? ' preview-docked' : ''}`}
         >
-          {customCard && <Card cardData={customCard} autoTour={autoTour} />}
+          {customCard && <Card cardData={customCard} autoTour={touched} />}
           <PreviewTools className="preview-tools">
-            <span className="lab">motion</span>
-            {['auto', 'on', 'off'].map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                data-motion={mode}
-                className={motionMode === mode ? 'active' : ''}
-                onClick={() => setMotionMode(mode)}
-              >{mode}</button>
-            ))}
+            <button
+              type="button"
+              data-mode={touchMode}
+              className={touched ? 'active' : ''}
+              onClick={cycleTouch}
+              title="The card's touched (hovered) state. Auto-cycles; tap to pin on, again for off, again to resume."
+            >
+              touch{touchMode !== 'auto' && <span className="pin"> · {touchMode}</span>}
+            </button>
+            <Dim className="hint">
+              a card has two states — resting and touched (hover). the preview
+              cycles between them; tap to pin one.
+            </Dim>
           </PreviewTools>
         </CardPreviewSection>
 
@@ -531,38 +540,42 @@ const CardPreviewSection = styled.div`
       transform-origin: top right;
       pointer-events: none;
     }
-    /* The motion toggle rides along under the docked mini card. */
-    &.preview-docked .preview-tools {
-      position: fixed;
-      top: 140px;
-      right: 8px;
-      z-index: 1100;
-    }
   }
 `;
 
 const PreviewTools = styled.div`
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
+  max-width: 340px;
   font-family: var(--font-mono);
   font-size: 10px;
 
-  .lab { color: var(--amber-dim); margin-right: 2px; }
-
   button {
+    flex-shrink: 0;
     font-family: var(--font-mono);
     font-size: 10px;
-    padding: 3px 8px;
+    padding: 3px 10px;
     border-radius: 10px;
     border: 1px solid var(--panel-border);
     background: var(--field-bg);
     color: var(--amber-dim);
     cursor: pointer;
-    transition: color 0.15s, border-color 0.15s;
+    transition: color 0.2s, border-color 0.2s, background 0.2s;
 
+    .pin { opacity: 0.8; }
     &:hover { color: var(--white); border-color: var(--gold); }
-    &.active { color: var(--gold-bright); border-color: var(--gold); }
+    &.active {
+      color: #140d03;
+      background: var(--gold);
+      border-color: var(--gold);
+    }
+  }
+
+  .hint {
+    font-size: 9px;
+    line-height: 1.5;
+    text-align: left;
   }
 `;
 

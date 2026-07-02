@@ -103,6 +103,11 @@ export const CardScene = styled.div`
   /* Add z-index to ensure proper stacking context */
   position: relative;
   z-index: 1;
+  /* Touching a card must never select it or flash a tap highlight — that's
+     what made the holo state "stick" on phones. */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 
   /* Very narrow screens: shrink the card (children are %-based, so the whole
      face scales) and trim the glow margin so it never overflows the viewport. */

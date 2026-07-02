@@ -54,9 +54,15 @@ const main = async () => {
   await page.goto(`${APP_URL}/customize`, { waitUntil: 'networkidle' });
   await page.waitForSelector('.card-preview-section', { timeout: 10000 });
   await page.waitForTimeout(800);
-  // The preview's auto motion continuously mutates the card's inline styles,
-  // which would make every before/after snapshot diff spuriously — rest it.
-  await page.locator('.preview-tools button[data-motion=off]').click().catch(() => {});
+  // The preview's auto touch-cycle continuously mutates the card's inline
+  // styles, which would make every before/after snapshot diff spuriously —
+  // pin it off (the chip cycles auto → on → off).
+  for (let i = 0; i < 3; i++) {
+    const mode = await page.locator('.preview-tools button').getAttribute('data-mode').catch(() => null);
+    if (mode === 'off' || mode === null) break;
+    await page.locator('.preview-tools button').click();
+    await page.waitForTimeout(150);
+  }
   await page.waitForTimeout(300);
   await page.screenshot({ path: path.join(SHOTS, '0_initial.png'), fullPage: true });
 
