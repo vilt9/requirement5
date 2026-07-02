@@ -240,10 +240,10 @@ const main = async () => {
   // before sweeping. Otherwise tier-specific sliders look "broken".
   console.log('— setup: upload image + enable all effects —');
   const sampleImage = path.resolve(process.cwd(), '..', 'card_images', 'wolf_toys_1.png');
-  await selectStage('start');
-  const mainFile = page.locator('.start-stage input[type=file]').first();
-  if (await mainFile.count()) { await mainFile.setInputFiles(sampleImage); await page.waitForTimeout(800); }
   await selectStage('design');
+  await selectTab('image');
+  const mainFile = page.locator('.image-picker input[type=file]').first();
+  if (await mainFile.count()) { await mainFile.setInputFiles(sampleImage); await page.waitForTimeout(800); }
   await selectTab('holo');
   for (const name of ['Rare Holo Galaxy', 'Rare Holo VMAX', 'Wowa Holo', 'Rare Holo']) {
     await enableToggle(name);
@@ -317,21 +317,26 @@ const main = async () => {
     await colorSweepTab();
   }
 
-  // Phase 4: image uploads (start stage). Use a DIFFERENT image than setup's so the
-  // main image input registers a real change (re-uploading the same file is a no-op).
+  // Phase 4: image uploads (design stage, image tab). Use a DIFFERENT image than
+  // setup's so the main image input registers a real change (re-uploading the
+  // same file is a no-op).
   console.log('\n— phase 4: image uploads + library —');
-  await selectStage('start');
+  await selectStage('design');
+  await selectTab('image');
   const altImage = path.resolve(process.cwd(), '..', 'card_images', 'bed_elephant_1.png');
-  const fileInputs = await page.locator('.start-stage input[type=file]').count();
+  const fileInputs = await page.locator('.image-picker input[type=file]').count();
   for (let i = 0; i < fileInputs; i++) {
     const before = await snapshot();
-    await page.locator('.start-stage input[type=file]').nth(i).setInputFiles(altImage);
+    await page.locator('.image-picker input[type=file]').nth(i).setInputFiles(altImage);
     await page.waitForTimeout(900);
     const after = await snapshot();
     report(`file input [${i}]`, 'uploaded bed_elephant_1.png', before !== after);
   }
   // Uploads must land in the reusable image library, and "use as base" must
   // change the preview (it re-applies the image + custom_image marker).
+  // The library is collapsed by default — pop it open first.
+  await page.locator('.library-toggle').click().catch(() => {});
+  await page.waitForTimeout(200);
   const libCount = await page.locator('.image-library .library-item').count();
   report('image library', 'uploads appear in library', libCount > 0, `${libCount} item(s)`);
   if (libCount > 0) {

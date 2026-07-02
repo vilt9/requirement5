@@ -11,6 +11,7 @@ import EdgeHighlightControls from '../components/CardCustomizer/EdgeHighlightCon
 import CentralPanelControls from '../components/CardCustomizer/CentralPanelControls';
 import BaseBackgroundControls from '../components/CardCustomizer/BaseBackgroundControls';
 import StartStage from '../components/CardCustomizer/StartStage';
+import ImagePicker from '../components/CardCustomizer/ImagePicker';
 import PublishStage from '../components/CardCustomizer/PublishStage';
 import { generateBaseBackground, generateCardAttributes } from '../utils/cardGenerator';
 import { applyPreset } from '../utils/presets';
@@ -279,7 +280,7 @@ const CardCustomizer = () => {
     <CustomizerContainer className="customizer-container">
       <Header>
         <div className="title">Create a card</div>
-        <Dim>Start with images, design the effects, then tag and publish.</Dim>
+        <Dim>Pick a base design, add your images and tune the effects, then tag and publish.</Dim>
       </Header>
 
       <CustomizerLayout className="customizer-layout">
@@ -308,13 +309,6 @@ const CardCustomizer = () => {
           {stage === 'start' && (
             <StageBody>
               <StartStage
-                mainImagePreview={mainImagePreview}
-                holoImagePreview={holoImagePreview}
-                onMainImageChange={handleMainImageChange}
-                onHoloImageChange={handleHoloImageChange}
-                onUseLibraryImage={handleUseLibraryImage}
-                imageLibrary={imageLibrary}
-                onRemoveLibraryImage={removeFromLibrary}
                 presets={presets}
                 selectedPresetId={selectedPresetId}
                 onLoadPreset={handleLoadPreset}
@@ -328,21 +322,6 @@ const CardCustomizer = () => {
 
           {stage === 'design' && (
             <>
-              {/* Current images, one glance + one click back to swap them. */}
-              <CurrentImages className="current-images">
-                <button type="button" onClick={() => setStage('start')} title="Change images (back to Start)">
-                  {mainImagePreview
-                    ? <img src={mainImagePreview} alt="base" />
-                    : <span className="ph">no base</span>}
-                </button>
-                <button type="button" onClick={() => setStage('start')} title="Change images (back to Start)">
-                  {holoImagePreview
-                    ? <img src={holoImagePreview} alt="holo" />
-                    : <span className="ph">no holo</span>}
-                </button>
-                <Dim>images — click to change</Dim>
-              </CurrentImages>
-
               {/* Tabs: pick which part of the card to customize. */}
               <TabBar className="customizer-tabs">
                 {TABS.map((tab) => (
@@ -361,11 +340,22 @@ const CardCustomizer = () => {
 
               <ControlsInner className="controls-inner">
                 {activeTab === 'image' && (
-                  <ImageEffectControls
-                    className="image-effect-controls"
-                    customCard={customCard}
-                    handleParamChange={handleParamChange}
-                  />
+                  <>
+                    <ImagePicker
+                      mainImagePreview={mainImagePreview}
+                      holoImagePreview={holoImagePreview}
+                      onMainImageChange={handleMainImageChange}
+                      onHoloImageChange={handleHoloImageChange}
+                      onUseLibraryImage={handleUseLibraryImage}
+                      imageLibrary={imageLibrary}
+                      onRemoveLibraryImage={removeFromLibrary}
+                    />
+                    <ImageEffectControls
+                      className="image-effect-controls"
+                      customCard={customCard}
+                      handleParamChange={handleParamChange}
+                    />
+                  </>
                 )}
 
                 {activeTab === 'holo' && (
@@ -532,29 +522,6 @@ const StageBody = styled.div`
   flex: 1;
   min-height: 0;
   padding-right: 10px;
-`;
-
-const CurrentImages = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-  flex-shrink: 0;
-  font-size: 11px;
-
-  button {
-    width: 34px;
-    height: 44px;
-    padding: 0;
-    border-radius: 4px;
-    border: 1px solid var(--panel-border);
-    background: var(--field-bg);
-    overflow: hidden;
-    cursor: pointer;
-    &:hover { border-color: var(--gold); }
-    img { width: 100%; height: 100%; object-fit: cover; display: block; }
-    .ph { font-size: 8px; color: var(--amber-dim); font-family: var(--font-mono); }
-  }
 `;
 
 const TabBar = styled.div`
