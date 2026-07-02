@@ -147,6 +147,14 @@ const CardLine = styled.div`
   .tier { width: 12ch; flex-shrink: 0; }
   .creator { width: 16ch; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; }
   .counts { width: 18ch; text-align: right; flex-shrink: 0; }
+
+  /* Narrow screens: the fixed columns don't fit on one line — wrap instead. */
+  @media (max-width: 640px) {
+    flex-wrap: wrap;
+    row-gap: 2px;
+    .name { flex-basis: 100%; }
+    .tier, .creator, .counts { width: auto; text-align: left; }
+  }
 `;
 
 export default Pool;

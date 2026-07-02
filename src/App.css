@@ -5,6 +5,14 @@
   text-align: center;
 }
 
+/* Phones: the 2rem side padding costs 64px of a ~375px screen. Keep only the
+   top clearance for the fixed nav; pages manage their own side padding. */
+@media (max-width: 640px) {
+  #root {
+    padding: 48px 0 24px;
+  }
+}
+
 .logo {
   height: 6em;
   padding: 1.5em;

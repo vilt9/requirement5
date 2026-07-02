@@ -103,6 +103,14 @@ export const CardScene = styled.div`
   /* Add z-index to ensure proper stacking context */
   position: relative;
   z-index: 1;
+
+  /* Very narrow screens: shrink the card (children are %-based, so the whole
+     face scales) and trim the glow margin so it never overflows the viewport. */
+  @media (max-width: 374px) {
+    width: 260px;
+    height: 364px;
+    margin: 12px;
+  }
 `;
 
 // Card container - handles hover and moving states

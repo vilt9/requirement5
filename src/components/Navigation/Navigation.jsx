@@ -97,6 +97,9 @@ const Links = styled.div`
   display: flex;
   gap: 14px;
   flex: 1;
+  /* min-width: 0 lets this flex item shrink below its content width — without
+     it the links push the balance clean off narrow screens. */
+  min-width: 0;
   overflow-x: auto;
   /* Horizontal swipe on phones without a scrollbar stealing height. */
   scrollbar-width: none;

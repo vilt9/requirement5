@@ -278,11 +278,6 @@ const CardCustomizer = () => {
 
   return (
     <CustomizerContainer className="customizer-container">
-      <Header>
-        <div className="title">Create a card</div>
-        <Dim>Pick a base design, add your images and tune the effects, then tag and publish.</Dim>
-      </Header>
-
       <CustomizerLayout className="customizer-layout">
         <CardPreviewSection className="card-preview-section">
           {customCard && <Card cardData={customCard} />}
@@ -435,22 +430,16 @@ const CardCustomizer = () => {
 };
 
 // Page chrome in the same register as the card pages: left-aligned,
-// 13px mono, amber on black.
+// 13px mono, amber on black. No heading — the card preview is the header.
 const CustomizerContainer = styled.div`
   width: 100%;
   max-width: 1200px;
   margin: 0 auto;
   padding: 20px 15px 64px;
-`;
 
-const Header = styled.div`
-  text-align: left;
-  margin-bottom: 14px;
-  font-family: var(--font-mono);
-  font-size: 13px;
-  line-height: 1.6;
-
-  .title { color: var(--amber-text); }
+  @media (max-width: 640px) {
+    padding: 4px 6px 40px;
+  }
 `;
 
 const CustomizerLayout = styled.div`
@@ -460,7 +449,8 @@ const CustomizerLayout = styled.div`
   width: 100%;
 
   @media (max-width: 768px) {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
   }
 `;
 
@@ -485,9 +475,10 @@ const ControlsSection = styled.div`
   /* Body copy reads left-aligned (the app root centers text globally). */
   text-align: left;
 
-  /* Phones: one page scroll, no nested scrollbox. */
+  /* Phones: one page scroll, no nested scrollbox, slimmer padding. */
   @media (max-width: 768px) {
     max-height: none;
+    padding: 10px;
   }
 `;
 
