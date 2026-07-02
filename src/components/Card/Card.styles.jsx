@@ -875,8 +875,15 @@ export const CardImage = styled.div`
   height: 100%;
   top: 0;
   left: 0;
-  overflow: visible; /* Allow effects to overflow the card image */
+  /* Clip the parallax-scaled artwork to the rounded corners HERE. Relying on
+     the card face's clip is not enough: the img is a 3D-composited layer
+     (scale + translate3d), and mobile Chrome fails to apply an ancestor's
+     rounded clip to those — square image corners poke over the curve. The
+     translateZ(0) forces this element onto its own clip layer so the radius
+     is honoured by the compositor. */
+  overflow: hidden;
   border-radius: 15px;
+  transform: translateZ(0);
   z-index: 2; /* Set the base z-index */
   
   img {
