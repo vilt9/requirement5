@@ -333,9 +333,13 @@ const main = async () => {
   console.log('\n— phase 4: image uploads + library —');
   await selectStage('design');
   const altImage = path.resolve(process.cwd(), '..', 'card_images', 'bed_elephant_1.png');
-  for (const [tab, slot] of [['image', 'main'], ['holo', 'holo']]) {
+  const uploadTargets = [
+    ['image', 'base', '.image-picker-main input[type=file]'],
+    ['holo', 'overlay', '#holo-image-upload']
+  ];
+  for (const [tab, slot, selector] of uploadTargets) {
     await selectTab(tab);
-    const input = page.locator(`.image-picker-${slot} input[type=file]`);
+    const input = page.locator(selector);
     if (!(await input.count())) {
       report(`file input (${slot})`, 'find', false, `no picker on ${tab} tab`);
       continue;

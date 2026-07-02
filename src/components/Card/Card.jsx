@@ -467,17 +467,18 @@ const Card = ({ cardData, isInteractive = true, onClick, autoTour = false }) => 
               }}
             />
             
-            {/* Add holographic effects if applicable */}
-            {customHoloImageUrl ? (
-              <>
+            {/* Holographic layers. The overlay image is one technique among
+                five — it stacks with the animated systems rather than
+                replacing them. */}
+            {customHoloImageUrl && (
               <CustomHoloEffect
                 className="custom-holo-effect"
-                $active={true} 
-                $imageUrl={customHoloImageUrl} 
-                $blendMode={effectParams?.customHoloBlendMode || 'color-dodge'} 
+                $active={true}
+                $imageUrl={customHoloImageUrl}
+                $blendMode={effectParams?.customHoloBlendMode || 'color-dodge'}
               />
-              </>
-            ) : (
+            )}
+            {(
               <>
                 {/* Render holo effects with custom background images */}
                 {(() => {

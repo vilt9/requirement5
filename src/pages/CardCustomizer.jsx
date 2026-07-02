@@ -140,21 +140,17 @@ const CardCustomizer = () => {
     });
   };
 
+  // The overlay holo image coexists with the four animated systems — it's the
+  // fifth technique, not a replacement for them.
   const applyHoloImage = (imageDataUrl) => {
     if (!customCard) return;
     setCustomCard({
       ...customCard,
       customHoloImageUrl: imageDataUrl,
       // Force a high enough rarity to ensure the holo layer is visible.
-      rarity: Math.max(customCard.rarity, 0.7),
-      // A custom holo image replaces the CSS-based holo systems.
-      holoEffects: {
-        rareHolo: false,
-        rareHoloGalaxy: false,
-        wowaHolo: false,
-        rareHoloVmax: false
-      }
+      rarity: imageDataUrl ? Math.max(customCard.rarity, 0.7) : customCard.rarity
     });
+    if (imageDataUrl) addToLibrary(imageDataUrl);
   };
 
   const readFileAsDataUrl = (e, apply) => {
@@ -169,12 +165,6 @@ const CardCustomizer = () => {
   };
 
   const handleMainImageChange = (e) => readFileAsDataUrl(e, applyMainImage);
-  const handleHoloImageChange = (e) => readFileAsDataUrl(e, applyHoloImage);
-
-  const handleUseLibraryImage = (dataUrl, slot) => {
-    if (slot === 'holo') applyHoloImage(dataUrl);
-    else applyMainImage(dataUrl);
-  };
 
   // Roll a fresh design (colours, background, effects) but keep the images —
   // starting over shouldn't cost you your uploads.
@@ -392,7 +382,7 @@ const CardCustomizer = () => {
                       note="The card's artwork. Everything on this tab tunes how it sits in the frame."
                       preview={mainImagePreview}
                       onFileChange={handleMainImageChange}
-                      onUseLibraryImage={(dataUrl) => handleUseLibraryImage(dataUrl, 'main')}
+                      onUseLibraryImage={applyMainImage}
                       imageLibrary={imageLibrary}
                       onRemoveLibraryImage={removeFromLibrary}
                     />
@@ -406,20 +396,15 @@ const CardCustomizer = () => {
 
                 {activeTab === 'holo' && (
                   <>
-                    <ImagePicker
-                      slot="holo"
-                      label="holo image"
-                      note="Optional — becomes the holographic overlay. Uploading one replaces the CSS holo effects below."
-                      preview={holoImagePreview}
-                      onFileChange={handleHoloImageChange}
-                      onUseLibraryImage={(dataUrl) => handleUseLibraryImage(dataUrl, 'holo')}
-                      imageLibrary={imageLibrary}
-                      onRemoveLibraryImage={removeFromLibrary}
-                    />
                     <HoloEffectToggles
                       className="holo-effect-toggles"
                       customCard={customCard}
                       handleParamChange={handleParamChange}
+                      imageLibrary={imageLibrary}
+                      addToLibrary={addToLibrary}
+                      overlayImage={holoImagePreview}
+                      onOverlaySelect={applyHoloImage}
+                      onOverlayClear={() => applyHoloImage(null)}
                     />
                     <HoloEffectControls
                       customCard={customCard}

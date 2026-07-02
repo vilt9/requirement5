@@ -5,42 +5,27 @@ import ToggleSwitch from './ToggleSwitch';
 import ParameterControl from './ParameterControl';
 import BlendModeSelector from './BlendModeSelector';
 import ColorPaletteEditor from './ColorPaletteEditor';
-import ImageUploader from './ImageUploader';
+import HoloImageInput from './HoloImageInput';
+import { Dim } from '../UI';
 
-const HoloEffectToggles = ({ 
-  customCard, 
-  handleParamChange, 
-  className 
+const HoloEffectToggles = ({
+  customCard,
+  handleParamChange,
+  className,
+  imageLibrary = [],
+  addToLibrary,
+  overlayImage,
+  onOverlaySelect,
+  onOverlayClear
 }) => {
-  
-  // Helper function to handle image uploads for specific holo effects
-  const handleHoloImageUpload = (effectName, e) => {
-    
-    const file = e.target.files[0];
-    if (!file) {
-      return;
-    }
-    
-    
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const imageDataUrl = reader.result;
-      
-      // Get the current parameters for this effect to preserve them
-      const paramName = `${effectName}Params`;
-      const currentParams = customCard[paramName] || {};
-      
-      // Create updated parameters that preserve existing values
-      const updatedParams = {
-        ...currentParams,  // ← Preserve all existing parameters (including colors array)
-        backgroundImage: imageDataUrl  // ← Only update the background image
-      };
-      
-      
-      // Update the entire params object to preserve all properties
-      handleParamChange(paramName, updatedParams, false);
-    };
-    reader.readAsDataURL(file);
+  // Set (or clear, with null) the texture image for one of the four systems.
+  // Every image chosen here also lands in the shared library.
+  const setEffectImage = (effectName, imageDataUrl) => {
+    const paramName = `${effectName}Params`;
+    const currentParams = customCard[paramName] || {};
+    const updatedParams = { ...currentParams, backgroundImage: imageDataUrl || undefined };
+    handleParamChange(paramName, updatedParams, false);
+    if (imageDataUrl && addToLibrary) addToLibrary(imageDataUrl);
   };
   if (!customCard) return null;
   
@@ -120,8 +105,35 @@ const HoloEffectToggles = ({
 
   
   return (
-    <ControlSection title="Holo Effect Toggles" className={className}>
+    <ControlSection title="Holographic Systems" className={className}>
       <TogglesContainer>
+        <Dim style={{ fontSize: 11, lineHeight: 1.5 }}>
+          Five ways to make a card holographic — combine them freely, and any
+          image from your library can drive any of them. The overlay blends
+          your image straight over the card; the four systems below animate
+          their texture as the card tilts, each with its own character. A
+          system without an image uses its built-in gradient.
+        </Dim>
+
+        {/* Overlay: the simplest technique — image + blend mode, no machinery. */}
+        <ToggleGroup className="holo-overlay-group">
+          <OverlayHead>
+            <span className="name">Overlay image</span>
+            <Dim style={{ fontSize: 10 }}>
+              Blended straight over the card, shining with the pointer. Its
+              blend mode is under Holographic Effect below.
+            </Dim>
+          </OverlayHead>
+          <HoloImageInput
+            id="holo-image-upload"
+            label="overlay image"
+            value={overlayImage || null}
+            onSelect={onOverlaySelect}
+            onClear={onOverlayClear}
+            imageLibrary={imageLibrary}
+          />
+        </ToggleGroup>
+
         {/* Rare Holo Toggle and Controls */}
         <ToggleGroup>
           <ToggleSwitch
@@ -231,12 +243,13 @@ const HoloEffectToggles = ({
                 tooltipContent="Customize the colors in the rainbow gradient. Add, remove, or reorder colors to create your own unique rainbow effect."
               />
               
-              <ImageUploader
+              <HoloImageInput
                 id="rare-holo-background-upload"
-                label="Background Image"
-                onImageChange={(e) => handleHoloImageUpload('rareHolo', e)}
-                previewSrc={rareHoloParams.backgroundImage}
-                tooltipContent="Upload a custom background image to replace the default rainbow gradient pattern."
+                label="texture image (replaces the rainbow gradient)"
+                value={rareHoloParams.backgroundImage || null}
+                onSelect={(url) => setEffectImage('rareHolo', url)}
+                onClear={() => setEffectImage('rareHolo', null)}
+                imageLibrary={imageLibrary}
               />
             </EffectControls>
           )}
@@ -349,12 +362,13 @@ const HoloEffectToggles = ({
                 tooltipContent="Customize the colors in the galaxy gradient. Add, remove, or reorder colors to create your own unique galaxy effect."
               />
               
-              <ImageUploader
+              <HoloImageInput
                 id="rare-holo-galaxy-background-upload"
-                label="Galaxy Background"
-                onImageChange={(e) => handleHoloImageUpload('rareHoloGalaxy', e)}
-                previewSrc={rareHoloGalaxyParams.backgroundImage}
-                tooltipContent="Upload a custom galaxy background image to replace the default space-themed background."
+                label="texture image (replaces the galaxy background)"
+                value={rareHoloGalaxyParams.backgroundImage || null}
+                onSelect={(url) => setEffectImage('rareHoloGalaxy', url)}
+                onClear={() => setEffectImage('rareHoloGalaxy', null)}
+                imageLibrary={imageLibrary}
               />
             </EffectControls>
           )}
@@ -416,12 +430,13 @@ const HoloEffectToggles = ({
                 tooltipContent="Controls the contrast of the wowa pattern."
               />
               
-              <ImageUploader
+              <HoloImageInput
                 id="wowa-holo-background-upload"
-                label="Illusion Background"
-                onImageChange={(e) => handleHoloImageUpload('wowaHolo', e)}
-                previewSrc={wowaHoloParams.backgroundImage}
-                tooltipContent="Upload a custom illusion background image to replace the default wowa effect background."
+                label="texture image (replaces the illusion background)"
+                value={wowaHoloParams.backgroundImage || null}
+                onSelect={(url) => setEffectImage('wowaHolo', url)}
+                onClear={() => setEffectImage('wowaHolo', null)}
+                imageLibrary={imageLibrary}
               />
             </EffectControls>
           )}
@@ -483,12 +498,13 @@ const HoloEffectToggles = ({
                 tooltipContent="Controls the contrast of the VMAX pattern."
               />
               
-              <ImageUploader
+              <HoloImageInput
                 id="rare-holo-vmax-background-upload"
-                label="VMAX Background"
-                onImageChange={(e) => handleHoloImageUpload('rareHoloVmax', e)}
-                previewSrc={rareHoloVmaxParams.backgroundImage}
-                tooltipContent="Upload a custom VMAX background image to replace the default red/pink gradient background."
+                label="texture image (replaces the red/pink gradient)"
+                value={rareHoloVmaxParams.backgroundImage || null}
+                onSelect={(url) => setEffectImage('rareHoloVmax', url)}
+                onClear={() => setEffectImage('rareHoloVmax', null)}
+                imageLibrary={imageLibrary}
               />
             </EffectControls>
           )}
@@ -514,6 +530,18 @@ const ToggleGroup = styled.div`
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 6px;
   background: rgba(0, 0, 0, 0.2);
+`;
+
+const OverlayHead = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  .name {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--amber-text);
+  }
 `;
 
 const EffectControls = styled.div`

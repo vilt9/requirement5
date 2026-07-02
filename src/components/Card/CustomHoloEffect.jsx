@@ -41,7 +41,10 @@ const CustomHoloEffect = styled.div`
   /* Apply filter based on mouse movement */
   filter: brightness(calc((var(--hyp) + 0.7) * 0.8)) contrast(1.5) saturate(1.2);
   
-  ${CardContainer}:hover & {
+  /* Alive on real hover AND while the simulated touch tour drives the card
+     (.moving) — :hover alone would leave it invisible on touch screens. */
+  ${CardContainer}:hover &,
+  ${CardContainer}.moving & {
     opacity: ${({ $active }) => $active ? '0.9' : '0'};
   }
 `;
