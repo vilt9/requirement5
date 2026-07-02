@@ -5,7 +5,8 @@ import { getTier, saveCost, ECONOMY, dividendFor, saveValue, normalizeProvenance
 import { absorb, issue, InsufficientFundsError } from '../services/ledger.js';
 import { cardStats } from '../services/drawEngine.js';
 import { requireAuth } from '../middleware/auth.js';
-import { offloadImages, storeBuffer } from '../storage/index.js';
+import path from 'path';
+import { offloadImages, storeBuffer, UPLOADS_DIR } from '../storage/index.js';
 import { renderCard, renderStills, MIME } from '../services/capture.js';
 
 const router = express.Router();
@@ -259,57 +260,95 @@ const RENDER_CACHE_TTL_MS = 10 * 24 * 60 * 60 * 1000; // 10 days (< the 14-day e
 
 const cardVersion = (card) => card?.updated_at || card?.updatedAt || '';
 
+// Ensure a render exists for (card, format), sharing the cache and in-flight
+// dedupe. Returns { payload, card } or { notFound: true }.
+const ensureRender = async (id, format, count) => {
+  const found = await Card.findById(id);
+  if (!found.success) return { notFound: true, found };
+
+  const version = cardVersion(found.data);
+  const key = format === 'frames' ? `${id}:frames:${count}` : `${id}:${format}`;
+
+  const cached = renderCache.get(key);
+  const fresh = cached && cached.version === version &&
+    (Date.now() - cached.at) < RENDER_CACHE_TTL_MS;
+  if (fresh) return { payload: cached.payload, card: found.data };
+
+  if (!renderInFlight.has(key)) {
+    const job = (async () => {
+      let payload;
+      if (format === 'frames') {
+        const buffers = await renderStills(id, { count });
+        const urls = [];
+        for (let i = 0; i < buffers.length; i++) {
+          const { url } = await storeBuffer(buffers[i], MIME.png, `card_${id}_still${i}`, { prefix: 'renders' });
+          urls.push(url);
+        }
+        payload = { urls };
+      } else {
+        const buffer = await renderCard(id, { format });
+        const { url } = await storeBuffer(buffer, MIME[format], `card_${id}`, { prefix: 'renders' });
+        payload = { url };
+      }
+      renderCache.set(key, { payload, version, at: Date.now() });
+      return payload;
+    })().finally(() => renderInFlight.delete(key));
+    renderInFlight.set(key, job);
+  }
+
+  const payload = await renderInFlight.get(key);
+  return { payload, card: found.data };
+};
+
 router.get('/:id/render', async (req, res) => {
   const format = req.query.format === 'mp4' ? 'mp4'
     : req.query.format === 'frames' ? 'frames' : 'gif';
-  const { id } = req.params;
 
   try {
-    const found = await Card.findById(id);
-    if (!found.success) return res.status(404).json(found);
-
-    const version = cardVersion(found.data);
     // 'frames' returns a set of still PNGs (rest pose + orbit poses) instead of
     // a stitched clip — cheap previews an agent can look at one by one.
     const count = format === 'frames'
       ? Math.max(1, Math.min(8, parseInt(req.query.count, 10) || 4))
       : null;
-    const key = format === 'frames' ? `${id}:frames:${count}` : `${id}:${format}`;
-
-    const cached = renderCache.get(key);
-    const fresh = cached && cached.version === version &&
-      (Date.now() - cached.at) < RENDER_CACHE_TTL_MS;
-    if (fresh) {
-      return res.json({ success: true, data: { ...cached.payload, format } });
-    }
-
-    if (!renderInFlight.has(key)) {
-      const job = (async () => {
-        let payload;
-        if (format === 'frames') {
-          const buffers = await renderStills(id, { count });
-          const urls = [];
-          for (let i = 0; i < buffers.length; i++) {
-            const { url } = await storeBuffer(buffers[i], MIME.png, `card_${id}_still${i}`, { prefix: 'renders' });
-            urls.push(url);
-          }
-          payload = { urls };
-        } else {
-          const buffer = await renderCard(id, { format });
-          const { url } = await storeBuffer(buffer, MIME[format], `card_${id}`, { prefix: 'renders' });
-          payload = { url };
-        }
-        renderCache.set(key, { payload, version, at: Date.now() });
-        return payload;
-      })().finally(() => renderInFlight.delete(key));
-      renderInFlight.set(key, job);
-    }
-
-    const payload = await renderInFlight.get(key);
-    res.json({ success: true, data: { ...payload, format } });
+    const result = await ensureRender(req.params.id, format, count);
+    if (result.notFound) return res.status(404).json(result.found);
+    res.json({ success: true, data: { ...result.payload, format } });
   } catch (error) {
     console.error('Error rendering card:', error);
     res.status(500).json({ success: false, error: 'Failed to render card' });
+  }
+});
+
+// Download a render as a file. The stored render lives on the object store
+// (a different origin with no CORS headers), so the browser cannot fetch it
+// itself — this endpoint streams the bytes same-origin with an attachment
+// disposition. Pointing the browser here downloads without leaving the page,
+// which is also the only pattern mobile Safari reliably honours.
+router.get('/:id/render/download', async (req, res) => {
+  const format = req.query.format === 'mp4' ? 'mp4' : 'gif';
+  try {
+    const result = await ensureRender(req.params.id, format, null);
+    if (result.notFound) return res.status(404).json(result.found);
+
+    const { url } = result.payload;
+    const name = String(result.card.name || req.params.id).replace(/[^a-zA-Z0-9_-]+/g, '_') || 'card';
+    res.setHeader('Content-Disposition', `attachment; filename="${name}.${format}"`);
+
+    if (/^https?:/i.test(url)) {
+      const upstream = await fetch(url);
+      if (!upstream.ok) throw new Error(`upstream fetch failed: ${upstream.status}`);
+      const buffer = Buffer.from(await upstream.arrayBuffer());
+      res.setHeader('Content-Type', MIME[format]);
+      res.setHeader('Content-Length', buffer.length);
+      res.end(buffer);
+    } else {
+      // Local driver: url is /uploads/<key>, backed by a file on disk.
+      const key = url.replace(/^\/uploads\//, '');
+      res.sendFile(path.resolve(UPLOADS_DIR, key));
+    }
+  } catch (error) {
+    console.error('Error downloading render:', error);
+    res.status(500).json({ success: false, error: 'Failed to download render' });
   }
 });
 

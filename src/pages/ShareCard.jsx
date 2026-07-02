@@ -215,22 +215,22 @@ const ShareCard = () => {
   }, [user, status, id]);
 
   // Render the card to a moving image and download it. The server records the live
-  // holographic tilt (first render takes a few seconds; repeats are cached).
+  // holographic tilt (first render takes a few seconds; repeats are cached). The
+  // file itself comes through our own /download endpoint: the object store is a
+  // different origin without CORS, so a browser-side fetch of the render URL fails —
+  // and blob-anchor downloads are flaky on mobile Safari anyway. Navigating an
+  // anchor at an attachment response downloads everywhere without leaving the page.
   const download = useCallback(async (format) => {
     setRendering(format);
     setRenderError(null);
     try {
-      const { url } = await api(`/api/cards/${id}/render?format=${format}`);
-      const res = await fetch(/^https?:/.test(url) ? url : `${apiBase}${url}`);
-      const blob = await res.blob();
-      const objectUrl = URL.createObjectURL(blob);
+      await api(`/api/cards/${id}/render?format=${format}`); // waits for the render to exist
       const a = document.createElement('a');
-      a.href = objectUrl;
+      a.href = `${apiBase}/api/cards/${id}/render/download?format=${format}`;
       a.download = `${(card?.name || id).replace(/[^a-z0-9_-]+/gi, '_')}.${format}`;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      URL.revokeObjectURL(objectUrl);
     } catch {
       setRenderError('Could not render this card. Try again.');
     }
@@ -313,7 +313,7 @@ const ShareCard = () => {
             // Keyed on identity: swapping provisional→stored (or card→card)
             // remounts with a soft fade instead of a hard cut.
             <FadeSwap key={`${id}:${synthetic ? 'synth' : 'stored'}`}>
-              <Card cardData={cardData} autoTour touched={touchPhase} />
+              <Card cardData={cardData} autoTour touched={touchPhase} scrub />
             </FadeSwap>
           )
           : <Panel><Dim>This card has no renderable data.</Dim></Panel>}

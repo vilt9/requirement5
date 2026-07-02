@@ -118,6 +118,45 @@ export const CardScene = styled.div`
   }
 `;
 
+// The mobile scrub track: on touch screens this is the only way to drive the
+// card — a vertical line beside it with a draggable dot. The brighter middle
+// stretch (25%–75%) is the shiny zone; the dot rides the auto loop when the
+// user isn't holding it. The wide invisible column is the touch target.
+export const ScrubTrack = styled.div`
+  position: absolute;
+  top: 4%;
+  bottom: 4%;
+  right: -36px;
+  width: 44px;
+  z-index: 30;
+  touch-action: none; /* dragging the dot must never scroll the page */
+
+  .line, .zone {
+    position: absolute;
+    left: 50%;
+    width: 2px;
+    transform: translateX(-50%);
+    border-radius: 1px;
+    pointer-events: none;
+  }
+  .line { top: 0; bottom: 0; background: rgba(255, 255, 255, 0.16); }
+  .zone { top: 25%; bottom: 25%; background: rgba(232, 180, 85, 0.45); }
+
+  .dot {
+    position: absolute;
+    left: 50%;
+    top: 0%;
+    width: 22px;
+    height: 22px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: rgba(248, 212, 136, 0.85);
+    border: 2px solid rgba(0, 0, 0, 0.4);
+    box-shadow: 0 0 10px rgba(232, 180, 85, 0.45);
+    pointer-events: none;
+  }
+`;
+
 // Card container - handles hover and moving states
 export const CardContainer = styled.div`
   position: relative;
@@ -983,6 +1022,9 @@ export const ImageShine = styled.div`
     );
     mix-blend-mode: overlay;
     opacity: var(--effect-intensity, 0);
+    /* --effect-intensity flips 0↔1; without a transition this was the one
+       layer that jolted when the shiny state changed. */
+    transition: opacity 0.4s ease;
   }
 `;
 
