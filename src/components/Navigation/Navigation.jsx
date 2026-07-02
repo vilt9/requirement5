@@ -5,9 +5,10 @@ import { useAuth } from '../../context/AuthContext';
 
 const REPO_URL = 'https://github.com/vilt9/requirement5';
 
+// Discovery happens through Generate (draws surface published cards), so the
+// Pool listing left the nav — the /pool route still answers deep links.
 const LINKS = [
   { to: '/', label: 'Generate' },
-  { to: '/pool', label: 'Pool' },
   { to: '/collection', label: 'Collection' },
   { to: '/customize', label: 'Create' },
   { to: '/about', label: 'About' },
@@ -16,7 +17,7 @@ const LINKS = [
 
 const Navigation = () => {
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, stash } = useAuth();
 
   return (
     <Bar>
@@ -42,10 +43,12 @@ const Navigation = () => {
         >
           <FiGithub />
         </GitHubLink>
-        <Balance to="/account">
+        <Balance to="/account" className="nav-balance">
           {user
             ? <><span className="who">{user.username} · </span><b>{user.balance} /t26</b></>
-            : <span className="dim"><span className="who">Not logged in</span><span className="short">Log in</span></span>}
+            : stash > 0
+              ? <><b>{stash} /t26</b> <span className="who">· log in to claim</span><span className="short">· claim</span></>
+              : <span className="dim"><span className="who">Not logged in</span><span className="short">Log in</span></span>}
         </Balance>
       </Inner>
     </Bar>

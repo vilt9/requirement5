@@ -1,7 +1,44 @@
-import { getRandomItem, hslToHex } from './cardData';
+import { hslToHex } from './cardData';
+
+// All randomness in this module flows through `rng` so a card can be generated
+// DETERMINISTICALLY from a seed: /card/<uuid> renders the same card for
+// everyone, forever, without a database row — the uuid IS the card. Unseeded
+// callers keep plain Math.random behaviour.
+let rng = Math.random;
+
+// mulberry32 — tiny, fast, good-enough PRNG for visuals.
+const mulberry32 = (a) => () => {
+  a |= 0; a = (a + 0x6D2B79F5) | 0;
+  let t = Math.imul(a ^ (a >>> 15), 1 | a);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+};
+
+// FNV-1a over the seed string → 32-bit state for mulberry32.
+const hashSeed = (str) => {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+};
+
+// Run fn with the module RNG seeded; always restore Math.random after.
+const withSeed = (seed, fn) => {
+  rng = mulberry32(hashSeed(String(seed)));
+  try {
+    return fn();
+  } finally {
+    rng = Math.random;
+  }
+};
 
 // Function to generate a random number in a range
-const random = (min, max) => Math.random() * (max - min) + min;
+const random = (min, max) => rng() * (max - min) + min;
+
+// Seed-aware pick (cardData's getRandomItem uses Math.random directly).
+const getRandomItem = (array) => array[Math.floor(rng() * array.length)];
 
 // Function to generate circle pattern CSS
 export const generateCirclePattern = () => {
@@ -77,7 +114,7 @@ export const generateFractalNoise = () => {
   const noiseDetail = random(1, 5);
   let filter = 'contrast(1200%) brightness(1000%)';
   
-  if (Math.random() > 0.5) {
+  if (rng() > 0.5) {
     filter += ' invert(1)';
   }
   
@@ -160,7 +197,7 @@ export const generateSolidColorBackground = (baseHue = null) => {
   
   // Always use vibrant colors for better visual impact
   // Default to using gradients for all cards (like working_index.html)
-  const isGradient = Math.random() > 0.2; // 80% chance for gradient
+  const isGradient = rng() > 0.2; // 80% chance for gradient
   let gradient, color;
   
   if (isGradient) {
@@ -235,7 +272,7 @@ export const generateBaseBackground = (baseHue = null) => {
     color1: hslToHex(hue, r(55, 80), r(12, 26)),
     color2: hslToHex(h2, r(45, 70), r(3, 11)),
     color3: hslToHex(h3, r(55, 80), r(16, 32)),
-    useThird: Math.random() > 0.45,
+    useThird: rng() > 0.45,
     angle: r(0, 360),
     posX: r(20, 80),
     posY: r(20, 80),
@@ -250,13 +287,22 @@ export const generateBaseBackground = (baseHue = null) => {
 // options.rarityRange: [low, high] forces the rarity score into a tier band
 // (used when the server rolls a tier and the client synthesises the card).
 export const generateCardAttributes = (options = {}) => {
+  // A seed (the card's uuid) makes the whole card deterministic — same seed,
+  // same card, on any machine. The seed becomes the card's id.
+  if (options.seed) {
+    return withSeed(options.seed, () => buildCardAttributes(options));
+  }
+  return buildCardAttributes(options);
+};
+
+const buildCardAttributes = (options = {}) => {
   // Generate rarity
   let rarity;
   if (options.rarityRange) {
     const [low, high] = options.rarityRange;
-    rarity = low + Math.random() * (high - low);
+    rarity = low + rng() * (high - low);
   } else {
-    rarity = Math.random();
+    rarity = rng();
   }
   
   // Determine card background color/gradient
@@ -301,7 +347,7 @@ export const generateCardAttributes = (options = {}) => {
   const pixelDensity = Math.floor(random(4, 12));
   
   return {
-    id: crypto.randomUUID(),
+    id: options.seed || crypto.randomUUID(),
     createdAt: new Date().toISOString(),
     rarity,
     patternInfo: {
@@ -397,8 +443,8 @@ export const getNewShinyEffectType = (rarity) => {
 // Function to generate border effects
 export const generateBorderEffects = (rarity, baseHue = null) => {
   // Determine if card should have borders based on rarity
-  const thickBorderEnabled = rarity >= 0.6 || Math.random() > 0.7;
-  const thinEdgeEnabled = rarity >= 0.4 || Math.random() > 0.5;
+  const thickBorderEnabled = rarity >= 0.6 || rng() > 0.7;
+  const thinEdgeEnabled = rarity >= 0.4 || rng() > 0.5;
   
   // Use provided baseHue or generate a random one
   const hue = baseHue !== null ? baseHue : Math.floor(random(0, 360));

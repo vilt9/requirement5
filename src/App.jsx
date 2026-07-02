@@ -3,7 +3,7 @@ import { createGlobalStyle } from 'styled-components';
 import { CardProvider } from './context/CardContext';
 import { AuthProvider } from './context/AuthContext';
 import Navigation from './components/Navigation/Navigation';
-import Home from './pages/Home';
+import GenerateGate from './pages/GenerateGate';
 import Pool from './pages/Pool';
 import Collection from './pages/Collection';
 import CardCustomizer from './pages/CardCustomizer';
@@ -133,7 +133,7 @@ function App() {
             <Navigation />
             <main style={{ marginTop: '46px' }}>
               <Routes>
-                <Route path="/" element={<Home />} />
+                <Route path="/" element={<GenerateGate />} />
                 <Route path="/pool" element={<Pool />} />
                 <Route path="/collection" element={<Collection />} />
                 <Route path="/customize" element={<CardCustomizer />} />

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
@@ -8,6 +8,7 @@ import { Page, Panel, Row, PillButton, TextInput, Divider, Dim, ErrorText } from
 const TXN_LABELS = {
   grant: 'Signup grant',
   draw_yield: 'Draw yield',
+  claimed_yield: 'Claimed logged-out stash',
   save: 'Card saved',
   dividend: 'Creator dividend',
   publish_stake: 'Publish stake'
@@ -63,6 +64,16 @@ const Stack = ({ children }) => (
 const Account = () => {
   const { user, config, yieldRemaining, login, signup, logout, refreshBalance } = useAuth();
   const [transactions, setTransactions] = useState([]);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Arrived here mid-action (e.g. saving a card while logged out)? Once the
+  // login/signup lands, send them straight back to finish what they started.
+  useEffect(() => {
+    if (user && location.state?.returnTo) {
+      navigate(location.state.returnTo, { replace: true });
+    }
+  }, [user, location.state, navigate]);
 
   useEffect(() => {
     if (!user) return;

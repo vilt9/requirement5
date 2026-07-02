@@ -128,12 +128,14 @@ router.post('/:id/save', requireAuth, async (req, res) => {
   }
 });
 
-// Save a synthetic draw (a card the client generated because the pool had none
-// in the rolled tier). Costs the same as a pool save; the whole cost is absorbed
-// by the cloud since there is no creator. The card is stored privately.
+// Save a synthetic card — one generated deterministically from its uuid rather
+// than stored. Costs the same as a pool save at the CHOSEN tier; the whole cost
+// is absorbed by the cloud since there is no creator. The card is stored
+// privately, and if the request carries the uuid it was generated from, that
+// uuid is claimed — the shared /card/<uuid> URL keeps working, now DB-backed.
 router.post('/save-synthetic', requireAuth, async (req, res) => {
   try {
-    const { name, stateData, tier: tierKey, tags } = req.body || {};
+    const { id, name, stateData, tier: tierKey, tags } = req.body || {};
     const tier = getTier(tierKey);
     if (!tier) {
       return res.status(400).json({ success: false, error: `Unknown tier: ${tierKey}` });
@@ -141,21 +143,33 @@ router.post('/save-synthetic', requireAuth, async (req, res) => {
     if (!stateData || typeof stateData !== 'object') {
       return res.status(400).json({ success: false, error: 'stateData is required' });
     }
+    // Claim the requested uuid if it's sane and free (first save wins; a second
+    // saver of the same shared card gets a fresh id).
+    const requestedId = typeof id === 'string' && /^[0-9a-f-]{10,64}$/i.test(id) && !memoryDb.getCardById(id)
+      ? id : undefined;
 
     const cost = saveCost(tier.key);
     absorb(req.user.id, 'save', cost);
 
     const { value: offloadedState } = await offloadImages(stateData, req.user.username);
     const result = await Card.create({
+      id: requestedId,
       name: name || 'Synthetic draw',
       stateData: offloadedState,
       creatorId: 'cloud',
       isPublic: false,
       tags: tags || stateData?.customCard?.tags || []
     });
+    // The user picked the tier at save time — clamp the generated rarity into
+    // that band so the stored score and tier agree.
+    const [low, high] = tier.scoreRange;
+    const rawScore = Number(stateData?.customCard?.rarity);
+    const score = Number.isFinite(rawScore)
+      ? Math.min(high, Math.max(low, rawScore))
+      : Math.round(((low + high) / 2) * 1000) / 1000;
     const card = memoryDb.updateCard(result.data.id, {
       tier: tier.key,
-      rarity_score: stateData?.customCard?.rarity ?? null,
+      rarity_score: score,
       times_saved: 1
     });
     const save = memoryDb.createSave({ user_id: req.user.id, card_id: card.id });

@@ -3,11 +3,34 @@ import { api, getToken, setToken } from '../utils/api';
 
 const AuthContext = createContext();
 
+// Logged-out generates earn into a local stash (plain localStorage so it's
+// synchronous and survives reloads). Logging in or signing up claims it: the
+// count rides along on the auth request and the server credits it, capped.
+const STASH_KEY = 'r5c_stash';
+const readStash = () => {
+  const n = parseInt(localStorage.getItem(STASH_KEY), 10);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+};
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [config, setConfig] = useState(null);   // economy config: tiers, costs, odds
   const [yieldRemaining, setYieldRemaining] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [stash, setStash] = useState(readStash);
+
+  const bumpStash = useCallback((amount = 1) => {
+    setStash(current => {
+      const next = current + amount;
+      try { localStorage.setItem(STASH_KEY, String(next)); } catch { /* private mode */ }
+      return next;
+    });
+  }, []);
+
+  const clearStash = useCallback(() => {
+    setStash(0);
+    try { localStorage.removeItem(STASH_KEY); } catch { /* private mode */ }
+  }, []);
 
   // Economy config is public and drives every band/odds/cost render.
   useEffect(() => {
@@ -47,16 +70,24 @@ export function AuthProvider({ children }) {
   }, []);
 
   const signup = async (username, password) => {
-    const data = await api('/api/auth/signup', { method: 'POST', body: { username, password } });
+    const data = await api('/api/auth/signup', {
+      method: 'POST',
+      body: { username, password, stash: readStash() }
+    });
     setToken(data.token);
     setUser(data.user);
+    clearStash();
     return data.user;
   };
 
   const login = async (username, password) => {
-    const data = await api('/api/auth/login', { method: 'POST', body: { username, password } });
+    const data = await api('/api/auth/login', {
+      method: 'POST',
+      body: { username, password, stash: readStash() }
+    });
     setToken(data.token);
     setUser(data.user);
+    clearStash();
     return data.user;
   };
 
@@ -74,7 +105,8 @@ export function AuthProvider({ children }) {
   return (
     <AuthContext.Provider value={{
       user, config, yieldRemaining, loading,
-      signup, login, logout, refreshBalance, setBalance
+      signup, login, logout, refreshBalance, setBalance,
+      stash, bumpStash
     }}>
       {children}
     </AuthContext.Provider>

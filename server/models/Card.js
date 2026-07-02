@@ -4,6 +4,9 @@ export default class Card {
   static async create(cardData) {
     try {
       const card = {
+        // Optional caller-chosen id (e.g. claiming a synthetic card's uuid);
+        // the store generates one when absent.
+        ...(cardData.id ? { id: cardData.id } : {}),
         name: cardData.name || 'Unnamed Card',
         state_data: cardData.stateData || {},
         creator_id: cardData.creatorId || 'anonymous',
