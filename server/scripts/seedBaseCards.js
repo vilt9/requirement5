@@ -8,7 +8,7 @@
 //   node server/scripts/seedBaseCards.js            # local JSON store
 //   DATABASE_URL=... node server/scripts/seedBaseCards.js   # prod
 import crypto from 'crypto';
-import { initializeDatabase, shutdownDatabase, memoryDb, dbConfig } from '../config/database.js';
+import { testConnection, initializeDatabase, shutdownDatabase, memoryDb, dbConfig } from '../config/database.js';
 
 const COUNT = 24;
 const rand = (min, max) => Math.random() * (max - min) + min;
@@ -65,6 +65,9 @@ const buildCustomCard = (i) => {
 };
 
 const main = async () => {
+  // Opens the Postgres pool when DATABASE_URL is set (no-op on the JSON store);
+  // initializeDatabase assumes the connection already exists.
+  await testConnection();
   await initializeDatabase();
 
   const existing = memoryDb.getAllCards().filter(c =>
