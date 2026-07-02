@@ -75,8 +75,11 @@ router.post('/publish', requireAuth, async (req, res) => {
 // the remainder is absorbed by the cloud.
 router.post('/:id/save', requireAuth, async (req, res) => {
   try {
+    // Saveable: pool cards, plus claimed synthetic draws (creator 'cloud') —
+    // a shared draw isn't used up by its first saver; anyone with the link can
+    // still claim it at the same per-id price.
     const card = memoryDb.getCardById(req.params.id);
-    if (!card || !card.is_public) {
+    if (!card || !(card.is_public || card.creator_id === 'cloud')) {
       return res.status(404).json({ success: false, error: 'Card not found' });
     }
     if (memoryDb.getSave(req.user.id, card.id)) {
@@ -89,12 +92,15 @@ router.post('/:id/save', requireAuth, async (req, res) => {
     // seeded from its id, independent of rarity.
     const provenance = normalizeProvenance(req.body?.provenance);
     const cost = saveCostFor(card.id);
-    const dividend = dividendFor(card.id, provenance);
+    // No creator account (cloud-claimed draws) → no dividend; the cloud
+    // absorbs the whole cost.
+    const hasCreator = !!memoryDb.getUserById(card.creator_id);
+    const dividend = hasCreator ? dividendFor(card.id, provenance) : 0;
     const value = saveValueFor(card.id, provenance);
 
     absorb(req.user.id, 'save', cost, { card_id: card.id });
-    // Dividend leaves the absorbed pot and goes to the creator, if they exist.
-    if (dividend > 0 && memoryDb.getUserById(card.creator_id)) {
+    // Dividend leaves the absorbed pot and goes to the creator.
+    if (dividend > 0) {
       issue(card.creator_id, 'dividend', dividend, {
         card_id: card.id, counterparty_id: req.user.id
       });
@@ -139,9 +145,10 @@ router.post('/save-synthetic', requireAuth, async (req, res) => {
     if (!stateData || typeof stateData !== 'object') {
       return res.status(400).json({ success: false, error: 'stateData is required' });
     }
-    // Claim the requested uuid if it's sane and free (first save wins; a second
-    // saver of the same shared card gets a fresh id). The id is settled BEFORE
-    // charging: the card's own id seeds its price.
+    // Claim the requested uuid if it's sane and free. (Once claimed the card
+    // is DB-backed, and later savers of the same link go through /:id/save —
+    // same card, same price.) The id is settled BEFORE charging: the card's
+    // own id seeds its price.
     const requestedId = typeof id === 'string' && /^[0-9a-f-]{10,64}$/i.test(id) && !memoryDb.getCardById(id)
       ? id : undefined;
     const finalId = requestedId || crypto.randomUUID();

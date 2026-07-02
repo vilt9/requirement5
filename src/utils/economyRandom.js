@@ -6,7 +6,7 @@
 
 export const PRICE_BANDS = {
   saveCost: [1.5, 48],     // /t26 to save a card into your collection
-  drawYield: [0.002, 1.8], // /t26 earned per generate
+  drawYield: [0.01, 0.35], // /t26 earned per generate
   publishStake: [1, 4]     // /t26 to publish a card into the pool
 };
 
@@ -40,11 +40,12 @@ export const saveCostFor = (cardId) =>
 export const drawYieldFor = (seed) =>
   Math.round(logBand(bell01(`${seed}:yield`), PRICE_BANDS.drawYield) * 1e6) / 1e6;
 
-// Display: whole-ish amounts read with 2 decimals; sub-1 amounts keep their
-// full 6-decimal precision (that's the texture of the currency).
-export const fmtT26 = (v) => {
+// Display: whole-ish amounts read with 2 decimals (3 for running totals, via
+// dp); sub-1 amounts keep their full 6-decimal precision (that's the texture
+// of the currency).
+export const fmtT26 = (v, dp = 2) => {
   const n = Number(v);
   if (!Number.isFinite(n)) return '0';
-  if (Math.abs(n) >= 1) return n.toFixed(2);
+  if (Math.abs(n) >= 1) return n.toFixed(dp);
   return n.toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
 };

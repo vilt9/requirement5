@@ -35,6 +35,12 @@ const BaseBackgroundControls = ({ customCard, handleParamChange, onRandomize }) 
     <ControlSection title="Base Background">
       <Hint>Sits behind the image — lower the Image Opacity to reveal it.</Hint>
 
+      {/* First thing in the section: rolling a fresh palette is the move most
+          people want before fine-tuning anything below. */}
+      <RandomizeButton type="button" onClick={onRandomize}>
+        ⟳ Randomize background
+      </RandomizeButton>
+
       <FieldRow>
         <RowLabel>Fade Shape</RowLabel>
         <Select
@@ -151,9 +157,6 @@ const BaseBackgroundControls = ({ customCard, handleParamChange, onRandomize }) 
         tooltipContent="Subtle film-grain texture over the background for a printed, tactile feel."
       />
 
-      <RandomizeButton type="button" onClick={onRandomize}>
-        ⟳ Randomize background
-      </RandomizeButton>
     </ControlSection>
   );
 };
@@ -193,7 +196,7 @@ const Select = styled.select`
 `;
 
 const RandomizeButton = styled.button`
-  margin-top: 10px;
+  margin-bottom: 10px;
   width: 100%;
   background: var(--panel);
   border: 1px solid var(--gold);

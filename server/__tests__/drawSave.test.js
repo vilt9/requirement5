@@ -253,6 +253,31 @@ describe('save-synthetic', () => {
     const pool = await request(app).get('/api/cards/community/all');
     expect(pool.body.data).toHaveLength(0);
   });
+
+  test('a claimed draw is not used up: a second user saves the same card at the same price', async () => {
+    const claimedId = '1a2b3c4d-5e6f-7081-92a3-b4c5d6e7f809';
+    const first = await signup('firstsaver');
+    await request(app)
+      .post('/api/cards/save-synthetic')
+      .set(auth(first.token))
+      .send({ id: claimedId, stateData: { customCard: { rarity: 0.4 } } });
+
+    const second = await signup('secondsaver');
+    const res = await request(app)
+      .post(`/api/cards/${claimedId}/save`)
+      .set(auth(second.token));
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.cost).toBe(saveCostFor(claimedId)); // same card, same price
+    expect(res.body.data.dividend).toBe(0); // 'cloud' has no user account to pay
+
+    const card = memoryDb.getCardById(claimedId);
+    expect(card.times_saved).toBe(2);
+
+    const collection = await request(app).get('/api/cards/collection/mine').set(auth(second.token));
+    expect(collection.body.data).toHaveLength(1);
+    expect(collection.body.data[0].card.id).toBe(claimedId);
+  });
 });
 
 describe('economy endpoints', () => {

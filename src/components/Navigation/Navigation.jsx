@@ -18,7 +18,7 @@ const LINKS = [
 
 const Navigation = () => {
   const location = useLocation();
-  const { user, stash } = useAuth();
+  const { user, stash, earnFlash } = useAuth();
 
   return (
     <Bar>
@@ -46,10 +46,15 @@ const Navigation = () => {
         </GitHubLink>
         <Balance to="/account" className="nav-balance">
           {user
-            ? <><span className="who">{user.username} · </span><b>{fmtT26(user.balance)} /t26</b></>
+            ? <><span className="who">{user.username} · </span><b>{fmtT26(user.balance, 3)} /t26</b></>
             : stash > 0
-              ? <><b>{fmtT26(stash)} /t26</b> <span className="who">· log in to claim</span><span className="short">· claim</span></>
+              ? <><b>{fmtT26(stash, 3)} /t26</b> <span className="who">· log in to claim</span><span className="short">· claim</span></>
               : <span className="dim"><span className="who">Not logged in</span><span className="short">Log in</span></span>}
+          {/* The earn, made visible — quietly: a small tick under the total
+              that fades in and out. Re-keyed per generate. */}
+          {earnFlash && (
+            <EarnTick key={earnFlash.seq} aria-hidden>+{fmtT26(earnFlash.amount)}</EarnTick>
+          )}
         </Balance>
       </Inner>
     </Bar>
@@ -139,6 +144,7 @@ const GitHubLink = styled.a`
 `;
 
 const Balance = styled(Link)`
+  position: relative; /* the earn tick hangs off the total */
   color: var(--amber-dim);
   white-space: nowrap;
   &:hover { text-decoration: none; color: var(--white); }
@@ -150,6 +156,27 @@ const Balance = styled(Link)`
   @media (max-width: 640px) {
     .who { display: none; }
     .short { display: inline; }
+  }
+`;
+
+// A generate's earn, ticking in just below the running total — small and
+// quiet, gone in a couple of seconds. Absolute, so the nav never shifts.
+const EarnTick = styled.span`
+  position: absolute;
+  top: calc(100% + 1px);
+  right: 0;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--gold-bright);
+  pointer-events: none;
+  opacity: 0;
+  animation: earnTick 2.4s ease-out forwards;
+
+  @keyframes earnTick {
+    0%   { opacity: 0; transform: translateY(-2px); }
+    18%  { opacity: 0.9; transform: translateY(0); }
+    70%  { opacity: 0.9; }
+    100% { opacity: 0; }
   }
 `;
 

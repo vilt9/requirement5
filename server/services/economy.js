@@ -42,7 +42,7 @@ export const ECONOMY = {
 // the price the page shows must be exactly the price the server charges.
 export const PRICE_BANDS = {
   saveCost: [1.5, 48],     // /t26 to save a card into your collection
-  drawYield: [0.002, 1.8], // /t26 earned per generate
+  drawYield: [0.01, 0.35], // /t26 earned per generate
   publishStake: [1, 4]     // /t26 to publish a card into the pool
 };
 

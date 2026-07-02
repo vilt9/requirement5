@@ -309,21 +309,18 @@ const ShareCard = () => {
             </FadeSwap>
           )
           : <Panel><Dim>This card has no renderable data.</Dim></Panel>}
-        {/* The earn, made visible: floats up off the card and fades. Keyed on
-            the card id so every generate flashes anew. */}
-        {earned != null && (
-          <EarnFlash key={id} aria-hidden>+{fmtT26(earned)} /t26</EarnFlash>
-        )}
       </Hero>
 
       <Column>
-        <Meta>
-          <div className="name">{card.name || (synthetic ? 'Unclaimed draw' : 'Untitled card')}</div>
-          <div className="sub"><Dim>{synthetic
-            ? (provisional ? '…' : 'lives only in this URL — save it to keep it')
-            : card.creator_id === 'cloud' ? 'synthetic' : `by ${card.creator_id}`}</Dim></div>
-          {tags.length > 0 && <div className="tags"><TagList tags={tags} /></div>}
-        </Meta>
+        {/* Unclaimed draws carry no name/provenance lines — the card speaks
+            for itself and vertical space above the fold is precious. */}
+        {!synthetic && (
+          <Meta>
+            <div className="name">{card.name || 'Untitled card'}</div>
+            <div className="sub"><Dim>{card.creator_id === 'cloud' ? 'synthetic' : `by ${card.creator_id}`}</Dim></div>
+            {tags.length > 0 && <div className="tags"><TagList tags={tags} /></div>}
+          </Meta>
+        )}
 
         {/* Generate + Save live in a fixed dock at the bottom of the screen —
             always visible, so the next card is one tap away from anywhere. */}
@@ -442,23 +439,12 @@ const ShareCard = () => {
             <Dim>You will be asked to sign up/in to save.</Dim>
           </Note>
         )}
-        {!saveResult && !provisional && (
+        {!saveResult && !provisional && !synthetic && (
           <Note>
-            {synthetic ? (
-              <>
-                <span className="k">Unclaimed:</span>{' '}
-                <Dim>This card is generated from its URL — anyone with the link sees the
-                same card. Every card carries its own price, independent of rarity;
-                this one costs {fmtT26(cardPrice)} /t26 to claim.</Dim>
-              </>
-            ) : (
-              <>
-                <span className="k">{discovered ? 'Discovered Save:' : 'Linked Save:'}</span>{' '}
-                <Dim>{discovered
-                  ? 'A card you discover is worth full value.'
-                  : 'A card saved from a shared link is worth less than one you discover.'}</Dim>
-              </>
-            )}
+            <span className="k">{discovered ? 'Discovered Save:' : 'Linked Save:'}</span>{' '}
+            <Dim>{discovered
+              ? 'A card you discover is worth full value.'
+              : 'A card saved from a shared link is worth less than one you discover.'}</Dim>
           </Note>
         )}
       </Column>
@@ -466,8 +452,7 @@ const ShareCard = () => {
   );
 };
 
-// The card is a hero element — fine to centre it. (Relative: the earn flash
-// positions against it.)
+// The card is a hero element — fine to centre it.
 const Hero = styled.div`
   position: relative;
   display: flex;
@@ -477,30 +462,6 @@ const Hero = styled.div`
   /* Phones: vertical space is precious — the card starts almost at the top. */
   @media (max-width: 640px) {
     padding: 4px 10px 2px;
-  }
-`;
-
-// The moment of earning, made visible: the amount floats up over the card and
-// fades. Re-keyed per card id, so every generate flashes.
-const EarnFlash = styled.div`
-  position: absolute;
-  top: 22px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 25;
-  pointer-events: none;
-  font-family: var(--font-mono);
-  font-weight: 700;
-  font-size: 15px;
-  color: var(--gold-bright);
-  text-shadow: 0 0 12px rgba(232, 180, 85, 0.8), 0 1px 2px rgba(0, 0, 0, 0.9);
-  animation: earnFloat 2.2s ease-out forwards;
-
-  @keyframes earnFloat {
-    0%   { opacity: 0; transform: translate(-50%, 14px); }
-    12%  { opacity: 1; transform: translate(-50%, 0); }
-    70%  { opacity: 1; }
-    100% { opacity: 0; transform: translate(-50%, -26px); }
   }
 `;
 
@@ -558,7 +519,23 @@ const FixedDock = styled.div`
   background: rgba(8, 6, 3, 0.85);
   backdrop-filter: blur(6px);
   border: 1px solid var(--panel-border);
-  button { font-family: var(--font-mono); font-weight: 600; font-size: 13px; }
+  button {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: 13px;
+    /* A slow, gentle glow — enough to draw the eye, never enough to nag. */
+    animation: dockPulse 3.2s ease-in-out infinite;
+  }
+  button:disabled { animation: none; }
+
+  @keyframes dockPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(232, 180, 85, 0); }
+    50%      { box-shadow: 0 0 10px 1px rgba(232, 180, 85, 0.3); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    button { animation: none; }
+  }
 `;
 
 // "Save" with a small provenance subtext beneath it.

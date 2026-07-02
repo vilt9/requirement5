@@ -22,6 +22,16 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [stash, setStash] = useState(readStash);
 
+  // The last generate's earn, surfaced as a subtle tick next to the nav
+  // balance (re-keyed by seq so every generate re-animates).
+  const [earnFlash, setEarnFlash] = useState(null);
+  const earnSeqRef = useRef(0);
+  const flashEarn = useCallback((amount) => {
+    if (!(amount > 0)) return;
+    earnSeqRef.current += 1;
+    setEarnFlash({ amount, seq: earnSeqRef.current });
+  }, []);
+
   const bumpStash = useCallback((amount = 1) => {
     setStash(current => {
       const next = round6(current + amount);
@@ -172,18 +182,20 @@ export function AuthProvider({ children }) {
     if (!user) {
       const entry = mintFresh();
       bumpStash(entry.earned); // the stash grows by the card's own seeded yield
+      flashEarn(entry.earned);
       return entry;
     }
-    const entry = queueRef.current.shift();
+    const entry = queueRef.current.shift() || mintFresh();
     refill();
-    return entry || mintFresh();
-  }, [user, refill, bumpStash, mintFresh]);
+    flashEarn(entry.earned);
+    return entry;
+  }, [user, refill, bumpStash, mintFresh, flashEarn]);
 
   return (
     <AuthContext.Provider value={{
       user, config, yieldRemaining, loading,
       signup, login, logout, refreshBalance, setBalance,
-      stash, bumpStash, nextCard
+      stash, bumpStash, nextCard, earnFlash
     }}>
       {children}
     </AuthContext.Provider>

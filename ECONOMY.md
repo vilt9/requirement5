@@ -41,7 +41,7 @@ the same card id always prices the same, client and server agree exactly.
 
 | Action            | Band            | Typical (median) |
 |-------------------|-----------------|------------------|
-| Generate yield    | 0.002 – 1.8     | ≈ 0.06           |
+| Generate yield    | 0.01 – 0.35     | ≈ 0.06           |
 | Save cost         | 1.5 – 48        | ≈ 8.5            |
 | Creator dividend  | 20% of the card's save cost | ≈ 1.7 |
 | Publish stake     | 1 – 4 (rolled at publish)   | ≈ 2   |
