@@ -349,34 +349,39 @@ const ShareCard = () => {
           </TierSlider>
         )}
 
-        <Actions>
-          <PillButton onClick={generate} disabled={busy}>
-            {busy ? 'Working…' : 'Generate ⟳'}
-          </PillButton>
-          <SaveButton
-            $secondary
-            onClick={() => save()}
-            disabled={busy || provisional || saveResult === 'exists' || !!saveResult}
-          >
-            <span className="main">{mainLabel}</span>
-            {subLabel && <span className="sub">{subLabel}</span>}
-          </SaveButton>
-          <PillButton $secondary onClick={copyLink}>
-            {copied ? 'Link copied ✓' : 'Copy link'}
-          </PillButton>
-        </Actions>
-
-        {/* Server-side rendering needs the card in the database. */}
-        {!synthetic && (
+        {/* The action bar floats pinned to the bottom of the screen until its
+            natural spot scrolls into view, then locks into place (sticky). */}
+        <StickyActions className="card-actions">
           <Actions>
-            <PillButton $secondary onClick={() => download('gif')} disabled={!!rendering}>
-              {rendering === 'gif' ? 'Rendering…' : 'Download GIF'}
-            </PillButton>
-            <PillButton $secondary onClick={() => download('mp4')} disabled={!!rendering}>
-              {rendering === 'mp4' ? 'Rendering…' : 'Download MP4'}
+            <SaveButton onClick={generate} disabled={busy}>
+              <span className="main">{busy ? 'Working…' : 'Generate'}</span>
+              <span className="sub">earns +1 /t26</span>
+            </SaveButton>
+            <SaveButton
+              $secondary
+              onClick={() => save()}
+              disabled={busy || provisional || saveResult === 'exists' || !!saveResult}
+            >
+              <span className="main">{mainLabel}</span>
+              {subLabel && <span className="sub">{subLabel}</span>}
+            </SaveButton>
+            <PillButton $secondary onClick={copyLink}>
+              {copied ? 'Link copied ✓' : 'Copy link'}
             </PillButton>
           </Actions>
-        )}
+
+          {/* Server-side rendering needs the card in the database. */}
+          {!synthetic && (
+            <Actions>
+              <PillButton $secondary onClick={() => download('gif')} disabled={!!rendering}>
+                {rendering === 'gif' ? 'Rendering…' : 'Download GIF'}
+              </PillButton>
+              <PillButton $secondary onClick={() => download('mp4')} disabled={!!rendering}>
+                {rendering === 'mp4' ? 'Rendering…' : 'Download MP4'}
+              </PillButton>
+            </Actions>
+          )}
+        </StickyActions>
         {renderError && <Result $error>{renderError}</Result>}
 
         {saved && (
@@ -490,6 +495,11 @@ const Hero = styled.div`
   display: flex;
   justify-content: center;
   padding: 18px 12px 4px;
+
+  /* Phones: vertical space is precious — the card starts almost at the top. */
+  @media (max-width: 640px) {
+    padding: 4px 10px 2px;
+  }
 `;
 
 // Soft entrance when a card (or its resolved identity) arrives.
@@ -526,6 +536,25 @@ const Actions = styled.div`
   align-items: stretch;
   /* Buttons read in the same mono font as the rest of the page. */
   button { font-family: var(--font-mono); font-weight: 600; font-size: 13px; }
+`;
+
+// Bottom-sticky: while the bar's natural spot is below the fold it hovers
+// pinned above the screen edge (over the content), and once you scroll down
+// to where it belongs it locks into the flow. The translucent panel makes the
+// hovering state read as deliberate rather than as overlap.
+const StickyActions = styled.div`
+  position: sticky;
+  bottom: 8px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px;
+  margin: 0 -10px;
+  border-radius: 10px;
+  background: rgba(8, 6, 3, 0.82);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--panel-border);
 `;
 
 // "Save" with a small provenance subtext beneath it.

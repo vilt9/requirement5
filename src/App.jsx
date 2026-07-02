@@ -18,6 +18,15 @@ import './App.css';
 // gold accents for links and primary actions. Tokens live in :root so the whole
 // system reskins from one place.
 const GlobalStyle = createGlobalStyle`
+  /* Clear the fixed nav on desktop; on phones the nav is static (scrolls with
+     the page), so reserving the height would just be blank space. */
+  .app-main {
+    margin-top: 46px;
+    @media (max-width: 640px) {
+      margin-top: 0;
+    }
+  }
+
   :root {
     /* Base values for mouse tracking */
     --mx: 50%;
@@ -131,7 +140,7 @@ function App() {
           <GlobalStyle />
           <div className="App">
             <Navigation />
-            <main style={{ marginTop: '46px' }}>
+            <main className="app-main">
               <Routes>
                 <Route path="/" element={<GenerateGate />} />
                 <Route path="/pool" element={<Pool />} />
