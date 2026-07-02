@@ -44,8 +44,8 @@ const Navigation = () => {
         </GitHubLink>
         <Balance to="/account">
           {user
-            ? <>{user.username} · <b>{user.balance} /t26</b></>
-            : <span className="dim">Not logged in</span>}
+            ? <><span className="who">{user.username} · </span><b>{user.balance} /t26</b></>
+            : <span className="dim"><span className="who">Not logged in</span><span className="short">Log in</span></span>}
         </Balance>
       </Inner>
     </Bar>
@@ -71,6 +71,12 @@ const Inner = styled.div`
   display: flex;
   align-items: center;
   gap: 16px;
+
+  @media (max-width: 640px) {
+    gap: 10px;
+    padding: 0 10px;
+    font-size: 12px;
+  }
 `;
 
 const Brand = styled(Link)`
@@ -92,6 +98,13 @@ const Links = styled.div`
   gap: 14px;
   flex: 1;
   overflow-x: auto;
+  /* Horizontal swipe on phones without a scrollbar stealing height. */
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+
+  @media (max-width: 640px) {
+    gap: 10px;
+  }
 `;
 
 const NavLink = styled(Link)`
@@ -107,6 +120,10 @@ const GitHubLink = styled.a`
   color: var(--amber-dim);
   font-size: 16px;
   &:hover { color: var(--white); text-decoration: none; }
+
+  @media (max-width: 640px) {
+    display: none;
+  }
 `;
 
 const Balance = styled(Link)`
@@ -115,6 +132,13 @@ const Balance = styled(Link)`
   &:hover { text-decoration: none; color: var(--white); }
   b { color: var(--gold-bright); }
   .dim { color: var(--amber-dim); }
+  .short { display: none; }
+
+  /* Phones: keep the balance, drop the username / long label. */
+  @media (max-width: 640px) {
+    .who { display: none; }
+    .short { display: inline; }
+  }
 `;
 
 export default Navigation;

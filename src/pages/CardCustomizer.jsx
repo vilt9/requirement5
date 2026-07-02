@@ -484,6 +484,11 @@ const ControlsSection = styled.div`
   flex-direction: column;
   /* Body copy reads left-aligned (the app root centers text globally). */
   text-align: left;
+
+  /* Phones: one page scroll, no nested scrollbox. */
+  @media (max-width: 768px) {
+    max-height: none;
+  }
 `;
 
 const Stepper = styled.div`
@@ -522,6 +527,11 @@ const StageBody = styled.div`
   flex: 1;
   min-height: 0;
   padding-right: 10px;
+
+  @media (max-width: 768px) {
+    overflow-y: visible;
+    padding-right: 0;
+  }
 `;
 
 const TabBar = styled.div`
@@ -554,6 +564,11 @@ const ControlsInner = styled.div`
   flex: 1;
   min-height: 0;
   padding-right: 10px; /* Add some padding for the scrollbar */
+
+  @media (max-width: 768px) {
+    overflow-y: visible;
+    padding-right: 0;
+  }
 `;
 
 const StageFooter = styled.div`

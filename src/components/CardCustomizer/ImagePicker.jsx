@@ -76,7 +76,7 @@ const ImagePicker = ({
           </LibraryToggle>
           {libraryOpen && (
             <>
-              <Dim>Everything you upload, reusable across cards — hover an image to use it.</Dim>
+              <Dim>Everything you upload, reusable across cards — pick an image to use it as base or holo.</Dim>
               <LibraryGrid className="image-library">
                 {imageLibrary.map((img) => (
                   <LibraryItem key={img.id} className="library-item">
@@ -208,6 +208,11 @@ const LibraryItem = styled.div`
     transition: opacity 0.15s;
   }
   &:hover .actions { opacity: 1; }
+
+  /* Touch screens have no hover — keep the actions visible, lighter. */
+  @media (hover: none) {
+    .actions { opacity: 1; background: rgba(0, 0, 0, 0.45); }
+  }
 
   .actions button {
     font-family: var(--font-mono);
