@@ -1,5 +1,6 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { api, getToken, setToken } from '../utils/api';
+import { prefetchedCards } from '../utils/drawQueue';
 
 const AuthContext = createContext();
 
@@ -102,11 +103,75 @@ export function AuthProvider({ children }) {
     setUser(current => (current ? { ...current, balance } : current));
   }, []);
 
+  // --- The generate queue: the next cards, drawn ahead of time -------------
+  // Tapping Generate should be instant. Logged in, the server draw (which
+  // pays the yield and can surface a published card) runs in the BACKGROUND
+  // to keep a small queue topped up; each tap pops a ready entry. Logged out
+  // there's nothing to wait for — uuids are minted locally.
+  const queueRef = useRef([]);
+  const refillingRef = useRef(false);
+  const userRef = useRef(null);
+  userRef.current = user;
+
+  const mintFresh = useCallback(() => {
+    const id = crypto.randomUUID();
+    prefetchedCards.set(id, 'synthetic');
+    return { id, discovered: false };
+  }, []);
+
+  const refill = useCallback(async () => {
+    if (refillingRef.current) return;
+    refillingRef.current = true;
+    try {
+      while (userRef.current && queueRef.current.length < 2) {
+        const result = await api('/api/draw', { method: 'POST' });
+        setBalance(result.balance);
+        // Rare pool finds always surface; common pool finds only half the
+        // time, so generating stays generative even with a populated pool.
+        const showPool = result.source === 'pool' && result.card &&
+          (result.tier?.key !== 'common' || Math.random() < 0.5);
+        if (showPool) {
+          prefetchedCards.set(result.card.id, result.card);
+          queueRef.current.push({ id: result.card.id, discovered: true });
+        } else {
+          queueRef.current.push(mintFresh());
+        }
+      }
+    } catch (error) {
+      console.error('Draw prefetch failed:', error);
+    } finally {
+      refillingRef.current = false;
+    }
+  }, [setBalance, mintFresh]);
+
+  // Fresh session or auth change: the old queue's provenance is stale.
+  // Keyed on the user's ID, not the object — refill updates the balance,
+  // which recreates the user object, and keying on identity would loop
+  // draw → new user object → reset → draw... until the daily cap drained.
+  const userId = user?.id || null;
+  useEffect(() => {
+    queueRef.current = [];
+    if (userId) refill();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  // Pop the next card to show. Never waits: an empty queue mints a fresh
+  // uuid on the spot (its card generates from the seed, no network needed).
+  const nextCard = useCallback(() => {
+    if (!user) {
+      bumpStash(1);
+      return mintFresh();
+    }
+    const entry = queueRef.current.shift();
+    refill();
+    return entry || mintFresh();
+  }, [user, refill, bumpStash, mintFresh]);
+
   return (
     <AuthContext.Provider value={{
       user, config, yieldRemaining, loading,
       signup, login, logout, refreshBalance, setBalance,
-      stash, bumpStash
+      stash, bumpStash, nextCard
     }}>
       {children}
     </AuthContext.Provider>

@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { api, ApiError, apiBase } from '../utils/api';
 import { poolCardToCardData, asOdds } from '../utils/poolCard';
 import { scoreCard, generateCardAttributes } from '../utils/cardGenerator';
+import { prefetchedCards } from '../utils/drawQueue';
 import { HOLO_NAMES } from '../utils/holoNames';
 import { useScrollBloom } from '../utils/useScrollBloom';
 import AboutR5c from '../components/AboutR5c';
@@ -22,7 +23,7 @@ const ShareCard = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, config, setBalance, refreshBalance } = useAuth();
+  const { user, config, setBalance, refreshBalance, nextCard } = useAuth();
 
   // Reached via the Generate button this session? Lives in router state, never the URL.
   const discovered = !!location.state?.discovered;
@@ -39,30 +40,73 @@ const ShareCard = () => {
   const [rendering, setRendering] = useState(null); // 'gif' | 'mp4' while a moving image renders
   const [renderError, setRenderError] = useState(null);
 
+  // The card lives on its page like the customizer preview: always in motion,
+  // cycling between resting and touched so the holo shows itself without a
+  // pointer (on phones there is no hover to discover it with).
+  const [touchPhase, setTouchPhase] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    let timer;
+    const cycle = (on) => {
+      if (cancelled) return;
+      setTouchPhase(on);
+      timer = setTimeout(() => cycle(!on), on ? 6000 : 3000);
+    };
+    cycle(true);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, []);
+
+  // provisional = we're showing the uuid-seeded card while the server tells us
+  // whether a stored card owns this id. Fresh mints skip that check entirely.
+  const [provisional, setProvisional] = useState(false);
+
+  const synthFromSeed = (seed) => ({
+    id: seed,
+    name: null,
+    creator_id: null,
+    tags: [],
+    times_saved: 0,
+    state_data: { customCard: generateCardAttributes({ seed }) },
+    synthetic: true
+  });
+
   useEffect(() => {
     let active = true;
-    setStatus('loading');
     setSaveResult(null);
     setSaveError(null);
+
+    // Prefetched by the generate queue? Render with zero waiting. Consumed
+    // once — a revisit re-checks the server (the card may be saved by then).
+    const cached = prefetchedCards.get(id);
+    if (cached) {
+      prefetchedCards.delete(id);
+      setCard(cached === 'synthetic' ? synthFromSeed(id) : cached);
+      setProvisional(false);
+      setStatus('ok');
+      return;
+    }
+
+    const uuidish = /^[0-9a-f-]{10,64}$/i.test(id);
+    if (uuidish) {
+      // The uuid IS the card: render the seeded version IMMEDIATELY (no dead
+      // loading state), and let the fetch below either confirm it (404 — it
+      // exists only as math) or cross-fade to the stored card that claimed it.
+      setCard(synthFromSeed(id));
+      setProvisional(true);
+      setStatus('ok');
+    } else {
+      setCard(null);
+      setStatus('loading');
+    }
+
     api(`/api/cards/${id}`)
-      .then(record => { if (active) { setCard(record); setStatus('ok'); } })
+      .then(record => { if (active) { setCard(record); setProvisional(false); setStatus('ok'); } })
       .catch(err => {
         if (!active) return;
-        if (err?.status === 404 && /^[0-9a-f-]{10,64}$/i.test(id)) {
-          // Not in the database → the uuid IS the card: generate it
-          // deterministically from the id. Same URL, same card, for everyone.
-          // It exists only as math until someone saves it.
-          const customCard = generateCardAttributes({ seed: id });
-          setCard({
-            id,
-            name: null,
-            creator_id: null,
-            tags: [],
-            times_saved: 0,
-            state_data: { customCard },
-            synthetic: true
-          });
-          setStatus('ok');
+        if (uuidish && err?.status === 404) {
+          setProvisional(false); // the seeded render was right — unclaimed
+        } else if (uuidish) {
+          setProvisional(false); // network hiccup: the seeded card still shows
         } else {
           setStatus(err?.status === 404 ? 'notfound' : 'error');
         }
@@ -90,9 +134,12 @@ const ShareCard = () => {
     } catch { /* clipboard blocked — URL is in the address bar anyway */ }
   }, []);
 
-  // Generate = go through the gate at '/': it credits the draw yield (or grows
-  // the logged-out stash) and routes to a pool card or a fresh uuid.
-  const generate = useCallback(() => navigate('/'), [navigate]);
+  // Generate pops the next prefetched card — instant, no gate page. Pushed
+  // (not replaced) so Back walks through the cards you've seen.
+  const generate = useCallback(() => {
+    const entry = nextCard();
+    navigate(`/card/${entry.id}`, { state: { discovered: entry.discovered } });
+  }, [nextCard, navigate]);
 
   // Tiers commonest → rarest; the synthetic-save slider indexes into this.
   const orderedTiers = (config?.tiers || []).slice().sort((a, b) => a.scoreRange[0] - b.scoreRange[0]);
@@ -261,21 +308,30 @@ const ShareCard = () => {
   return (
     <Page>
       <Hero>
-        {cardData ? <Card cardData={cardData} /> : <Panel><Dim>This card has no renderable data.</Dim></Panel>}
+        {cardData
+          ? (
+            // Keyed on identity: swapping provisional→stored (or card→card)
+            // remounts with a soft fade instead of a hard cut.
+            <FadeSwap key={`${id}:${synthetic ? 'synth' : 'stored'}`}>
+              <Card cardData={cardData} autoTour touched={touchPhase} />
+            </FadeSwap>
+          )
+          : <Panel><Dim>This card has no renderable data.</Dim></Panel>}
       </Hero>
 
       <Column>
         <Meta>
           <div className="name">{card.name || (synthetic ? 'Unclaimed draw' : 'Untitled card')}</div>
           <div className="sub"><Dim>{synthetic
-            ? 'lives only in this URL — save it to keep it'
+            ? (provisional ? '…' : 'lives only in this URL — save it to keep it')
             : card.creator_id === 'cloud' ? 'synthetic' : `by ${card.creator_id}`}</Dim></div>
           {tags.length > 0 && <div className="tags"><TagList tags={tags} /></div>}
         </Meta>
 
         {/* Synthetic saves let the saver pick how rare the card should be —
-            the slider walks the tier ladder; rarer tiers cost more to save. */}
-        {synthetic && !saveResult && orderedTiers.length > 0 && (
+            the slider walks the tier ladder; rarer tiers cost more to save.
+            Hidden while provisional (the server may yet reveal a stored card). */}
+        {synthetic && !provisional && !saveResult && orderedTiers.length > 0 && (
           <TierSlider className="tier-slider">
             <div className="row">
               <span className="k">Save as:</span>
@@ -300,7 +356,7 @@ const ShareCard = () => {
           <SaveButton
             $secondary
             onClick={() => save()}
-            disabled={busy || saveResult === 'exists' || !!saveResult}
+            disabled={busy || provisional || saveResult === 'exists' || !!saveResult}
           >
             <span className="main">{mainLabel}</span>
             {subLabel && <span className="sub">{subLabel}</span>}
@@ -406,7 +462,7 @@ const ShareCard = () => {
             <Dim>You will be asked to sign up/in to save.</Dim>
           </Note>
         )}
-        {!saveResult && (
+        {!saveResult && !provisional && (
           <Note>
             {synthetic ? (
               <>
@@ -434,6 +490,15 @@ const Hero = styled.div`
   display: flex;
   justify-content: center;
   padding: 18px 12px 4px;
+`;
+
+// Soft entrance when a card (or its resolved identity) arrives.
+const FadeSwap = styled.div`
+  animation: cardIn 0.45s ease;
+  @keyframes cardIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
 `;
 
 // Text content reads left-aligned in a width-bounded column (centred as a block).

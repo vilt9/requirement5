@@ -23,7 +23,6 @@ const buildBaseBackground = (bg) => {
 };
 
 const Card = ({ cardData, isInteractive = true, onClick, autoTour = false, touched = true }) => {
-  const [isFlipped, setIsFlipped] = useState(false);
   const [isMoving, setIsMoving] = useState(false);
   const [failedSrc, setFailedSrc] = useState(null); // hides an image that 404s, per-src, so it can't flicker
   const cardRef = useRef(null);
@@ -133,13 +132,11 @@ const Card = ({ cardData, isInteractive = true, onClick, autoTour = false, touch
     });
     
     // Apply transform directly to match the working HTML version
-    const transform = `
+    cardRef.current.style.transform = `
       rotateY(${rotateY}deg)
       rotateX(${rotateX}deg)
       translateZ(50px)
-      ${isFlipped ? 'rotateY(180deg)' : ''}
     `;
-    cardRef.current.style.transform = transform;
   };
 
   // Handle mouse movement for interactive card effects
@@ -171,8 +168,7 @@ const Card = ({ cardData, isInteractive = true, onClick, autoTour = false, touch
     cardRef.current.classList.add('floating');
 
     // Reset transform directly
-    const transform = isFlipped ? 'rotateY(180deg)' : '';
-    cardRef.current.style.transform = transform;
+    cardRef.current.style.transform = '';
 
     // Reset CSS properties to center
     setCardCSSVariables({
@@ -205,13 +201,13 @@ const Card = ({ cardData, isInteractive = true, onClick, autoTour = false, touch
     resetToRest();
   };
   
-  // Handle card click for flip
+  // Click-to-flip was removed: the card has no real back face, so flipping
+  // just mirrored it. A click only forwards to the caller's handler now.
   const handleCardClick = () => {
     if (!isInteractive) return;
-    setIsFlipped(!isFlipped);
     if (onClick) onClick();
   };
-  
+
   // Handle touch events for mobile
   const handleTouchMove = (e) => {
     if (!isInteractive || !cardRef.current || e.touches.length === 0) return;
@@ -407,7 +403,6 @@ const Card = ({ cardData, isInteractive = true, onClick, autoTour = false, touch
     >
       <S.CardContainer
         ref={cardRef}
-        $isFlipped={isFlipped}
         $isInteractive={isInteractive}
         onClick={handleCardClick}
         data-rarity={holoShineClass}
@@ -424,7 +419,7 @@ const Card = ({ cardData, isInteractive = true, onClick, autoTour = false, touch
           }}
         />
         
-        <S.CardElement $isFlipped={isFlipped} className="card-element">
+        <S.CardElement className="card-element">
           <S.CardFace
             className="card-face"
             style={{
@@ -681,8 +676,6 @@ const Card = ({ cardData, isInteractive = true, onClick, autoTour = false, touch
               }}
             />
           </S.CardFace>
-          
-          <S.CardBack className="card-back" />
         </S.CardElement>
       </S.CardContainer>
     </S.CardScene>

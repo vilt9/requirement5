@@ -128,26 +128,22 @@ export const CardContainer = styled.div`
   /* This creates a single stacking context for all card elements */
   isolation: isolate;
   
-  /* Change transition to match working HTML, only for flipping */
   transition: box-shadow 0.3s ease;
-  
-  /* Only apply rotateY for flipping */
-  ${({ $isFlipped }) => $isFlipped && css`
-    & > .${CardElement} {
-      transform: rotateY(180deg);
-    }
-  `}
-  
+
   /* Floating animation for non-moving state */
   ${({ $isInteractive }) => $isInteractive && css`
     &.floating {
       animation: ${floatingCard} 5s ease-in-out infinite;
     }
     
-    &:hover {
-      animation-play-state: paused;
+    /* Real-hover devices only: on touch screens :hover sticks after the
+       finger lifts, which froze the floating animation forever. */
+    @media (hover: hover) {
+      &:hover {
+        animation-play-state: paused;
+      }
     }
-    
+
     /* Moving class gets added/removed via direct DOM manipulation */
     &.moving {
       animation-play-state: paused;
@@ -252,11 +248,15 @@ export const ThinEdgeBorder = styled.div`
   }
 `;
 
-// Main card element - handles flipping
+// Main card element — the tilting body of the card
 export const CardElement = styled.div`
   width: 100%;
   height: 100%;
-  border-radius: var(--card-border-radius);
+  /* This element clips every layer during a press (it owns overflow:hidden on
+     its own compositor layer). --card-border-radius is set nowhere, and with
+     no fallback the radius computed to 0 — mobile Chrome clipped the pressed
+     effect layers SQUARE while desktop happened to clip via CardFace. */
+  border-radius: var(--card-border-radius, 15px);
   position: absolute;
   transform-style: preserve-3d;
   /* Mouse Response Speed: higher = snappier tilt (shorter transition). */
@@ -299,18 +299,6 @@ export const CardFace = styled.div`
   transform: translateZ(0.5px);
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
   z-index: 1; /* Ensure proper stacking context */
-`;
-
-/* Card back - back of card */
-export const CardBack = styled.div`
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  border-radius: 15px;
-  transform-style: preserve-3d;
-  backface-visibility: hidden;
-  background: linear-gradient(45deg, #1a1a1a, #333);
-  transform: rotateY(180deg) translateZ(0.5px);
 `;
 
 /* Base-background vignette: darkens the edges of the gradient behind the image. */
