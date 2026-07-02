@@ -4,7 +4,6 @@ import ControlSection from './ControlSection';
 import ParameterControl from './ParameterControl';
 import ColorPicker from './ColorPicker';
 import ToggleSwitch from './ToggleSwitch';
-import Tooltip from './Tooltip';
 
 // The base background sits behind the card image and shows through as the image
 // opacity drops. Fully editable: geometry (type), up to three colours, the fade
@@ -37,15 +36,15 @@ const BaseBackgroundControls = ({ customCard, handleParamChange, onRandomize }) 
       <Hint>Sits behind the image — lower the Image Opacity to reveal it.</Hint>
 
       <FieldRow>
-        <RowLabel>Type</RowLabel>
+        <RowLabel>Fade Shape</RowLabel>
         <Select
           value={bg.type}
           onChange={(e) => handleParamChange('baseBackground.type', e.target.value, false)}
         >
           {TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
         </Select>
-        <Tooltip content="Geometry of the fade: linear (directional), radial (from a point), conic (angular sweep), or a flat solid colour." />
       </FieldRow>
+      <Hint>Linear fades in one direction, radial spreads from a point, conic sweeps around it — or pick a flat solid color.</Hint>
 
       <ColorPicker
         label="Color 1"
@@ -172,7 +171,7 @@ const FieldRow = styled.div`
   margin-bottom: 10px;
 `;
 
-const RowLabel = styled.span`
+const RowLabel = styled.label`
   font-size: 11px;
   color: var(--amber-text);
   min-width: 36px;
@@ -184,9 +183,10 @@ const Select = styled.select`
   border: 1px solid var(--panel-border);
   color: var(--amber-text);
   font-family: var(--font-mono);
-  font-size: 11px;
-  padding: 4px 6px;
-  border-radius: 3px;
+  font-size: 12px;
+  padding: 10px 8px;
+  min-height: 40px;
+  border-radius: 4px;
 
   &:focus { outline: none; border-color: var(--gold); }
   option { background: #1a1510; }
@@ -199,9 +199,9 @@ const RandomizeButton = styled.button`
   border: 1px solid var(--gold);
   color: var(--gold-bright);
   font-family: var(--font-mono);
-  font-size: 11px;
-  padding: 7px;
-  border-radius: 3px;
+  font-size: 12px;
+  padding: 11px;
+  border-radius: 4px;
   cursor: pointer;
 
   &:hover { background: var(--panel-hover); color: var(--white); }

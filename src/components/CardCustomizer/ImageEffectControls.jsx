@@ -31,51 +31,51 @@ const ImageEffectControls = ({
           max={1}
           step={0.01}
           onChange={handleParamChange}
-          tooltipContent="Adjusts how visible the main card image is."
+          description="How solid the artwork is — lower it to let the background show through."
         />
 
         <ParameterControl
-          label="Image Contrast"
+          label="Contrast"
           param="imageEffects.contrast"
           value={imageContrast}
           min={0.5}
           max={2}
           step={0.05}
           onChange={handleParamChange}
-          tooltipContent="Enhances or reduces the difference between light and dark areas."
+          description="Deepens the shadows and brightens the highlights of the artwork."
         />
 
         <ParameterControl
-          label="Image Saturation"
+          label="Color Saturation"
           param="imageEffects.saturation"
           value={imageSaturation}
           min={0}
           max={2}
           step={0.05}
           onChange={handleParamChange}
-          tooltipContent="Controls the intensity of colors in your image."
+          description="0 turns the artwork black and white; high makes it vivid."
         />
 
         <ParameterControl
-          label="Parallax Depth"
+          label="3D Depth"
           param="effectParams.parallaxDepth"
           value={customCard.effectParams?.parallaxDepth ?? 0}
           min={0}
           max={1}
           step={0.01}
           onChange={handleParamChange}
-          tooltipContent="Gives the card a sense of 3D depth: as you tilt it, the image shifts against the frame like a window into the scene. 0 is flat."
+          description="The artwork shifts against the frame as the card tilts, like a window into the scene. 0 is flat."
         />
 
         <ParameterControl
-          label="Image Opacity (Hover)"
+          label="Opacity While Touched"
           param="imageEffects.opacityHover"
           value={imageOpacityHover}
           min={0}
           max={1}
           step={0.01}
           onChange={handleParamChange}
-          tooltipContent="Adjusts the image's visibility when you hover over the card."
+          description="The artwork's opacity while the card is being touched — set it lower to let the effects flare."
         />
       </ImageControlsGrid>
     </ControlSection>

@@ -105,7 +105,8 @@ function defaultCustomCard({ hue, rarity, tags }) {
       aberrationSpeed: '10s',
       filterBrightness: 1.05, filterContrast: 1.2, filterSaturate: 1.25,
       holoAngle: 133,
-      parallaxDepth: 6,
+      // 0–1, same band as the customizer slider (scales the artwork's 3D shift)
+      parallaxDepth: 0.4,
       customHoloBlendMode: 'color-dodge'
     },
     imageEffects: {
@@ -343,18 +344,15 @@ const FULL_TEMPLATE = {
     },
     patternInfo: { type: 'Constellation', opacity: 0.7, numLines: 11, lineOpacity: 0.07 },
     effectParams: {
-      imageShineIntensity: '0.99', aberrationIntensity: '0.6',
       filterBrightness: 1.1, filterContrast: 1.3, filterSaturate: 1.4,
-      holoAngle: 133, parallaxDepth: 8, customHoloBlendMode: 'color-dodge'
+      parallaxDepth: 0.5, customHoloBlendMode: 'color-dodge'
     },
     imageEffects: {
-      maskType: 'vignette', maskOpacity: '0.10', blurAmount: '1px',
-      glowIntensity: '5px', glowColor: 'hsla(280, 70%, 50%, 0.3)',
-      contrast: 1.15, saturation: 1.3
+      opacity: 0.98, opacityHover: 0.9, contrast: 1.15, saturation: 1.3
     },
     borderEffects: {
       thickBorderEnabled: true, thinEdgeEnabled: true, borderImageEnabled: true,
-      borderColor: 'rgba(255, 215, 0, 0.4)', borderOpacity: 0.8,
+      color: 'rgb(255, 215, 0)', opacity: 0.4, imageOpacity: 0.7,
       edgeColor1: 'rgba(255, 215, 0, 0.7)', edgeColor2: 'rgba(255, 255, 255, 0.3)',
       thinEdgeColor: 'rgba(255, 215, 0, 0.8)'
     },

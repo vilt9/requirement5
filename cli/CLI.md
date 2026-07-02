@@ -120,13 +120,11 @@ from `backgroundColor.baseHue`. The one-stop terminal reference is
     },
     "patternInfo": { "type": "Constellation", "opacity": 0.7 },
     "effectParams": {
-      "imageShineIntensity": "0.99",
-      "holoAngle": 133,
-      "parallaxDepth": 8,
+      "parallaxDepth": 0.5,
       "customHoloBlendMode": "color-dodge"
     },
-    "imageEffects": { "maskType": "vignette", "glowIntensity": "5px" },
-    "borderEffects": { "thickBorderEnabled": true, "borderColor": "rgba(255,215,0,0.4)" },
+    "imageEffects": { "opacity": 0.98, "saturation": 1.3 },
+    "borderEffects": { "thickBorderEnabled": true, "color": "rgb(255,215,0)", "opacity": 0.4 },
     "holoEffects": { "rareHolo": true, "rareHoloGalaxy": true },
     "rareHoloParams": { "intensity": "extreme", "blendMode": "soft-light" }
   }
@@ -142,14 +140,16 @@ The systems, briefly:
 - **`patternInfo`** — a decorative pattern layer. Types: `Circles`, `Spindles`,
   `Squares`, `Triangles`, `Starburst`, `Hexagons`, `Fractal Noise`, `3D Grid`,
   `3D Isometric`, `3D Wave`, `Constellation`. `opacity` 0.3–0.9.
-- **`effectParams`** — shine sweep and chromatic aberration over the artwork:
-  intensity, angle, per-channel filter (brightness/contrast/saturate),
-  `parallaxDepth`, and the blend mode for a custom holo image.
-- **`imageEffects`** — how the artwork sits in the frame: mask
-  (`vignette` / `horizontal-fade` / `vertical-fade` / `diagonal-fade`), blur,
-  glow, contrast, saturation.
-- **`borderEffects`** — thick border, thin edge line, and border-image layers
-  with independent colors/opacities.
+- **`effectParams`** — `parallaxDepth` (0–1, the artwork's 3D shift as the
+  card tilts), `filterBrightness`/`filterContrast`/`filterSaturate` (drive the
+  Nebula/Pulse filters), and `customHoloBlendMode` (how the Veil overlay
+  blends).
+- **`imageEffects`** — how the artwork sits in the frame: `opacity` (and
+  `opacityHover` while touched), `contrast`, `saturation`, `blendMode`.
+- **`borderEffects`** — the center panel (`thickBorderEnabled`, `color`,
+  `opacity`, touched variants, plus a blurred artwork wash via
+  `borderImageEnabled`/`imageOpacity`), the thin edge line, and the edge
+  glow colors.
 - **`holoEffects`** — toggles for the four animated holographic systems
   (combine freely). Site display names in brackets: `rareHolo` [Prism —
   rainbow bands], `rareHoloGalaxy` [Nebula — galaxy swirl], `wowaHolo`

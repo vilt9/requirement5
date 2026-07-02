@@ -1,6 +1,5 @@
 import React from 'react';
 import styled from 'styled-components';
-import Tooltip from './Tooltip';
 
 const ParameterControl = ({
   label,
@@ -11,11 +10,13 @@ const ParameterControl = ({
   step = 0.01,
   onChange,
   tooltipContent,
+  description,
   className
 }) => {
   // Keep the inputs controlled at all times: an undefined value (a param field
   // not yet initialised) would flip them to uncontrolled and warn in React.
   const safeValue = Number.isFinite(Number(value)) && value !== '' && value != null ? value : min;
+  const desc = description || tooltipContent;
 
   const handleSliderChange = (e) => {
     onChange(param, e.target.value);
@@ -27,10 +28,8 @@ const ParameterControl = ({
 
   return (
     <ControlGroup className={className}>
-      <LabelRow>
-        <ControlLabel>{label}</ControlLabel>
-        {tooltipContent && <Tooltip content={tooltipContent} />}
-      </LabelRow>
+      <ControlLabel>{label}</ControlLabel>
+      {desc && <Description>{desc}</Description>}
       <SliderContainer>
         <Slider
           type="range"
@@ -56,13 +55,19 @@ const ParameterControl = ({
 const ControlGroup = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 3px;
 `;
 
 const ControlLabel = styled.label`
   font-size: 11px;
   color: var(--amber-text);
-  margin-bottom: 4px;
+`;
+
+/* Descriptions are always visible (hover tooltips don't exist on touch). */
+const Description = styled.span`
+  font-size: 10px;
+  line-height: 1.45;
+  color: var(--amber-dim);
 `;
 
 const SliderContainer = styled.div`
@@ -71,68 +76,79 @@ const SliderContainer = styled.div`
   gap: 10px;
 `;
 
+/* Chunky by design: an 8px track and a 24px thumb are draggable with a thumb,
+   not just a mouse. The transparent vertical padding widens the hit area to
+   ~32px without changing the visual weight. */
 const Slider = styled.input`
   flex: 1;
   -webkit-appearance: none;
   width: 100%;
-  height: 4px;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.2);
+  height: 32px;
+  background: transparent;
   outline: none;
-  
+  touch-action: pan-y;
+
+  &::-webkit-slider-runnable-track {
+    height: 8px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.18);
+  }
+
   &::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
-    width: 12px;
-    height: 12px;
+    width: 24px;
+    height: 24px;
+    margin-top: -8px;
     border-radius: 50%;
     background: var(--gold);
+    border: 2px solid rgba(0, 0, 0, 0.35);
     cursor: pointer;
   }
-  
+
+  &::-moz-range-track {
+    height: 8px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.18);
+  }
+
   &::-moz-range-thumb {
-    width: 12px;
-    height: 12px;
+    width: 24px;
+    height: 24px;
     border-radius: 50%;
     background: var(--gold);
     cursor: pointer;
-    border: none;
+    border: 2px solid rgba(0, 0, 0, 0.35);
   }
 `;
 
 const SliderValue = styled.input`
-  width: 50px;
+  width: 54px;
   background: var(--field-bg);
   border: 1px solid var(--panel-border);
-  padding: 3px 5px;
-  border-radius: 3px;
+  padding: 7px 5px;
+  border-radius: 4px;
   color: var(--amber-text);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   text-align: center;
 
   &:focus {
     outline: none;
     border-color: var(--gold);
   }
-  
+
   /* Hide spinner controls */
   &::-webkit-outer-spin-button,
   &::-webkit-inner-spin-button {
     -webkit-appearance: none;
     margin: 0;
   }
-  
+
   /* Firefox */
   &[type=number] {
     -moz-appearance: textfield;
   }
-`;
-
-const LabelRow = styled.div`
-  display: flex;
-  align-items: center;
-  margin-bottom: 4px;
 `;
 
 export default ParameterControl;

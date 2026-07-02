@@ -89,11 +89,10 @@ const HoloEffectToggles = ({
     ]
   };
 
+  // Signal only reads spacing/angle/texture — it has no brightness/contrast.
   const wowaHoloParams = customCard.wowaHoloParams || {
     space: 4,
-    angle: 45,
-    brightness: 0.6,
-    contrast: 1.2
+    angle: 45
   };
 
   const rareHoloVmaxParams = customCard.rareHoloVmaxParams || {
@@ -164,92 +163,89 @@ const HoloEffectToggles = ({
                 imageLibrary={imageLibrary}
               />
               <ParameterControl
-                label="Color Spacing (%)"
+                label="Band Width"
                 param="rareHoloParams.space"
                 value={rareHoloParams.space}
                 min={0.5}
                 max={5}
                 step={0.1}
                 onChange={handleParamChange}
-                tooltipContent="Controls the spacing between colors in the rainbow gradient. Lower values create tighter bands."
+                description="How wide each rainbow band is — low is tight stripes, high is broad washes."
               />
-              
+
               <ParameterControl
-                label="Hue Multiplier"
+                label="Color Spread"
                 param="rareHoloParams.hue"
                 value={rareHoloParams.hue}
                 min={1}
                 max={50}
                 step={1}
                 onChange={handleParamChange}
-                tooltipContent="Controls the hue variation in the rainbow pattern. Higher values create more color diversity."
+                description="How many different colors get packed into the sweep — higher is busier."
               />
-              
+
               <ParameterControl
-                label="Saturation (%)"
+                label="Color Vividness"
                 param="rareHoloParams.saturation"
                 value={rareHoloParams.saturation}
                 min={20}
                 max={100}
                 step={5}
                 onChange={handleParamChange}
-                tooltipContent="Controls the color intensity of the rainbow pattern."
+                description="Grey and subtle at the low end, neon at the top."
               />
-              
+
               <ParameterControl
-                label="Lightness (%)"
+                label="Band Brightness"
                 param="rareHoloParams.lightness"
                 value={rareHoloParams.lightness}
                 min={20}
                 max={80}
                 step={5}
                 onChange={handleParamChange}
-                tooltipContent="Controls the brightness of the rainbow colors."
+                description="How light the bands glow — low is moody, high is bright."
               />
-              
-              <ParameterControl
-                label="Effect Intensity"
+
+              <ToggleSwitch
+                label="Extra Layers"
                 param="rareHoloParams.intensity"
-                value={rareHoloParams.intensity}
-                type="select"
-                options={[
-                  { value: 'subtle', label: 'Subtle (Mathematical)' },
-                  { value: 'extreme', label: 'Extreme (Layered)' }
-                ]}
-                onChange={handleParamChange}
-                tooltipContent="Choose between subtle mathematical gradients or extreme layered effects with image texture."
+                checked={rareHoloParams.intensity === 'extreme'}
+                onChange={(param, checked) =>
+                  handleParamChange(param, checked ? 'extreme' : 'subtle', false)
+                }
+                description="Stacks a second, heavier rainbow pass for a stronger effect."
               />
-              
+
               <ParameterControl
-                label="Filter Strength"
+                label="Effect Strength"
                 param="rareHoloParams.filterStrength"
                 value={rareHoloParams.filterStrength || 1.0}
                 min={0.1}
                 max={3.0}
                 step={0.1}
                 onChange={handleParamChange}
-                tooltipContent="Controls the intensity of the brightness, contrast, and saturation filters. Higher values create more dramatic effects."
+                description="One knob that turns the whole Prism effect up or down."
               />
-              
+
               <ParameterControl
-                label="Mouse Response Speed"
+                label="Tilt Response"
                 param="rareHoloParams.mouseSpeed"
                 value={rareHoloParams.mouseSpeed || 1.0}
                 min={0.1}
                 max={5.0}
                 step={0.1}
                 onChange={handleParamChange}
-                tooltipContent="Controls how quickly the effect responds to mouse movement. Higher values make the effect more reactive."
+                description="How fast the card follows your touch — high snaps, low glides."
               />
-              
+
               <BlendModeSelector
                 label="Blend Mode"
                 param="rareHoloParams.blendMode"
                 value={rareHoloParams.blendMode || 'soft-light'}
                 onChange={handleParamChange}
-                tooltipContent="Choose how the holo effect blends with the card image. Different modes create different visual styles."
+                description="How the rainbow mixes with the artwork underneath it."
               />
-              
+
               <ColorPaletteEditor
                 label="Rainbow Colors"
                 colors={rareHoloParams.colors}
@@ -257,7 +253,7 @@ const HoloEffectToggles = ({
                   const updatedParams = { ...rareHoloParams, colors: newColors };
                   handleParamChange('rareHoloParams', updatedParams, false);
                 }}
-                tooltipContent="Customize the colors in the rainbow gradient. Add, remove, or reorder colors to create your own unique rainbow effect."
+                tooltipContent="The band colors, in order — add, remove, or reorder them."
               />
               
             </EffectControls>
@@ -285,16 +281,16 @@ const HoloEffectToggles = ({
                 imageLibrary={imageLibrary}
               />
               <ParameterControl
-                label="Color Spacing (%)"
+                label="Swirl Scale"
                 param="rareHoloGalaxyParams.space"
                 value={rareHoloGalaxyParams.space}
                 min={1}
                 max={10}
                 step={0.5}
                 onChange={handleParamChange}
-                tooltipContent="Controls the spacing between galaxy colors. Higher values spread colors further apart."
+                description="Size of the color swirls — low is fine detail, high is broad clouds."
               />
-              
+
               <ParameterControl
                 label="Brightness"
                 param="rareHoloGalaxyParams.brightness"
@@ -303,9 +299,9 @@ const HoloEffectToggles = ({
                 max={2}
                 step={0.05}
                 onChange={handleParamChange}
-                tooltipContent="Controls the overall brightness of the galaxy effect."
+                description="Lifts or dims the whole effect."
               />
-              
+
               <ParameterControl
                 label="Contrast"
                 param="rareHoloGalaxyParams.contrast"
@@ -314,69 +310,69 @@ const HoloEffectToggles = ({
                 max={3}
                 step={0.1}
                 onChange={handleParamChange}
-                tooltipContent="Controls the contrast between light and dark areas."
+                description="Sharpens the split between glow and shadow."
               />
-              
+
               <ParameterControl
-                label="Saturation"
+                label="Color Vividness"
                 param="rareHoloGalaxyParams.saturation"
                 value={rareHoloGalaxyParams.saturation}
                 min={0.5}
                 max={3}
                 step={0.1}
                 onChange={handleParamChange}
-                tooltipContent="Controls the color intensity of the galaxy effect."
+                description="Grey and subtle at the low end, neon at the top."
               />
-              
+
               <BlendModeSelector
-                label="Image Blend Mode"
+                label="Blend Mode"
                 param="rareHoloGalaxyParams.blendMode"
                 value={rareHoloGalaxyParams.blendMode || 'color-dodge'}
                 onChange={handleParamChange}
-                tooltipContent="Controls how the uploaded image blends with the galaxy colors. Try different modes to see dramatic visual changes!"
+                description="How the nebula mixes with the artwork underneath it."
               />
-              
+
               <ParameterControl
-                label="Gradient Width"
+                label="Glow Width"
                 param="rareHoloGalaxyParams.gradientSize"
                 value={rareHoloGalaxyParams.gradientSize}
                 min={100}
                 max={800}
                 step={50}
                 onChange={handleParamChange}
-                tooltipContent="Controls the width of the rainbow gradient. Smaller values = tighter stripes, larger values = wider stripes."
+                description="Stretches the color field sideways — low is tight stripes, high is wide washes."
               />
-              
+
               <ParameterControl
-                label="Gradient Height"
+                label="Glow Height"
                 param="rareHoloGalaxyParams.gradientHeight"
                 value={rareHoloGalaxyParams.gradientHeight}
                 min={200}
                 max={1500}
                 step={100}
                 onChange={handleParamChange}
-                tooltipContent="Controls the height of the rainbow gradient. Affects how the gradient stretches vertically with mouse movement."
+                description="Stretches the color field vertically as the card tilts."
               />
-              
+
               <ParameterControl
-                label="Smooth Transitions"
+                label="Color Blending"
                 param="rareHoloGalaxyParams.smoothTransitions"
                 value={rareHoloGalaxyParams.smoothTransitions}
                 min={0}
                 max={1}
                 step={0.1}
                 onChange={handleParamChange}
-                tooltipContent="Controls smoothness of color transitions. 0=hard stops, 1=maximum smooth blending between colors."
+                description="0 keeps hard edges between colors; 1 melts them together."
               />
-              
+
               <ColorPaletteEditor
-                label="Galaxy Colors"
+                label="Nebula Colors"
                 colors={rareHoloGalaxyParams.colors}
                 onChange={(newColors) => {
                   const updatedParams = { ...rareHoloGalaxyParams, colors: newColors };
                   handleParamChange('rareHoloGalaxyParams', updatedParams, false);
                 }}
-                tooltipContent="Customize the colors in the galaxy gradient. Add, remove, or reorder colors to create your own unique galaxy effect."
+                tooltipContent="The swirl colors, in order — add, remove, or reorder them."
               />
               
             </EffectControls>
@@ -404,49 +400,27 @@ const HoloEffectToggles = ({
                 imageLibrary={imageLibrary}
               />
               <ParameterControl
-                label="Color Spacing (%)"
+                label="Stripe Spacing"
                 param="wowaHoloParams.space"
                 value={wowaHoloParams.space}
                 min={1}
                 max={10}
                 step={0.5}
                 onChange={handleParamChange}
-                tooltipContent="Controls the spacing between wowa effect colors."
+                description="Distance between the sweeping stripes."
               />
-              
+
               <ParameterControl
-                label="Pattern Angle (°)"
+                label="Sweep Direction"
                 param="wowaHoloParams.angle"
                 value={wowaHoloParams.angle}
                 min={0}
                 max={360}
                 step={5}
                 onChange={handleParamChange}
-                tooltipContent="Controls the angle of the wowa pattern gradient."
+                description="The angle the stripes travel across the card."
               />
-              
-              <ParameterControl
-                label="Brightness"
-                param="wowaHoloParams.brightness"
-                value={wowaHoloParams.brightness}
-                min={0.1}
-                max={2}
-                step={0.05}
-                onChange={handleParamChange}
-                tooltipContent="Controls the brightness of the wowa effect."
-              />
-              
-              <ParameterControl
-                label="Contrast"
-                param="wowaHoloParams.contrast"
-                value={wowaHoloParams.contrast}
-                min={0.5}
-                max={3}
-                step={0.1}
-                onChange={handleParamChange}
-                tooltipContent="Controls the contrast of the wowa pattern."
-              />
-              
+
             </EffectControls>
           )}
         </ToggleGroup>
@@ -472,27 +446,27 @@ const HoloEffectToggles = ({
                 imageLibrary={imageLibrary}
               />
               <ParameterControl
-                label="Color Spacing (%)"
+                label="Band Spacing"
                 param="rareHoloVmaxParams.space"
                 value={rareHoloVmaxParams.space}
                 min={1}
                 max={15}
                 step={0.5}
                 onChange={handleParamChange}
-                tooltipContent="Controls the spacing between VMAX red/pink colors."
+                description="Distance between the pulse bands."
               />
-              
+
               <ParameterControl
-                label="Pattern Angle (°)"
+                label="Band Direction"
                 param="rareHoloVmaxParams.angle"
                 value={rareHoloVmaxParams.angle}
                 min={0}
                 max={360}
                 step={5}
                 onChange={handleParamChange}
-                tooltipContent="Controls the angle of the VMAX diagonal pattern."
+                description="The angle the bands run across the card."
               />
-              
+
               <ParameterControl
                 label="Brightness"
                 param="rareHoloVmaxParams.brightness"
@@ -501,9 +475,9 @@ const HoloEffectToggles = ({
                 max={2}
                 step={0.05}
                 onChange={handleParamChange}
-                tooltipContent="Controls the brightness of the VMAX effect."
+                description="Lifts or dims the whole effect."
               />
-              
+
               <ParameterControl
                 label="Contrast"
                 param="rareHoloVmaxParams.contrast"
@@ -512,7 +486,7 @@ const HoloEffectToggles = ({
                 max={4}
                 step={0.1}
                 onChange={handleParamChange}
-                tooltipContent="Controls the contrast of the VMAX pattern."
+                description="Sharpens the split between light and dark bands."
               />
               
             </EffectControls>

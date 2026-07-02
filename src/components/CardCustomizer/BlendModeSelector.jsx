@@ -1,14 +1,15 @@
 import React from 'react';
 import styled from 'styled-components';
-import Tooltip from './Tooltip';
 
 const BlendModeSelector = ({
   label,
   param,
   value,
   onChange,
-  tooltipContent
+  tooltipContent,
+  description
 }) => {
+  const desc = description || tooltipContent;
   const handleChange = (e) => {
     onChange(param, e.target.value, false);
   };
@@ -32,10 +33,8 @@ const BlendModeSelector = ({
 
   return (
     <SelectorGroup>
-      <LabelRow>
-        <SelectorLabel>{label}</SelectorLabel>
-        {tooltipContent && <Tooltip content={tooltipContent} />}
-      </LabelRow>
+      <SelectorLabel>{label}</SelectorLabel>
+      {desc && <Description>{desc}</Description>}
       <SelectDropdown value={value} onChange={handleChange}>
         {blendModes.map((mode) => (
           <option key={mode} value={mode}>
@@ -56,13 +55,19 @@ const SelectorGroup = styled.div`
 const SelectorLabel = styled.label`
   font-size: 11px;
   color: var(--amber-text);
-  margin-bottom: 4px;
+`;
+
+const Description = styled.span`
+  font-size: 10px;
+  line-height: 1.45;
+  color: var(--amber-dim);
 `;
 
 const SelectDropdown = styled.select`
   background: var(--field-bg);
   border: 1px solid var(--panel-border);
-  padding: 6px 8px;
+  padding: 10px 8px;
+  min-height: 40px;
   border-radius: 4px;
   color: var(--amber-text);
   font-family: var(--font-mono);
@@ -80,12 +85,6 @@ const SelectDropdown = styled.select`
     color: var(--amber-text);
     padding: 4px;
   }
-`;
-
-const LabelRow = styled.div`
-  display: flex;
-  align-items: center;
-  margin-bottom: 4px;
 `;
 
 export default BlendModeSelector;

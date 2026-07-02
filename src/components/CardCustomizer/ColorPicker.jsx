@@ -2,15 +2,16 @@ import React, { useState, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import styled from 'styled-components';
 import { SketchPicker } from 'react-color';
-import Tooltip from './Tooltip';
 
 const ColorPicker = ({
   label,
   param,
   value,
   onChange,
-  tooltipContent
+  tooltipContent,
+  description
 }) => {
+  const desc = description || tooltipContent;
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [pickerPosition, setPickerPosition] = useState({ top: 0, left: 0 });
   const swatchRef = useRef(null);
@@ -50,10 +51,8 @@ const ColorPicker = ({
 
   return (
     <ColorPickerGroup>
-      <LabelRow>
-        <ColorPickerLabel>{label}</ColorPickerLabel>
-        {tooltipContent && <Tooltip content={tooltipContent} />}
-      </LabelRow>
+      <ColorPickerLabel>{label}</ColorPickerLabel>
+      {desc && <Description>{desc}</Description>}
       <ColorPickerControls>
         <ColorSwatch
           ref={swatchRef}
@@ -82,7 +81,12 @@ const ColorPickerGroup = styled.div`
 const ColorPickerLabel = styled.label`
   font-size: 11px;
   color: var(--amber-text);
-  margin-bottom: 4px;
+`;
+
+const Description = styled.span`
+  font-size: 10px;
+  line-height: 1.45;
+  color: var(--amber-dim);
 `;
 
 const ColorPickerControls = styled.div`
@@ -92,22 +96,23 @@ const ColorPickerControls = styled.div`
 `;
 
 const ColorSwatch = styled.div`
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.3);
   cursor: pointer;
+  flex-shrink: 0;
 `;
 
 const ColorInput = styled.input`
-  width: 120px; /* Wider to accommodate rgba values */
+  width: 130px; /* Wider to accommodate rgba values */
   background: var(--field-bg);
   border: 1px solid var(--panel-border);
-  padding: 3px 6px;
-  border-radius: 3px;
+  padding: 9px 6px;
+  border-radius: 4px;
   color: var(--amber-text);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
 
   &:focus {
     outline: none;

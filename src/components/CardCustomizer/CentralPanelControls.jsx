@@ -27,11 +27,11 @@ const CentralPanelControls = ({ customCard, handleParamChange }) => {
   return (
     <ControlSection title="Central Panel" className="central-panel-controls">
       <ToggleSwitch
-        label="Enable Panel"
+        label="Center Panel"
         param="borderEffects.thickBorderEnabled"
         checked={thickBorderEnabled}
         onChange={handleParamChange}
-        tooltipContent="Toggles the visibility of the central panel."
+        description="A tinted panel over the middle of the card, framing the artwork."
         className="central-panel-toggle"
       />
       
@@ -42,7 +42,7 @@ const CentralPanelControls = ({ customCard, handleParamChange }) => {
             param="borderEffects.color"
             value={color}
             onChange={handleColorChange}
-            tooltipContent="Sets the color of the central panel."
+            description="The panel's tint while the card rests."
             className="central-panel-color"
           />
           <ParameterControl
@@ -53,57 +53,57 @@ const CentralPanelControls = ({ customCard, handleParamChange }) => {
             max={1}
             step={0.01}
             onChange={handleParamChange}
-            tooltipContent="Controls the transparency of the central panel."
+            description="How strong the tint is while the card rests."
             className="central-panel-opacity"
           />
           <ColorPicker
-            label="Panel Color (Hover)"
+            label="Panel Color (Touched)"
             param="borderEffects.colorHover"
             value={colorHover}
             onChange={handleColorChange}
-            tooltipContent="Sets the color of the panel when you hover over the card."
+            description="The tint the panel shifts to while the card is touched."
             className="central-panel-color-hover"
           />
           <ParameterControl
-            label="Panel Opacity (Hover)"
+            label="Panel Opacity (Touched)"
             param="borderEffects.opacityHover"
             value={opacityHover}
             min={0}
             max={1}
             step={0.01}
             onChange={handleParamChange}
-            tooltipContent="Controls the panel's transparency on hover."
+            description="How strong the tint is while the card is touched."
             className="central-panel-opacity-hover"
           />
           <ParameterControl
-            label="Transition Duration (s)"
+            label="Touch Fade (s)"
             param="borderEffects.transitionDuration"
             value={customCard.borderEffects.transitionDuration || 0.1}
             min={0}
             max={2}
             step={0.1}
             onChange={handleParamChange}
-            tooltipContent="Controls how quickly the hover effects transition."
+            description="How many seconds the panel takes to shift between its resting and touched looks."
             className="central-panel-transition-duration"
           />
           <ToggleSwitch
-            label="Enable Panel Image"
+            label="Artwork Wash"
             param="borderEffects.borderImageEnabled"
             checked={borderImageEnabled}
             onChange={handleParamChange}
-            tooltipContent="Toggles the blurred image overlay on top of the panel."
+            description="Lays a blurred copy of the artwork over the panel for a frosted look."
             className="central-panel-image-toggle"
           />
           {borderImageEnabled && (
             <ParameterControl
-              label="Panel Image Opacity"
+              label="Wash Opacity"
               param="borderEffects.imageOpacity"
               value={imageOpacity}
               min={0}
               max={1}
               step={0.01}
               onChange={handleParamChange}
-              tooltipContent="Controls the transparency of the blurred image overlay."
+              description="How visible the blurred artwork wash is."
               className="central-panel-image-opacity"
             />
           )}

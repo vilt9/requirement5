@@ -2,9 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import Card from '../components/Card/Card';
 import { useCards } from '../context/CardContext';
-import ControlSection from '../components/CardCustomizer/ControlSection';
-import ParameterControl from '../components/CardCustomizer/ParameterControl';
-import HoloEffectControls from '../components/CardCustomizer/HoloEffectControls';
 import HoloEffectToggles from '../components/CardCustomizer/HoloEffectToggles';
 import ImageEffectControls from '../components/CardCustomizer/ImageEffectControls';
 import EdgeHighlightControls from '../components/CardCustomizer/EdgeHighlightControls';
@@ -406,10 +403,6 @@ const CardCustomizer = () => {
                       onOverlaySelect={applyHoloImage}
                       onOverlayClear={() => applyHoloImage(null)}
                     />
-                    <HoloEffectControls
-                      customCard={customCard}
-                      handleParamChange={handleParamChange}
-                    />
                   </>
                 )}
 
@@ -431,17 +424,6 @@ const CardCustomizer = () => {
                       customCard={customCard}
                       handleParamChange={handleParamChange}
                     />
-                    <ControlSection title="Border Image" className="additional-card-settings">
-                      <ControlsGrid>
-                        <ParameterControl
-                          className="border-image-opacity-control"
-                          label="Border Image Opacity"
-                          param="borderEffects.imageOpacity"
-                          value={customCard?.borderEffects?.imageOpacity ?? 0.5}
-                          onChange={handleParamChange}
-                        />
-                      </ControlsGrid>
-                    </ControlSection>
                   </>
                 )}
               </ControlsInner>
@@ -689,16 +671,6 @@ const NextButton = styled.button`
   color: #140d03;
   transition: background 0.15s;
   &:hover { background: var(--gold-bright); }
-`;
-
-const ControlsGrid = styled.div`
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 15px;
-
-  @media (min-width: 500px) {
-    grid-template-columns: 1fr 1fr;
-  }
 `;
 
 export default CardCustomizer;

@@ -1,7 +1,7 @@
 // All help text. `r5c help` / `r5c help <topic>`. The deep reference lives in
 // cli/CLI.md; `r5c help spec` carries enough of it to write a card without
 // leaving the terminal.
-import { TIERS, BLEND_MODES, PATTERN_TYPES, MASK_TYPES, HOLO_EFFECTS } from './spec.js';
+import { TIERS, BLEND_MODES, PATTERN_TYPES, HOLO_EFFECTS } from './spec.js';
 
 export const HELP = `r5c — Requirement5 cards from the command line
 
@@ -70,17 +70,17 @@ CARD OVERRIDES (spec.card.*) — everything optional
                                    vignette 0.1–0.55, grain 0–0.22 }
   patternInfo                    { type: ${PATTERN_TYPES.join('|')},
                                    opacity 0.3–0.9, numLines, lineOpacity }
-  effectParams                   Shine + chromatic aberration:
-                                 { imageShineIntensity "0.6"–"1.0",
-                                   aberrationIntensity, aberrationSpeed "10s",
-                                   filterBrightness/Contrast/Saturate,
-                                   holoAngle 0–360, parallaxDepth,
-                                   customHoloBlendMode: <blend mode> }
-  imageEffects                   { maskType: ${MASK_TYPES.join('|')},
-                                   maskOpacity, blurAmount "0px", glowIntensity "5px",
-                                   glowColor, opacity, contrast, saturation }
-  borderEffects                  { thickBorderEnabled, thinEdgeEnabled, borderImageEnabled,
-                                   borderColor, borderOpacity, edgeColor1/2, thinEdgeColor }
+  effectParams                   { parallaxDepth 0–1 (3D shift of the artwork as
+                                   the card tilts), filterBrightness/Contrast/Saturate
+                                   (drive the Nebula/Pulse filters),
+                                   customHoloBlendMode: <blend mode> (the Veil overlay) }
+  imageEffects                   { opacity 0–1, opacityHover (while touched),
+                                   contrast 0.5–2, saturation 0–2, blendMode }
+  borderEffects                  { thickBorderEnabled (center panel), color, opacity,
+                                   colorHover, opacityHover, transitionDuration,
+                                   borderImageEnabled + imageOpacity (blurred artwork
+                                   wash on the panel), thinEdgeEnabled,
+                                   edgeColor1/2, thinEdgeColor }
   holoEffects                    Toggle the four animated holo systems (any combination;
                                  display names: rareHolo=Prism, rareHoloGalaxy=Nebula,
                                  wowaHolo=Signal, rareHoloVmax=Pulse; the top-level
@@ -94,7 +94,7 @@ CARD OVERRIDES (spec.card.*) — everything optional
                                    saturation 0.5–3, blendMode, gradientSize 100–800,
                                    gradientHeight 200–1500, smoothTransitions 0–1,
                                    colors, backgroundImage }
-  wowaHoloParams                 { space 1–10, angle 0–360, brightness 0.1–2, contrast 0.5–3 }
+  wowaHoloParams                 { space 1–10, angle 0–360, backgroundImage }
   rareHoloVmaxParams             { space 1–15, angle 0–360, brightness 0.1–2, contrast 0.5–4 }
 
 BLEND MODES

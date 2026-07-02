@@ -1,14 +1,15 @@
 import React from 'react';
 import styled from 'styled-components';
 import ColorPicker from './ColorPicker';
-import Tooltip from './Tooltip';
 
 const ColorPaletteEditor = ({
   label,
   colors = ['#ffffff'], // Default to white if no colors provided
   onChange,
-  tooltipContent
+  tooltipContent,
+  description
 }) => {
+  const desc = description || tooltipContent;
   // Ensure colors is always an array
   const safeColors = Array.isArray(colors) ? colors : ['#ffffff'];
   
@@ -39,10 +40,8 @@ const ColorPaletteEditor = ({
 
   return (
     <PaletteContainer>
-      <LabelRow>
-        <PaletteLabel>{label}</PaletteLabel>
-        {tooltipContent && <Tooltip content={tooltipContent} />}
-      </LabelRow>
+      <PaletteLabel>{label}</PaletteLabel>
+      {desc && <Description>{desc}</Description>}
       
       <ColorsList>
         {safeColors.map((color, index) => (
@@ -103,16 +102,16 @@ const PaletteContainer = styled.div`
   border-radius: 4px;
 `;
 
-const LabelRow = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 5px;
-`;
-
 const PaletteLabel = styled.label`
   font-size: 11px;
   color: var(--amber-text);
   font-family: var(--font-mono);
+`;
+
+const Description = styled.span`
+  font-size: 10px;
+  line-height: 1.45;
+  color: var(--amber-dim);
 `;
 
 const ColorsList = styled.div`
@@ -136,14 +135,14 @@ const ColorControls = styled.div`
 `;
 
 const ControlButton = styled.button`
-  width: 20px;
-  height: 20px;
+  width: 32px;
+  height: 32px;
   border: none;
-  border-radius: 2px;
+  border-radius: 4px;
   background: ${props => props.danger ? 'rgba(255, 0, 0, 0.3)' : 'var(--field-bg)'};
   color: var(--amber-text);
   cursor: pointer;
-  font-size: 10px;
+  font-size: 13px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -157,10 +156,10 @@ const AddColorButton = styled.button`
   background: var(--panel);
   border: 1px solid var(--gold);
   color: var(--gold-bright);
-  padding: 5px 10px;
-  border-radius: 3px;
+  padding: 10px;
+  border-radius: 4px;
   cursor: pointer;
-  font-size: 10px;
+  font-size: 11px;
   font-family: var(--font-mono);
 
   &:hover {

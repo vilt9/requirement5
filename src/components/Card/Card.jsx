@@ -261,8 +261,12 @@ const Card = ({ cardData, isInteractive = true, onClick, autoTour = false, touch
 
     // Border / image layer parameters
     if (borderEffects) {
-      if (borderEffects.color) vars['border-color'] = borderEffects.color;
-      if (borderEffects.opacity !== undefined) vars['border-opacity'] = borderEffects.opacity;
+      // Generated cards store borderColor/borderOpacity; the customizer writes
+      // color/opacity. Accept both so random designs keep their rolled tint.
+      const panelColor = borderEffects.color || borderEffects.borderColor;
+      const panelOpacity = borderEffects.opacity ?? borderEffects.borderOpacity;
+      if (panelColor) vars['border-color'] = panelColor;
+      if (panelOpacity !== undefined) vars['border-opacity'] = panelOpacity;
       if (borderEffects.colorHover) vars['border-color-hover'] = borderEffects.colorHover;
       if (borderEffects.opacityHover !== undefined) vars['border-opacity-hover'] = borderEffects.opacityHover;
       if (borderEffects.transitionDuration !== undefined) vars['border-transition-duration'] = `${borderEffects.transitionDuration}s`;

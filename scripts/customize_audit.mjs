@@ -86,6 +86,10 @@ const main = async () => {
     const markPublish = eval(markPublishSrc);
     const scope = document.querySelector('.controls-inner') || document;
     const describe = (el) => {
+      // Toggle rows are one big <label> (whole-row tap target); the visible
+      // name sits in a .toggle-name span, separate from the description text.
+      const toggleName = el.closest('label')?.querySelector('.toggle-name')?.textContent?.trim();
+      if (toggleName) return toggleName.slice(0, 50);
       // Walk up looking for the control group's label, then the section heading.
       let node = el;
       for (let i = 0; i < 5 && node; i++) {
@@ -140,13 +144,12 @@ const main = async () => {
     return true;
   }, [kind, index, value]);
 
-  // Toggle a checkbox on by its exact label (no-op if already on).
+  // Toggle a checkbox on by its exact name (no-op if already on). Toggle rows
+  // are <label> wrappers with the name in a .toggle-name span.
   const enableToggle = (name) => page.evaluate((name) => {
     const scope = document.querySelector('.controls-inner');
-    const lab = [...scope.querySelectorAll('label')].find(l => l.textContent.trim() === name);
-    if (!lab) return false;
-    let g = lab.parentElement, cb = null;
-    for (let i = 0; i < 5 && g && !cb; i++) { cb = g.querySelector('input[type=checkbox]'); g = g.parentElement; }
+    const span = [...scope.querySelectorAll('.toggle-name')].find(s => s.textContent.trim() === name);
+    const cb = span?.closest('label')?.querySelector('input[type=checkbox]');
     if (cb && !cb.checked) { cb.click(); return true; }
     return !!cb;
   }, name);
@@ -183,15 +186,21 @@ const main = async () => {
   }, [kind, index]);
 
   const kindOrder = { range: 0, number: 1, select: 2, checkbox: 3 };
-  const sweep = async () => {
+  const sweep = async (tab) => {
     const controls = (await describeControls())
       .sort((a, b) => (kindOrder[a.kind] ?? 9) - (kindOrder[b.kind] ?? 9)); // checkboxes last so they don't hide untested controls
+    // Key by tab + nth-occurrence, not just label: different systems reuse
+    // plain names (Nebula and Pulse both have Brightness/Contrast) and every
+    // instance must be driven, not only the first.
+    const occurrence = {};
     for (const control of controls) {
       if (control.inPublish || control.kind === 'file') continue;
-      const key = `${control.kind}|${control.label}`;
+      const labelKey = `${control.kind}|${control.label}`;
+      const n = occurrence[labelKey] = (occurrence[labelKey] || 0) + 1;
+      const key = `${tab}|${labelKey}#${n}`;
       if (tested.has(key)) continue;
       tested.add(key);
-      const id = `${control.kind} · ${control.label}`;
+      const id = `${control.kind} · ${control.label}${n > 1 ? ` (#${n})` : ''}`;
 
       let target;
       if (control.kind === 'range' || control.kind === 'number') {
@@ -219,32 +228,6 @@ const main = async () => {
     }
   };
 
-  // Rarity only selects the auto holo class when NO explicit holo toggle is on, so
-  // test it on the holo tab before setup enables the toggles that override it.
-  await selectStage('design');
-  await selectTab('holo');
-  {
-    const before = await snapshot();
-    const moved = await page.evaluate(() => {
-      const scope = document.querySelector('.controls-inner');
-      const lab = [...scope.querySelectorAll('label')].find(l => l.textContent.includes('Rarity'));
-      if (!lab) return false;
-      let g = lab.parentElement, el = null;
-      for (let i = 0; i < 5 && g && !el; i++) { el = g.querySelector('input[type=range]'); g = g.parentElement; }
-      if (!el) return false;
-      const target = parseFloat(el.value) > 0.5 ? '0' : '1';
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, target);
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-      el.dispatchEvent(new Event('change', { bubbles: true }));
-      return target;
-    });
-    if (moved !== false) {
-      await page.waitForTimeout(250);
-      report('range · Rarity (Base Shimmer)', `set to ${moved} (no toggles)`, before !== (await snapshot()));
-      tested.add('range|Rarity (Base Shimmer)');
-    }
-  }
-
   // Setup: a control only affects the preview when its effect layer is live, so
   // upload a main image (image tab) and enable every effect (holo + frame tabs)
   // before sweeping. Otherwise tier-specific sliders look "broken".
@@ -252,6 +235,7 @@ const main = async () => {
   const sampleImage = path.resolve(process.cwd(), '..', 'card_images', 'wolf_toys_1.png');
   await selectStage('design');
   await selectTab('image');
+
   const mainFile = page.locator('.image-picker input[type=file]').first();
   if (await mainFile.count()) { await mainFile.setInputFiles(sampleImage); await page.waitForTimeout(800); }
   await selectTab('holo');
@@ -260,7 +244,7 @@ const main = async () => {
     await page.waitForTimeout(150);
   }
   await selectTab('frame');
-  for (const name of ['Enable Panel', 'Enable Panel Image']) {
+  for (const name of ['Center Panel', 'Artwork Wash']) {
     await enableToggle(name);
     await page.waitForTimeout(150);
   }
@@ -271,8 +255,8 @@ const main = async () => {
     await selectTab(tab);
     await hoverCard();
     console.log(`  · tab: ${tab}`);
-    await sweep();
-    await sweep(); // re-describe to catch anything a toggle revealed
+    await sweep(tab);
+    await sweep(tab); // re-describe to catch anything a toggle revealed
   }
   await page.screenshot({ path: path.join(SHOTS, '1_after_sweep.png'), fullPage: true });
 
@@ -284,27 +268,29 @@ const main = async () => {
   };
   // react-color re-renders on change, invalidating cached element handles, so
   // re-query the i-th swatch fresh each iteration and ensure any open picker closes.
-  const colorSweepTab = async () => {
-    const swatchCount = await page.evaluate(() => {
-      const scope = document.querySelector('.controls-inner');
-      return [...scope.querySelectorAll('div')].filter(d =>
-        d.style?.backgroundColor && d.previousElementSibling === null &&
-        d.parentElement?.previousElementSibling?.querySelector?.('label')).length;
-    });
+  // A color swatch is the first child of its controls row, inside a group whose
+  // direct children include the <label> (descriptions sit between them now).
+  const findSwatchesSrc = `(() => {
+    const scope = document.querySelector('.controls-inner');
+    return [...scope.querySelectorAll('div')].filter(d =>
+      d.style?.backgroundColor && d.previousElementSibling === null &&
+      d.parentElement?.parentElement?.querySelector(':scope > label'));
+  })`;
+  const colorSweepTab = async (tab) => {
+    const swatchCount = await page.evaluate(src => eval(src)().length, findSwatchesSrc);
     for (let i = 0; i < swatchCount; i++) {
       await closePicker();
-      const label = await page.evaluate(i => {
-        const scope = document.querySelector('.controls-inner');
-        const swatches = [...scope.querySelectorAll('div')].filter(d =>
-          d.style?.backgroundColor && d.previousElementSibling === null &&
-          d.parentElement?.previousElementSibling?.querySelector?.('label'));
+      const label = await page.evaluate(([i, src]) => {
+        const swatches = eval(src)();
         window.__sw = swatches[i];
-        return swatches[i]?.closest('div').parentElement?.querySelector('label')?.textContent?.trim() || `swatch ${i}`;
-      }, i);
+        return swatches[i]?.parentElement?.parentElement?.querySelector(':scope > label')?.textContent?.trim() || `swatch ${i}`;
+      }, [i, findSwatchesSrc]);
       // Unlabelled hits are non-interactive display swatches (e.g. gradient preview).
       if (/^swatch \d+$/.test(label)) continue;
-      if (tested.has(`color|${label}`)) continue;
-      tested.add(`color|${label}`);
+      // Key by tab + position: the Prism and Nebula palettes both contain
+      // "Color 1".."Color 12" and each swatch must be driven.
+      if (tested.has(`${tab}|color|${i}|${label}`)) continue;
+      tested.add(`${tab}|color|${i}|${label}`);
       const before = await snapshot();
       await page.evaluate(() => window.__sw?.click());
       await page.waitForTimeout(250);
@@ -324,7 +310,7 @@ const main = async () => {
   };
   for (const tab of ['frame', 'background', 'holo']) {
     await selectTab(tab);
-    await colorSweepTab();
+    await colorSweepTab(tab);
   }
 
   // Phase 4: image uploads (design stage; base on the image tab, holo on the
@@ -415,6 +401,33 @@ const main = async () => {
   } else {
     report('tag input', 'find', false, 'tag section not found (logged out?)');
   }
+
+  // Phase 8: mobile ergonomics at 375px — nothing overflows sideways, sliders
+  // are chunky enough to drag with a thumb, toggle rows are real touch targets.
+  console.log('\n— phase 8: mobile ergonomics (375px) —');
+  await page.setViewportSize({ width: 375, height: 800 });
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForTimeout(600);
+  await selectStage('design');
+  for (const tab of TABS) {
+    await selectTab(tab);
+    if (tab === 'holo') { for (const n of ['Prism', 'Nebula']) await enableToggle(n); }
+    if (tab === 'frame') { for (const n of ['Center Panel', 'Artwork Wash']) await enableToggle(n); }
+    await page.waitForTimeout(250);
+    const m = await page.evaluate(() => {
+      const overflow = document.body.scrollWidth - window.innerWidth;
+      const slider = document.querySelector('.controls-inner input[type=range]');
+      const thumb = slider ? parseFloat(getComputedStyle(slider, '::-webkit-slider-thumb').height) : null;
+      const toggles = [...document.querySelectorAll('.controls-inner .toggle-name')]
+        .map(s => s.closest('label')?.getBoundingClientRect().height ?? 0);
+      const minToggle = toggles.length ? Math.min(...toggles) : null;
+      return { overflow, thumb, minToggle };
+    });
+    report(`mobile · ${tab} tab`, 'no horizontal overflow', m.overflow <= 0, `${m.overflow}px over`);
+    if (m.thumb !== null) report(`mobile · ${tab} tab`, 'slider thumb ≥ 20px', m.thumb >= 20, `${m.thumb}px`);
+    if (m.minToggle !== null) report(`mobile · ${tab} tab`, 'toggle rows ≥ 40px tall', m.minToggle >= 40, `${Math.round(m.minToggle)}px`);
+  }
+  await page.screenshot({ path: path.join(SHOTS, '5_mobile_375.png'), fullPage: true });
 
   await browser.close();
 

@@ -11,18 +11,18 @@ const EdgeHighlightControls = ({ customCard, handleParamChange }) => {
   return (
     <ControlSection title="Edge Highlight">
       <ColorPicker
-        label="Edge Color 1"
+        label="Edge Glow Color"
         param="borderEffects.edgeColor1"
         value={customCard.borderEffects.edgeColor1 || 'rgba(255, 255, 255, 0.5)'}
         onChange={handleParamChange}
-        tooltipContent="The first color of the edge highlight gradient."
+        description="The glowing line that sweeps around the card's edge as it tilts."
       />
       <ColorPicker
-        label="Edge Color 2"
+        label="Edge Fade Color"
         param="borderEffects.edgeColor2"
         value={customCard.borderEffects.edgeColor2 || 'rgba(0, 0, 0, 0)'}
         onChange={handleParamChange}
-        tooltipContent="The second color of the edge highlight gradient."
+        description="What the glow fades into — keep it transparent for a clean fade."
       />
     </ControlSection>
   );

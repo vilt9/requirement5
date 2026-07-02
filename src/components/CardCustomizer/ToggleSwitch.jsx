@@ -1,19 +1,21 @@
 import React from 'react';
 import styled from 'styled-components';
-import Tooltip from './Tooltip';
 
-const ToggleSwitch = ({ label, param, checked, onChange, tooltipContent }) => {
+const ToggleSwitch = ({ label, param, checked, onChange, tooltipContent, description, className }) => {
+  const desc = description || tooltipContent;
   const handleChange = (e) => {
     // Ensure we pass the correct parameter structure back to the handler
     onChange(param, e.target.checked, false); // isNumeric = false
   };
 
+  // The whole row is the <label>, so tapping the text (or anywhere in the row)
+  // flips the switch — the visible control alone is too small a target.
   return (
-    <ToggleGroup>
-      <LabelRow>
-        <ToggleLabel>{label}</ToggleLabel>
-        {tooltipContent && <Tooltip content={tooltipContent} />}
-      </LabelRow>
+    <ToggleGroup className={className}>
+      <TextCol>
+        <ToggleLabel className="toggle-name">{label}</ToggleLabel>
+        {desc && <Description>{desc}</Description>}
+      </TextCol>
       <Switch>
         <input type="checkbox" checked={checked} onChange={handleChange} />
         <Slider />
@@ -22,31 +24,40 @@ const ToggleSwitch = ({ label, param, checked, onChange, tooltipContent }) => {
   );
 };
 
-const ToggleGroup = styled.div`
+const ToggleGroup = styled.label`
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 6px 0; /* Add some vertical padding */
+  padding: 8px 0;
+  min-height: 44px;
+  cursor: pointer;
 `;
 
-const LabelRow = styled.div`
+const TextCol = styled.span`
   display: flex;
-  align-items: center;
-  gap: 5px;
+  flex-direction: column;
+  gap: 3px;
 `;
 
-const ToggleLabel = styled.label`
+const ToggleLabel = styled.span`
   font-size: 11px;
   color: var(--amber-text);
   font-family: var(--font-mono);
 `;
 
-const Switch = styled.label`
+const Description = styled.span`
+  font-size: 10px;
+  line-height: 1.45;
+  color: var(--amber-dim);
+`;
+
+const Switch = styled.span`
   position: relative;
   display: inline-block;
-  width: 34px;
-  height: 20px;
+  flex-shrink: 0;
+  width: 46px;
+  height: 26px;
 
   input {
     opacity: 0;
@@ -63,19 +74,19 @@ const Slider = styled.span`
   right: 0;
   bottom: 0;
   background-color: #333;
-  transition: .4s;
-  border-radius: 20px;
+  transition: .3s;
+  border-radius: 26px;
   border: 1px solid #555;
 
   &:before {
     position: absolute;
     content: "";
-    height: 12px;
-    width: 12px;
+    height: 18px;
+    width: 18px;
     left: 3px;
     bottom: 3px;
     background-color: white;
-    transition: .4s;
+    transition: .3s;
     border-radius: 50%;
   }
 
@@ -85,7 +96,7 @@ const Slider = styled.span`
   }
 
   input:checked + &:before {
-    transform: translateX(14px);
+    transform: translateX(20px);
   }
 `;
 
