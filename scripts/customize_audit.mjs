@@ -437,9 +437,11 @@ const main = async () => {
     const optionExists = await page.locator('.preset-select option', { hasText: 'Audit set' }).count();
     report('preset save', 'save "Audit set"', optionExists > 0, optionExists > 0 ? 'in dropdown' : 'missing');
 
-    // Reload gives a fresh card (no tags); loading the preset must restore them.
+    // Reload restores the in-progress draft (that's the feature) and lands on
+    // the design stage — go back to Start, where the preset picker lives.
     await page.reload({ waitUntil: 'networkidle' });
     await page.waitForTimeout(500);
+    await selectStage('start');
     await page.selectOption('.preset-select', { label: 'Audit set' }).catch(() => {});
     await page.waitForTimeout(300);
     await selectStage('publish');

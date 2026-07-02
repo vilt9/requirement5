@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import localforage from 'localforage';
 import styled from 'styled-components';
 import Card from '../components/Card/Card';
 import { useCards } from '../context/CardContext';
@@ -40,6 +41,11 @@ const CardCustomizer = () => {
   } = useCards();
   const [customCard, setCustomCard] = useState(null);
   const [stage, setStage] = useState('start');
+  // The in-progress design is precious: publishing needs an account, and the
+  // signup link navigates away from this page. Drafts persist to local storage
+  // so the design survives the login round-trip (and reloads) — checked before
+  // any random card is generated over it.
+  const [draftChecked, setDraftChecked] = useState(false);
   const [activeTab, setActiveTab] = useState('image');
   const [feedback, setFeedback] = useState(null);
   const [presetName, setPresetName] = useState('');
@@ -91,8 +97,35 @@ const CardCustomizer = () => {
     return () => observer.disconnect();
   }, []);
 
-  // Initialize with a card if none exists
+  // Restore a saved draft before anything else can seed the design.
   useEffect(() => {
+    let cancelled = false;
+    localforage.getItem('customizerDraft')
+      .then((draft) => {
+        if (cancelled) return;
+        if (draft?.customCard) {
+          setCustomCard(draft.customCard);
+          setStage(draft.stage === 'publish' ? 'publish' : 'design');
+        }
+        setDraftChecked(true);
+      })
+      .catch(() => { if (!cancelled) setDraftChecked(true); });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Save the draft (debounced) on every design change.
+  useEffect(() => {
+    if (!draftChecked || !customCard) return;
+    const timer = setTimeout(() => {
+      localforage.setItem('customizerDraft', { customCard, stage, savedAt: Date.now() }).catch(() => {});
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [customCard, stage, draftChecked]);
+
+  // Initialize with a card if none exists (only once the draft check settled,
+  // and only when no draft claimed the slot).
+  useEffect(() => {
+    if (!draftChecked || customCard) return;
     if (!currentCard) {
       generateNewCard();
     } else {
@@ -113,7 +146,8 @@ const CardCustomizer = () => {
       };
       setCustomCard(initializedCard);
     }
-  }, [currentCard]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentCard, draftChecked]);
 
   // The upload previews ARE the card's images — derived, never separately
   // stored. A fresh card starts with empty slots; a set loaded with images

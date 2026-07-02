@@ -12,6 +12,7 @@ const PublishPanel = ({ customCard }) => {
   const [tierKey, setTierKey] = useState('common');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(null);
+  const [published, setPublished] = useState(null); // the created card record
   const [error, setError] = useState(null);
 
   const tier = config?.tiers?.find(t => t.key === tierKey);
@@ -36,6 +37,7 @@ const PublishPanel = ({ customCard }) => {
         }
       });
       setBalance(result.balance);
+      setPublished(result.card);
       setMessage(`Published to the pool. −${result.stake} /t26 stake. ` +
         `Your card now appears at ${tier?.odds ? `1 : ${tier.odds.toLocaleString()}` : 'common'} odds.`);
     } catch (err) {
@@ -49,7 +51,8 @@ const PublishPanel = ({ customCard }) => {
       <Panel>
         Publish to the pool
         <Divider />
-        <Dim>Publishing a card needs an account. <Link to="/account">Sign up or log in</Link> to publish.</Dim>
+        <Dim>Publishing a card needs an account. <Link to="/account">Sign up or log in</Link> to
+        publish — your design is saved right here and will be waiting when you're back.</Dim>
       </Panel>
     );
   }
@@ -88,7 +91,14 @@ const PublishPanel = ({ customCard }) => {
           card — rarer tiers pay more per save but circulate less.</Dim>
         </div>
         {error && <ErrorText>{error}</ErrorText>}
-        {message && <div>{message}</div>}
+        {message && <div className="publish-success">{message}</div>}
+        {published && (
+          <Dim className="publish-links">
+            <Link to={`/card/${published.id}`}>View your card</Link>
+            {' · '}
+            <Link to="/collection">all your creations</Link>
+          </Dim>
+        )}
         <div>
           <PillButton onClick={publish} disabled={busy || !customCard}>
             {busy ? 'Publishing…' : `Publish (−${config?.publishStake ?? 10} /t26)`}

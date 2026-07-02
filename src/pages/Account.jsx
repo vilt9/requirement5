@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import styled from 'styled-components';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
@@ -93,6 +94,9 @@ const Account = () => {
         Balance: <b>{user.balance} /t26</b><br />
         Yield remaining today: {yieldRemaining ?? '—'} /t26 <Dim>(cap {config?.dailyYieldCap} /t26 per day)</Dim><br />
         Erosion: suppressed on this platform
+        <Divider />
+        Your cards: <Link to="/collection">creations &amp; collection</Link>
+        {' · '}<Link to="/customize">design a new one</Link>
         <Divider />
         <PillButton $secondary onClick={logout}>Log out</PillButton>
       </Panel>

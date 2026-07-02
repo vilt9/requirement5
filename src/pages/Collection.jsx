@@ -9,11 +9,13 @@ import { poolCardToCardData } from '../utils/poolCard';
 import { Page, Panel, PillButton, Divider, Dim, TagList } from '../components/UI';
 import { ensureTags } from '../utils/tags';
 
-// Your collection: cards saved on your account, plus any legacy local saves.
+// Your collection: cards you created, cards saved on your account, plus any
+// legacy local saves.
 const Collection = () => {
   const { user, config } = useAuth();
   const { savedCards, deleteCard } = useCards();
   const [items, setItems] = useState([]);
+  const [creations, setCreations] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [tagFilter, setTagFilter] = useState('');
 
@@ -24,6 +26,12 @@ const Collection = () => {
       setItems(data);
     } catch (error) {
       console.error('Could not load collection:', error);
+    }
+    try {
+      const mine = await api('/api/cards/published/mine');
+      setCreations(mine);
+    } catch (error) {
+      console.error('Could not load creations:', error);
     }
     setLoaded(true);
   }, [user]);
@@ -61,6 +69,44 @@ const Collection = () => {
           <Link to="/account">Log in</Link> to see it.
           {savedCards.length > 0 && ' Local saves from before accounts are shown below.'}
         </Panel>
+      )}
+
+      {/* Cards this account created — the artist's shelf. Publishing from the
+          customizer lands here, so a fresh signup can always find their work. */}
+      {user && (
+        <Panel className="creations-panel">
+          Created by you: {creations.length} card{creations.length === 1 ? '' : 's'}
+          {loaded && creations.length === 0 && (
+            <> — nothing yet. <Link to="/customize">Design and publish a card</Link> and it will live here.</>
+          )}
+        </Panel>
+      )}
+      {user && creations.length > 0 && (
+        <Grid className="creations-grid">
+          {creations.map(({ card, stats }) => {
+            const cardData = poolCardToCardData(card);
+            const tier = tierOf(card.tier);
+            return (
+              <Item key={card.id}>
+                {cardData ? (
+                  <CardScale><Card cardData={cardData} /></CardScale>
+                ) : (
+                  <Missing>card data unavailable</Missing>
+                )}
+                <Panel>
+                  <div>{card.name}</div>
+                  {tier && <div style={{ color: tier.color }}>{tier.name}</div>}
+                  {stats && (
+                    <div><Dim>{stats.timesSaved} saved / {stats.timesDrawn} drawn in the pool</Dim></div>
+                  )}
+                  <div><Dim>Published {new Date(card.created_at).toISOString().slice(0, 10)}</Dim></div>
+                  <Divider />
+                  <Dim><Link to={`/card/${card.id}`}>View card page</Link></Dim>
+                </Panel>
+              </Item>
+            );
+          })}
+        </Grid>
       )}
 
       {user && (
