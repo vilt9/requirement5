@@ -27,11 +27,36 @@ let speed = (() => {
 let acc = 0;
 let lastResume = performance.now();
 
+// A hand on the dot freezes the clock — a held scrub must not drift — and
+// after release it stays frozen a beat longer so the chosen pose can be
+// looked at before the loop carries on. Deliberately separate from `paused`:
+// this is a transient grip, never persisted, never shown on the ▶/❚❚ button.
+const RESUME_DELAY_MS = 3000;
+let held = false;
+let resumeAt = 0; // a released grip keeps the clock frozen until this time
+
 const listeners = new Set();
 const notify = () => listeners.forEach((fn) => fn({ paused, speed }));
 
-const virtualNow = (t = performance.now()) =>
-  (paused ? acc : acc + (t - lastResume) * speed);
+const virtualNow = (t = performance.now()) => {
+  if (paused || held || t < resumeAt) return acc;
+  if (resumeAt) { resumeAt = 0; lastResume = t; } // delay elapsed: clock restarts here
+  return acc + (t - lastResume) * speed;
+};
+
+// The grip: MotionBar calls these around a drag. While held the clock is
+// frozen solid (scrubTo still moves it — that's the hand), and release arms
+// the resume delay.
+export const beginScrub = () => {
+  acc = virtualNow();
+  held = true;
+};
+
+export const endScrub = () => {
+  if (!held) return;
+  held = false;
+  resumeAt = performance.now() + RESUME_DELAY_MS;
+};
 
 // The shared phase, 0..1. Same value for every caller at the same instant.
 export const loopPhase = (t) => {

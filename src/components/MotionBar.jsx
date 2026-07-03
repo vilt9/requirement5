@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 import {
-  loopPhase, scrubTo, motionPaused, toggleMotion, onMotionChange,
+  loopPhase, scrubTo, beginScrub, endScrub,
+  motionPaused, toggleMotion, onMotionChange,
   motionSpeed, cycleMotionSpeed,
   SHINY_START, SHINY_END
 } from '../utils/cardMotion';
@@ -51,6 +52,10 @@ const MotionBar = ({ className }) => {
     return () => { cancelAnimationFrame(raf); if (ro) ro.disconnect(); };
   }, []);
 
+  // Unmounting mid-drag (e.g. navigating away) must release the grip, or the
+  // global clock would stay frozen with no hand on it.
+  useEffect(() => () => { if (draggingRef.current) endScrub(); }, []);
+
   const scrubFromEvent = (e) => {
     if (!trackRef.current) return;
     const rect = trackRef.current.getBoundingClientRect();
@@ -60,12 +65,17 @@ const MotionBar = ({ className }) => {
     e.preventDefault();
     draggingRef.current = true;
     try { trackRef.current.setPointerCapture(e.pointerId); } catch { /* already released */ }
+    beginScrub(); // a held dot must not drift — the clock freezes under the hand
     scrubFromEvent(e);
   };
   const onMove = (e) => {
     if (draggingRef.current) scrubFromEvent(e);
   };
-  const onUp = () => { draggingRef.current = false; };
+  const onUp = () => {
+    if (!draggingRef.current) return;
+    draggingRef.current = false;
+    endScrub(); // release arms a short delay before the loop carries on
+  };
 
   return (
     <Bar className={className}>
