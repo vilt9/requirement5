@@ -4,13 +4,15 @@ import {
   loopPhase, scrubTo, beginScrub, endScrub,
   motionPaused, toggleMotion, onMotionChange,
   motionSpeed, cycleMotionSpeed,
-  SHINY_START, SHINY_END
+  FLAT_FRAC, SHINY_END
 } from '../utils/cardMotion';
 
 // The universal card-motion bar: a vertical track whose dot rides the global
 // motion clock. Dragging the dot scrubs that clock — every synced card on the
-// page follows. The gold stretch is the shiny zone; the button at the base
-// pauses/plays card motion everywhere (persisted in the browser).
+// page follows. The track wears the run's three states: dotted ends where
+// the card lies flat, a gold stretch where the holo shines, a plain line
+// where it rotates without holo. The button at the base pauses/plays card
+// motion everywhere (persisted in the browser).
 //
 // This component carries the bar's look; each placement wraps it with
 // styled(MotionBar) to add positioning only.
@@ -87,8 +89,10 @@ const MotionBar = ({ className }) => {
         onPointerUp={onUp}
         onPointerCancel={onUp}
       >
-        <span className="line" />
+        <span className="dots dots-top" />
         <span className="zone" />
+        <span className="line" />
+        <span className="dots dots-bottom" />
         <span className="dot" ref={dotRef} />
       </div>
       {/* The speed dial: taps step through the stops, everywhere at once. */}
@@ -126,7 +130,7 @@ const Bar = styled.div`
     touch-action: none; /* dragging the dot must never scroll the page */
   }
 
-  .line, .zone {
+  .line, .zone, .dots {
     position: absolute;
     left: 50%;
     width: 2px;
@@ -134,11 +138,27 @@ const Bar = styled.div`
     border-radius: 1px;
     pointer-events: none;
   }
-  .line { top: 0; bottom: 0; background: rgba(255, 255, 255, 0.16); }
+  /* Dotted ends: the card lies flat here. */
+  .dots {
+    width: 3px;
+    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.5) 1px, transparent 1.4px);
+    background-size: 3px 6px;
+    background-repeat: repeat-y;
+    background-position: center;
+  }
+  .dots-top { top: 0; height: ${FLAT_FRAC * 100}%; }
+  .dots-bottom { bottom: 0; height: ${FLAT_FRAC * 100}%; }
+  /* Gold stretch: rotating with the holo alive. */
   .zone {
-    top: ${SHINY_START * 100}%;
+    top: ${FLAT_FRAC * 100}%;
     bottom: ${(1 - SHINY_END) * 100}%;
     background: rgba(232, 180, 85, 0.45);
+  }
+  /* Plain line: rotating, holo off. */
+  .line {
+    top: ${SHINY_END * 100}%;
+    bottom: ${FLAT_FRAC * 100}%;
+    background: rgba(255, 255, 255, 0.16);
   }
 
   .dot {

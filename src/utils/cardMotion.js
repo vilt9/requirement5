@@ -109,9 +109,14 @@ export const scrubTo = (p) => {
   lastResume = performance.now();
 };
 
-// The shiny zone along the track: [1/16 rest][1/2 shiny][7/16 rest] — the
-// flat→shiny transition lands almost immediately after the top, so a fresh
-// generate shows its holo character fast enough to judge (and re-roll).
-export const SHINY_START = 0.0625;
-export const SHINY_END = 0.5625;
+// The run's four stretches:
+//   [1/20 flat] [9/20 holo rotation] [9/20 plain rotation] [1/20 flat]
+// The flat ends hold the card completely still, so every loop shows the
+// card COME TO LIFE — the transition from flat to moving that constant
+// rotation never let you see. A fresh generate starts at the top: a beat of
+// flat, then straight into the holo.
+export const FLAT_FRAC = 0.05;
+export const SHINY_START = FLAT_FRAC; // the holo wakes the moment motion does
+export const SHINY_END = 0.5;
 export const inShinyZone = (p) => p > SHINY_START && p < SHINY_END;
+export const inFlatZone = (p) => p < FLAT_FRAC || p > 1 - FLAT_FRAC;

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import * as S from './Card.styles';
 import PropTypes from 'prop-types';
 import { getHolographicEffectClass } from '../../utils/cardGenerator';
-import { loopPhase, inShinyZone } from '../../utils/cardMotion';
+import { loopPhase, inShinyZone, FLAT_FRAC } from '../../utils/cardMotion';
 import CustomHoloEffect from './CustomHoloEffect';
 
 // Build the base-background CSS value (behind the card image) from the structured
@@ -457,6 +457,12 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
     // Longest .moving fade is 0.4s; the grace keeps shine variables live
     // well past it so a fade-out never freezes mid-shimmer.
     const SHINE_FADE_GRACE_MS = 800;
+    // How much of the rotating stretch the wake-up/settle ramps occupy.
+    const LIFE_RAMP = 0.08;
+    const easeRamp = (x) => {
+      const c = Math.max(0, Math.min(1, x));
+      return c * c * (3 - 2 * c);
+    };
     let shinyExitAt = -Infinity;
     const io = typeof IntersectionObserver !== 'undefined' && cardSceneRef.current
       ? new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; })
@@ -480,13 +486,20 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
         setIsMoving(shiny);
         if (!shiny) shinyExitAt = t; // fade-out starts now
       }
-      const angle = p * Math.PI * 4; // two full orbits over the run
+      // The run: [flat][holo rotation][plain rotation][flat]. The rotating
+      // stretch spans the middle 18/20; an ease envelope on the orbit radius
+      // takes the card from dead flat up to full tilt and back — the
+      // "coming to life" moment the flat ends exist to show. Inside the flat
+      // ends the envelope is 0, so the pose is exactly flat and still.
+      const tt = Math.max(0, Math.min(1, (p - FLAT_FRAC) / (1 - 2 * FLAT_FRAC)));
+      const env = easeRamp(tt / LIFE_RAMP) * easeRamp((1 - tt) / LIFE_RAMP);
+      const angle = tt * Math.PI * 4; // two full orbits over the rotating stretch
       // Pure math into drivePose — no getBoundingClientRect, no forced
       // style/layout flushes: the frame does one style pass, at render.
       // Shine variables keep updating through the fade-out (grace window >
       // the longest .moving transition), then stop while fully rested.
       const shineLive = shiny || (t - shinyExitAt) < SHINE_FADE_GRACE_MS;
-      drivePose(Math.sin(angle) * 0.6, Math.cos(angle) * 0.45, shineLive);
+      drivePose(Math.sin(angle) * 0.6 * env, Math.cos(angle) * 0.45 * env, shineLive);
     };
     raf = requestAnimationFrame(tick);
     return () => { cancelAnimationFrame(raf); if (io) io.disconnect(); resetToRest(); };
@@ -503,21 +516,13 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
     : `/assets/card_images/${imagePath}`;
 
   // Per-system image-layer presentation. Presence (how solid the image sits
-  // at rest), blend mode and gradient-suppression ride on the element itself,
-  // so several systems can each layer their own image at once. Cards saved
-  // before these fields existed hit the CSS fallbacks: invisible at rest,
-  // soft-light, gradient replaced — the old behaviour exactly.
+  // at rest) and blend mode ride on the element itself, so several systems
+  // can each layer their own image at once.
   const imageLayerProps = (p) => ({
     style: {
       ...(p?.imagePresence !== undefined ? { '--holo-image-presence': p.imagePresence } : {}),
-      ...(p?.imageBlendMode ? { '--holo-image-blend': p.imageBlendMode } : {}),
-      // New-style layers drop the old darkening filter (built for faint
-      // soft-light texture) for a gentle tilt-shade that keeps the image legible.
-      ...(p?.imagePresence !== undefined
-        ? { '--holo-image-filter': 'brightness(calc(var(--hyp, 0) * 0.35 + 0.95)) saturate(1.15)' }
-        : {})
-    },
-    'data-layered': p?.layerGradient ? 'true' : undefined
+      ...(p?.imageBlendMode ? { '--holo-image-blend': p.imageBlendMode } : {})
+    }
   });
 
   return (
@@ -633,11 +638,9 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
             />
             
             {/* Holographic layers. Veil is one technique among five — it
-                stacks with the animated systems rather than replacing them.
-                It runs with its own image OR (new) as a hue-matched sheen
-                gradient with no image; older cards without the explicit
-                toggle are on exactly when they carry an image. */}
-            {(holoEffects?.overlay ?? !!customHoloImageUrl) && (
+                stacks with the animated systems rather than replacing them,
+                and runs with its own image or as a hue-matched sheen. */}
+            {holoEffects?.overlay && (
               <CustomHoloEffect
                 className="custom-holo-effect"
                 $active={true}
@@ -754,7 +757,8 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
                 {/* Original CSS-based holo effects (subtle mode) */}
                 <S.HoloShine 
                   className="rare-holo holo-shine" 
-                  $active={holoEffects?.rareHolo && cardData.rareHoloParams?.intensity !== 'extreme'} 
+                  $active={holoEffects?.rareHolo && cardData.rareHoloParams?.intensity !== 'extreme'
+                    && cardData.rareHoloParams?.layerGradient !== false} 
                   data-intensity={cardData.rareHoloParams?.intensity || 'subtle'}
                 />
                 
@@ -798,15 +802,15 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
                 )}
                 <S.HoloShine 
                   className="rare-holo-galaxy holo-shine" 
-                  $active={holoEffects?.rareHoloGalaxy && (!cardData.rareHoloGalaxyParams?.backgroundImage || cardData.rareHoloGalaxyParams?.layerGradient)} 
+                  $active={holoEffects?.rareHoloGalaxy && cardData.rareHoloGalaxyParams?.layerGradient !== false} 
                 />
                 <S.HoloShine 
                   className="wowa-holo holo-shine" 
-                  $active={holoEffects?.wowaHolo && (!cardData.wowaHoloParams?.backgroundImage || cardData.wowaHoloParams?.layerGradient)} 
+                  $active={holoEffects?.wowaHolo && cardData.wowaHoloParams?.layerGradient !== false} 
                 />
                 <S.HoloShine 
                   className="rare-holo-vmax holo-shine" 
-                  $active={holoEffects?.rareHoloVmax && (!cardData.rareHoloVmaxParams?.backgroundImage || cardData.rareHoloVmaxParams?.layerGradient)} 
+                  $active={holoEffects?.rareHoloVmax && cardData.rareHoloVmaxParams?.layerGradient !== false} 
                 />
 
               </>

@@ -64,7 +64,7 @@ const HoloEffectToggles = ({
       <ToggleSwitch
         label="Gradient Underneath"
         param={`${sys}Params.layerGradient`}
-        checked={!!params.layerGradient}
+        checked={params.layerGradient !== false}
         onChange={(param, checked) => handleParamChange(param, checked, false)}
         description="Keeps the system's own gradient running under your image instead of being replaced by it."
       />
@@ -145,10 +145,8 @@ const HoloEffectToggles = ({
     contrast: 2.0
   };
 
-  // Veil state: cards from before the explicit toggle are on exactly when
-  // they carry an overlay image — same rule the renderer applies.
   const ep = customCard.effectParams || {};
-  const overlayOn = holoEffects.overlay ?? !!overlayImage;
+  const overlayOn = !!holoEffects.overlay;
 
 
   

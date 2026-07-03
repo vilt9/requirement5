@@ -320,8 +320,7 @@ const ShareCard = () => {
     const n = typeof v === 'number' ? v : parseFloat(v);
     return Number.isFinite(n) ? Number(n.toFixed(d)) : null;
   };
-  // Veil is on when flagged, or (pre-toggle cards) when it carries an image.
-  const veilOn = cc.holoEffects?.overlay ?? !!cc.customHoloImageUrl;
+  const veilOn = !!cc.holoEffects?.overlay;
   const activeHolo = Object.entries(cc.holoEffects || {})
     .filter(([k, v]) => v && k !== 'overlay')
     .map(([k]) => HOLO_NAMES[k] || k);

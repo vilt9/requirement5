@@ -796,105 +796,11 @@ export const HoloBackgroundImage = styled.div`
     transition: opacity 0.3s ease-in-out; /* Same timing as original */
   }
 
-  /* Whole-value override: new-style layers swap in a gentler filter that
-     keeps the picture legible instead of grinding it into a texture. */
-  filter: var(--holo-image-filter, brightness(calc((var(--hyp, 0) + 0.7) * 0.7)) contrast(1.2) saturate(1.5));
+  /* A gentle tilt-shade that keeps the picture legible — the system's own
+     gradient runs as its own layer, so the image doesn't have to double as
+     a shimmer texture. */
+  filter: brightness(calc(var(--hyp, 0) * 0.35 + 0.95)) saturate(1.15);
 
-  /* When the system's gradient renders as its own layer, don't also stamp
-     the gradient copy over the image. */
-  &[data-layered='true']::before {
-    content: none;
-  }
-
-  /* Add Galaxy Colors gradient layer for rare-holo-galaxy */
-  ${({ $className }) => $className === 'rare-holo-galaxy-background' && `
-    &::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: repeating-linear-gradient(
-        82deg,
-        var(--rare-holo-galaxy-color-1, rgb(219, 204, 86)) calc(var(--rare-holo-galaxy-space, 4%)*1),
-        var(--rare-holo-galaxy-color-1, rgb(219, 204, 86)) calc(var(--rare-holo-galaxy-space, 4%)*var(--rare-holo-galaxy-overlap-1, 1.0)),
-        var(--rare-holo-galaxy-color-2, rgb(121, 199, 58)) calc(var(--rare-holo-galaxy-space, 4%)*2),
-        var(--rare-holo-galaxy-color-2, rgb(121, 199, 58)) calc(var(--rare-holo-galaxy-space, 4%)*var(--rare-holo-galaxy-overlap-2, 2.0)),
-        var(--rare-holo-galaxy-color-3, rgb(58, 192, 183)) calc(var(--rare-holo-galaxy-space, 4%)*3),
-        var(--rare-holo-galaxy-color-3, rgb(58, 192, 183)) calc(var(--rare-holo-galaxy-space, 4%)*var(--rare-holo-galaxy-overlap-3, 3.0)),
-        var(--rare-holo-galaxy-color-4, rgb(71, 98, 207)) calc(var(--rare-holo-galaxy-space, 4%)*4),
-        var(--rare-holo-galaxy-color-4, rgb(71, 98, 207)) calc(var(--rare-holo-galaxy-space, 4%)*var(--rare-holo-galaxy-overlap-4, 4.0)),
-        var(--rare-holo-galaxy-color-5, rgb(170, 69, 209)) calc(var(--rare-holo-galaxy-space, 4%)*5),
-        var(--rare-holo-galaxy-color-5, rgb(170, 69, 209)) calc(var(--rare-holo-galaxy-space, 4%)*var(--rare-holo-galaxy-overlap-5, 5.0)),
-        var(--rare-holo-galaxy-color-6, rgb(255, 90, 180)) calc(var(--rare-holo-galaxy-space, 4%)*6),
-        var(--rare-holo-galaxy-color-6, rgb(255, 90, 180)) calc(var(--rare-holo-galaxy-space, 4%)*var(--rare-holo-galaxy-overlap-6, 6.0)),
-        var(--rare-holo-galaxy-color-7, rgb(255, 90, 180)) calc(var(--rare-holo-galaxy-space, 4%)*7),
-        var(--rare-holo-galaxy-color-7, rgb(255, 90, 180)) calc(var(--rare-holo-galaxy-space, 4%)*var(--rare-holo-galaxy-overlap-7, 7.0)),
-        var(--rare-holo-galaxy-color-8, rgb(170, 69, 209)) calc(var(--rare-holo-galaxy-space, 4%)*8),
-        var(--rare-holo-galaxy-color-8, rgb(170, 69, 209)) calc(var(--rare-holo-galaxy-space, 4%)*var(--rare-holo-galaxy-overlap-8, 8.0)),
-        var(--rare-holo-galaxy-color-9, rgb(71, 98, 207)) calc(var(--rare-holo-galaxy-space, 4%)*9),
-        var(--rare-holo-galaxy-color-9, rgb(71, 98, 207)) calc(var(--rare-holo-galaxy-space, 4%)*var(--rare-holo-galaxy-overlap-9, 9.0)),
-        var(--rare-holo-galaxy-color-10, rgb(58, 192, 183)) calc(var(--rare-holo-galaxy-space, 4%)*10),
-        var(--rare-holo-galaxy-color-10, rgb(58, 192, 183)) calc(var(--rare-holo-galaxy-space, 4%)*var(--rare-holo-galaxy-overlap-10, 10.0)),
-        var(--rare-holo-galaxy-color-11, rgb(121, 199, 58)) calc(var(--rare-holo-galaxy-space, 4%)*11),
-        var(--rare-holo-galaxy-color-11, rgb(121, 199, 58)) calc(var(--rare-holo-galaxy-space, 4%)*var(--rare-holo-galaxy-overlap-11, 11.0)),
-        var(--rare-holo-galaxy-color-12, rgb(219, 204, 86)) calc(var(--rare-holo-galaxy-space, 4%)*12)
-      );
-      background-size: var(--rare-holo-galaxy-gradient-size, 400%) var(--rare-holo-galaxy-gradient-height, 900%);
-      background-position: calc(((50% - var(--posx)) * 2.5) + 50%) calc(((50% - var(--posy)) * 2.5) + 50%);
-      mix-blend-mode: var(--rare-holo-galaxy-blend-mode, color-dodge);
-      opacity: 0.6;
-      pointer-events: none;
-    }
-  `}
-
-  /* Add Rainbow Colors gradient layer for rare-holo */
-  ${({ $className }) => $className === 'rare-holo-background' && `
-    &::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: repeating-linear-gradient(90deg,
-        var(--rare-holo-color-1, hsl(calc(var(--rare-holo-h, 21)*0), var(--rare-holo-s, 70%), var(--rare-holo-l, 50%))) calc(var(--rare-holo-space, 1.5%)*0),
-        var(--rare-holo-color-1, hsl(calc(var(--rare-holo-h, 21)*0), var(--rare-holo-s, 70%), var(--rare-holo-l, 50%))) calc(var(--rare-holo-space, 1.5%)*1),
-        var(--rare-holo-color-2, hsl(calc(var(--rare-holo-h, 21)*1), var(--rare-holo-s, 70%), var(--rare-holo-l, 50%))) calc(var(--rare-holo-space, 1.5%)*1),
-        var(--rare-holo-color-2, hsl(calc(var(--rare-holo-h, 21)*1), var(--rare-holo-s, 70%), var(--rare-holo-l, 50%))) calc(var(--rare-holo-space, 1.5%)*2),
-        var(--rare-holo-color-3, hsl(calc(var(--rare-holo-h, 21)*2), var(--rare-holo-s, 70%), var(--rare-holo-l, 50%))) calc(var(--rare-holo-space, 1.5%)*2),
-        var(--rare-holo-color-3, hsl(calc(var(--rare-holo-h, 21)*2), var(--rare-holo-s, 70%), var(--rare-holo-l, 50%))) calc(var(--rare-holo-space, 1.5%)*3),
-        var(--rare-holo-color-4, hsl(calc(var(--rare-holo-h, 21)*3), var(--rare-holo-s, 70%), var(--rare-holo-l, 50%))) calc(var(--rare-holo-space, 1.5%)*3),
-        var(--rare-holo-color-4, hsl(calc(var(--rare-holo-h, 21)*3), var(--rare-holo-s, 70%), var(--rare-holo-l, 50%))) calc(var(--rare-holo-space, 1.5%)*4),
-        var(--rare-holo-color-5, hsl(calc(var(--rare-holo-h, 21)*4), var(--rare-holo-s, 70%), var(--rare-holo-l, 50%))) calc(var(--rare-holo-space, 1.5%)*4),
-        var(--rare-holo-color-5, hsl(calc(var(--rare-holo-h, 21)*4), var(--rare-holo-s, 70%), var(--rare-holo-l, 50%))) calc(var(--rare-holo-space, 1.5%)*5),
-        var(--rare-holo-color-6, hsl(calc(var(--rare-holo-h, 21)*5), var(--rare-holo-s, 70%), var(--rare-holo-l, 50%))) calc(var(--rare-holo-space, 1.5%)*5),
-        var(--rare-holo-color-6, hsl(calc(var(--rare-holo-h, 21)*5), var(--rare-holo-s, 70%), var(--rare-holo-l, 50%))) calc(var(--rare-holo-space, 1.5%)*6),
-        var(--rare-holo-color-7, hsl(calc(var(--rare-holo-h, 21)*6), var(--rare-holo-s, 70%), var(--rare-holo-l, 50%))) calc(var(--rare-holo-space, 1.5%)*6),
-        var(--rare-holo-color-7, hsl(calc(var(--rare-holo-h, 21)*6), var(--rare-holo-s, 70%), var(--rare-holo-l, 50%))) calc(var(--rare-holo-space, 1.5%)*7),
-        var(--rare-holo-color-8, hsl(calc(var(--rare-holo-h, 21)*7), var(--rare-holo-s, 70%), var(--rare-holo-l, 50%))) calc(var(--rare-holo-space, 1.5%)*7),
-        var(--rare-holo-color-8, hsl(calc(var(--rare-holo-h, 21)*7), var(--rare-holo-s, 70%), var(--rare-holo-l, 50%))) calc(var(--rare-holo-space, 1.5%)*8),
-        var(--rare-holo-color-9, hsl(calc(var(--rare-holo-h, 21)*8), var(--rare-holo-s, 70%), var(--rare-holo-l, 50%))) calc(var(--rare-holo-space, 1.5%)*8),
-        var(--rare-holo-color-9, hsl(calc(var(--rare-holo-h, 21)*8), var(--rare-holo-s, 70%), var(--rare-holo-l, 50%))) calc(var(--rare-holo-space, 1.5%)*9),
-        var(--rare-holo-color-10, hsl(calc(var(--rare-holo-h, 21)*9), var(--rare-holo-s, 70%), var(--rare-holo-l, 50%))) calc(var(--rare-holo-space, 1.5%)*9),
-        var(--rare-holo-color-10, hsl(calc(var(--rare-holo-h, 21)*9), var(--rare-holo-s, 70%), var(--rare-holo-l, 50%))) calc(var(--rare-holo-space, 1.5%)*10),
-        var(--rare-holo-color-11, hsl(calc(var(--rare-holo-h, 21)*10), var(--rare-holo-s, 70%), var(--rare-holo-l, 50%))) calc(var(--rare-holo-space, 1.5%)*10),
-        var(--rare-holo-color-11, hsl(calc(var(--rare-holo-h, 21)*10), var(--rare-holo-s, 70%), var(--rare-holo-l, 50%))) calc(var(--rare-holo-space, 1.5%)*11),
-        var(--rare-holo-color-12, hsl(calc(var(--rare-holo-h, 21)*11), var(--rare-holo-s, 70%), var(--rare-holo-l, 50%))) calc(var(--rare-holo-space, 1.5%)*11),
-        var(--rare-holo-color-12, hsl(calc(var(--rare-holo-h, 21)*11), var(--rare-holo-s, 70%), var(--rare-holo-l, 50%))) calc(var(--rare-holo-space, 1.5%)*12)
-      ),
-      /* Modified shine effect for more natural light reflection */
-      radial-gradient(
-        ellipse at 
-        calc(var(--mx) * 0.8 + 10%) 
-        calc(var(--my) * 0.8 + 10%),
-        rgba(230, 230, 230, 0.6) 0%,
-        rgba(230, 230, 230, 0.5) 10%,
-        rgba(200, 200, 200, 0.3) 30%,
-        rgba(100, 100, 100, 0.2) 60%,
-        rgba(0, 0, 0, 0.3) 100%
-      );
-      background-blend-mode: soft-light, soft-light, screen, overlay;
-      background-position: center, calc(((50% - var(--posx)) * 25) + 50%) center;
-      background-size: 100px 100px, 200% 200%;
-      pointer-events: none;
-    }
-  `}
 `;
 
 // Card image and related styles
