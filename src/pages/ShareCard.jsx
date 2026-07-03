@@ -542,18 +542,31 @@ const FixedDock = styled.div`
     font-family: var(--font-mono);
     font-weight: 600;
     font-size: 13px;
-    /* A slow, gentle glow — enough to draw the eye, never enough to nag. */
+    position: relative;
+  }
+  /* A slow, gentle glow — enough to draw the eye, never enough to nag.
+     The shadow is painted ONCE on a pseudo-layer and pulsed via opacity
+     (compositor-only); animating box-shadow itself repainted the dock on
+     every frame of the 3.2s loop, forever. */
+  button::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: 0 0 10px 1px rgba(232, 180, 85, 0.3);
+    opacity: 0;
+    pointer-events: none;
     animation: dockPulse 3.2s ease-in-out infinite;
   }
-  button:disabled { animation: none; }
+  button:disabled::after { animation: none; opacity: 0; }
 
   @keyframes dockPulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(232, 180, 85, 0); }
-    50%      { box-shadow: 0 0 10px 1px rgba(232, 180, 85, 0.3); }
+    0%, 100% { opacity: 0; }
+    50%      { opacity: 1; }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    button { animation: none; }
+    button::after { animation: none; opacity: 0; }
   }
 `;
 

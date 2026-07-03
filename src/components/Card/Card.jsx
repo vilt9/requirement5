@@ -49,20 +49,74 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
   const directPointer = !(driven && coarse);
   const shinyRef = useRef(null); // last shiny state; null forces a re-apply
   
-  // Helper function to set CSS variables on both CardScene and CardContainer
-  // IMPORTANT: CSS variables set on both elements to ensure inheritance works in Chrome
-  // CardScene has stable hit area for mouse events, CardContainer for direct child access
+  // Set CSS variables on CardScene; every consumer lives below it and
+  // inherits them. Used for the PER-CARD parameter variables only (the
+  // cardData effect) — writing any custom property on the scene invalidates
+  // the whole var-heavy subtree, so doing it per frame was the main source
+  // of the "hot phone" style-recalc cost. Per-FRAME pose variables go
+  // through writeFrameVars below, scoped to the consuming layers.
   const setCardCSSVariables = (variables) => {
+    const el = cardSceneRef.current || cardRef.current;
+    if (!el) return;
     Object.entries(variables).forEach(([key, value]) => {
-      // Set on CardScene (stable hit area)
-      if (cardSceneRef.current) {
-        cardSceneRef.current.style.setProperty(`--${key}`, value);
-      }
-      // Also set on CardContainer (for direct child access)
-      if (cardRef.current) {
-        cardRef.current.style.setProperty(`--${key}`, value);
-      }
+      el.style.setProperty(`--${key}`, value);
     });
+  };
+
+  // The pose-driven variables are written straight onto the elements whose
+  // styles read them — invalidating a handful of tiny subtrees instead of
+  // the whole card. Cached per card; the cardData effect clears the cache
+  // (holo layers mount/unmount with their toggles).
+  const frameLayersRef = useRef(null);
+  const getFrameLayers = () => {
+    if (!frameLayersRef.current && cardSceneRef.current) {
+      const scene = cardSceneRef.current;
+      frameLayersRef.current = {
+        // every element whose styles read the shine/tilt pose variables
+        shine: [...scene.querySelectorAll(
+          '.holo-shine, .rare-holo-background, .rare-holo-galaxy-background, '
+          + '.wowa-holo-background, .rare-holo-vmax-background, '
+          + '.custom-holo-effect, .image-shine, .card-image'
+        )],
+        // the ONLY layers visible at rest that read a pose variable
+        // (their gradients follow --edge-angle at opacity 0.5)
+        edges: [...scene.querySelectorAll('.edge-highlight, .thin-edge-border')],
+      };
+    }
+    return frameLayersRef.current;
+  };
+  const writeFrameVars = (els, variables) => {
+    for (const el of els) {
+      for (const key in variables) el.style.setProperty(key, variables[key]);
+    }
+  };
+
+  // Apply one pose to the DOM. `shine: false` (card fully rested — every
+  // shine consumer is invisible) skips down to the edge gradients and the
+  // transform, which is nearly free by comparison.
+  const applyPose = (x, y, hyp, angle, nx, ny, rotateY, rotateX, shine) => {
+    const layers = getFrameLayers();
+    if (!layers || !cardRef.current) return;
+    if (shine) {
+      writeFrameVars(layers.shine, {
+        '--mx': `${x}%`,
+        '--my': `${y}%`,
+        '--posx': `${x}%`,
+        '--posy': `${y}%`,
+        '--hyp': hyp.toFixed(2),
+        '--holo-angle': `${angle}deg`,
+        // Normalised tilt (-1..1) drives the parallax depth shift.
+        '--tilt-x': nx.toFixed(3),
+        '--tilt-y': ny.toFixed(3)
+      });
+    }
+    writeFrameVars(layers.edges, { '--edge-angle': `${angle + 90}deg` });
+    // Apply transform directly to match the working HTML version
+    cardRef.current.style.transform = `
+      rotateY(${rotateY}deg)
+      rotateX(${rotateX}deg)
+      translateZ(50px)
+    `;
   };
   
   // Apply card attributes from cardData
@@ -126,36 +180,27 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
     
     // Calculate shine angle
     const angle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
-    
-    // Set CSS variables for holographic effects
-    setCardCSSVariables({
-      mx: `${x}%`,
-      my: `${y}%`,
-      posx: `${x}%`,
-      posy: `${y}%`,
-      hyp: hyp.toFixed(2),
-      'holo-angle': `${angle}deg`,
-      'edge-angle': `${angle + 90}deg`,
-      // Normalised tilt (-1..1) drives the parallax depth shift.
-      'tilt-x': distanceX.toFixed(3),
-      'tilt-y': distanceY.toFixed(3)
-    });
-    // (Param-derived variables are applied by the cardData effect; here we only
-    // update the mouse-driven ones.)
 
-    // Calculate and set the secondary hues for gradient
-    const baseHue = cardRef.current?.style.getPropertyValue('--base-hue').trim() || 220;
-    setCardCSSVariables({
-      'second-hue': `${(parseInt(baseHue) + 60) % 360}`,
-      'third-hue': `${(parseInt(baseHue) + 180) % 360}`
-    });
-    
-    // Apply transform directly to match the working HTML version
-    cardRef.current.style.transform = `
-      rotateY(${rotateY}deg)
-      rotateX(${rotateX}deg)
-      translateZ(50px)
-    `;
+    // (Param-derived variables — including the gradient's companion hues —
+    // are applied by the cardData effect; here only the pointer-driven ones.)
+    applyPose(x, y, hyp, angle, distanceX, distanceY, rotateY, rotateX, true);
+  };
+
+  // Drive the same tilt + shine math from a NORMALISED pose (nx, ny in
+  // -1..1) with ZERO DOM reads. The driven loop calls this every frame;
+  // drivePointer's getBoundingClientRect forced a style+layout flush per
+  // call, which (at 60fps, twice a frame) was the main-thread heat on
+  // phones. Formulas are drivePointer's exactly, with the live rect replaced
+  // by the card's fixed aspect ratio (420/300 = 364/260 = 1.4 at every
+  // size), so the output is pixel-identical.
+  const CARD_ASPECT = 1.4;
+  const drivePose = (nx, ny, shine = true) => {
+    if (!isInteractive || !cardRef.current) return;
+    const x = (nx + 1) * 50;
+    const y = (ny + 1) * 50;
+    const hyp = Math.sqrt(nx * nx + ny * ny);
+    const angle = Math.atan2(ny * CARD_ASPECT, nx) * (180 / Math.PI);
+    applyPose(x, y, hyp, angle, nx, ny, nx * 15, ny * -15, shine);
   };
 
   // Handle mouse movement for interactive card effects
@@ -189,16 +234,20 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
     // Reset transform directly
     cardRef.current.style.transform = '';
 
-    // Reset CSS properties to center
-    setCardCSSVariables({
-      mx: '50%',
-      my: '50%',
-      posx: '50%',
-      posy: '50%',
-      hyp: '0',
-      'tilt-x': '0',
-      'tilt-y': '0'
-    });
+    // Reset CSS properties to center (on the consuming layers, where the
+    // per-frame writes live — a scene-level reset would be shadowed).
+    const layers = getFrameLayers();
+    if (layers) {
+      writeFrameVars(layers.shine, {
+        '--mx': '50%',
+        '--my': '50%',
+        '--posx': '50%',
+        '--posy': '50%',
+        '--hyp': '0',
+        '--tilt-x': '0',
+        '--tilt-y': '0'
+      });
+    }
 
     // Update React state
     setIsMoving(false);
@@ -247,6 +296,9 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
   // Variables are set on the container and inherit to every effect layer.
   useEffect(() => {
     if (!cardData) return;
+    // Holo layers mount/unmount with their toggles — refresh the per-frame
+    // write targets on the next pose application.
+    frameLayersRef.current = null;
     const vars = {};
     const pct = (v) => (typeof v === 'number' || /^[\d.]+$/.test(String(v)) ? `${v}%` : v);
 
@@ -346,6 +398,14 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
       if (vmax.backgroundImage) vars['rare-holo-vmax-background-image'] = `url(${vmax.backgroundImage})`;
     }
 
+    // The gradient's companion hues derive from the base hue, which is
+    // static per card — computed here once, not on every animation frame
+    // (same fallback chain drivePointer used to run per frame).
+    const baseHue = vars['base-hue']
+      ?? (cardRef.current?.style.getPropertyValue('--base-hue').trim() || 220);
+    vars['second-hue'] = `${(parseInt(baseHue) + 60) % 360}`;
+    vars['third-hue'] = `${(parseInt(baseHue) + 180) % 360}`;
+
     setCardCSSVariables(vars);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cardData, holoEffects, customHoloImageUrl]);
@@ -360,6 +420,10 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
     let raf;
     let visible = true;
     let lastP = -1;
+    // Longest .moving fade is 0.4s; the grace keeps shine variables live
+    // well past it so a fade-out never freezes mid-shimmer.
+    const SHINE_FADE_GRACE_MS = 800;
+    let shinyExitAt = -Infinity;
     const io = typeof IntersectionObserver !== 'undefined' && cardSceneRef.current
       ? new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; })
       : null;
@@ -375,20 +439,20 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
       // ended and cleared the shiny state to force a re-apply).
       if (p === lastP && shinyRef.current !== null) return;
       lastP = p;
-      const rect = cardRef.current.getBoundingClientRect();
-      const angle = p * Math.PI * 4; // two full orbits over the run
-      const nx = Math.sin(angle) * 0.6;
-      const ny = Math.cos(angle) * 0.45;
-      drivePointer({
-        clientX: rect.left + rect.width / 2 + nx * (rect.width / 2),
-        clientY: rect.top + rect.height / 2 + ny * (rect.height / 2)
-      });
       const shiny = inShinyZone(p);
       if (shiny !== shinyRef.current) {
         shinyRef.current = shiny;
         cardRef.current.classList.toggle('moving', shiny);
         setIsMoving(shiny);
+        if (!shiny) shinyExitAt = t; // fade-out starts now
       }
+      const angle = p * Math.PI * 4; // two full orbits over the run
+      // Pure math into drivePose — no getBoundingClientRect, no forced
+      // style/layout flushes: the frame does one style pass, at render.
+      // Shine variables keep updating through the fade-out (grace window >
+      // the longest .moving transition), then stop while fully rested.
+      const shineLive = shiny || (t - shinyExitAt) < SHINE_FADE_GRACE_MS;
+      drivePose(Math.sin(angle) * 0.6, Math.cos(angle) * 0.45, shineLive);
     };
     raf = requestAnimationFrame(tick);
     return () => { cancelAnimationFrame(raf); if (io) io.disconnect(); resetToRest(); };

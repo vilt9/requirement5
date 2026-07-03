@@ -25,15 +25,30 @@ const MotionBar = ({ className }) => {
     setSpeed(s);
   }), []);
 
-  // The dot mirrors the clock — cheap DOM write, no re-render per frame.
+  // The dot mirrors the clock — a transform write per frame (never `top`,
+  // which would dirty layout every frame). Track height is cached and kept
+  // fresh by a ResizeObserver so the frame loop does zero DOM reads; a
+  // paused clock produces the same string and skips the write entirely.
   useEffect(() => {
+    const track = trackRef.current;
+    if (!track) return undefined;
+    let trackH = track.clientHeight;
+    const ro = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(() => { trackH = track.clientHeight; })
+      : null;
+    if (ro) ro.observe(track);
     let raf;
+    let last = '';
     const tick = (t) => {
       raf = requestAnimationFrame(tick);
-      if (dotRef.current) dotRef.current.style.top = `${loopPhase(t) * 100}%`;
+      if (!dotRef.current) return;
+      const next = `translate(-50%, ${(loopPhase(t) * trackH).toFixed(1)}px) translateY(-50%)`;
+      if (next === last) return;
+      last = next;
+      dotRef.current.style.transform = next;
     };
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    return () => { cancelAnimationFrame(raf); if (ro) ro.disconnect(); };
   }, []);
 
   const scrubFromEvent = (e) => {
@@ -119,7 +134,7 @@ const Bar = styled.div`
   .dot {
     position: absolute;
     left: 50%;
-    top: 0%;
+    top: 0; /* the frame loop positions it via transform, never top */
     width: 22px;
     height: 22px;
     transform: translate(-50%, -50%);
