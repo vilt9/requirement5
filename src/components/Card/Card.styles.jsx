@@ -138,6 +138,14 @@ export const ScrubTrack = styled(MotionBar)`
   @media (hover: hover) and (pointer: fine) {
     transform: translateZ(120px) scale(0.88);
   }
+  /* A mouse aims better than a thumb: clear the card face entirely and leave
+     a visible gap, so reaching for the bar never grazes the card. Width-
+     floored — a very narrow desktop window keeps the snug mobile placement
+     rather than pushing the bar into a horizontal scrollbar. */
+  @media (hover: hover) and (pointer: fine) and (min-width: 480px) {
+    right: -60px;
+    width: 36px;
+  }
 `;
 
 // Card container - handles hover and moving states

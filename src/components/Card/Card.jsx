@@ -204,15 +204,29 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
     applyPose(x, y, hyp, angle, nx, ny, nx * 15, ny * -15, shine);
   };
 
+  // The motion bar overflows the card face but lives inside the scene, so
+  // its pointer traffic bubbles into these handlers. The bar is a control
+  // surface, not card: hovering it must release the card (back to the loop),
+  // not tilt it — otherwise reaching for pause drags the card around.
+  const overBar = (e) => !!e?.target?.closest?.('.scrub-track');
+
   // Handle mouse movement for interactive card effects
   const handleMouseMove = (e) => {
     if (!isInteractive || !cardRef.current) return;
+    if (overBar(e)) {
+      if (pointerActiveRef.current) handleMouseLeave();
+      return;
+    }
+    // Crossing back from the bar onto the card re-takes ownership — the
+    // scene's own mouseenter won't fire again (the bar is inside it).
+    if (!pointerActiveRef.current) handleMouseEnter();
     drivePointer(e);
     setIsMoving(true);
   };
 
   // Handle mouse enter to activate effects
-  const handleMouseEnter = () => {
+  const handleMouseEnter = (e) => {
+    if (overBar(e)) return; // entered the scene via the bar — card stays loop-driven
     pointerActiveRef.current = true;
     if (!isInteractive || !cardRef.current) return;
 
