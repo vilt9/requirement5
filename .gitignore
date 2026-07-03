@@ -35,3 +35,6 @@ server/uploads/
 
 # Wrangler local state
 .wrangler/
+
+# Local-only Claude notes (names real infrastructure)
+CLAUDE.local.md
