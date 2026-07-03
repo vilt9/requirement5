@@ -7,6 +7,7 @@ import { api, ApiError, apiBase } from '../utils/api';
 import { poolCardToCardData, asOdds } from '../utils/poolCard';
 import { scoreCard, generateCardAttributes } from '../utils/cardGenerator';
 import { saveCostFor, fmtT26 } from '../utils/economyRandom';
+import { scrubTo } from '../utils/cardMotion';
 import { prefetchedCards } from '../utils/drawQueue';
 import { HOLO_NAMES } from '../utils/holoNames';
 import { useScrollBloom } from '../utils/useScrollBloom';
@@ -43,6 +44,15 @@ const ShareCard = () => {
   const scrolling = useScrollBloom(); // colour values bloom into their colour while scrolling
   const [rendering, setRendering] = useState(null); // 'gif' | 'mp4' while a moving image renders
   const [renderError, setRenderError] = useState(null);
+
+  // A generated card starts its run at the TOP of the track: flat for a
+  // breath, then straight into the shiny zone — the fastest read on whether
+  // this card's holo is a keeper or the next Generate beckons. `earned` rides
+  // along on every Generate navigation (and never on a shared link), so it's
+  // the "arrived via Generate" signal; `discovered` only marks pool finds.
+  useEffect(() => {
+    if (earned != null) scrubTo(0);
+  }, [id, earned]);
 
   // provisional = we're showing the uuid-seeded card while the server tells us
   // whether a stored card owns this id. Fresh mints skip that check entirely.

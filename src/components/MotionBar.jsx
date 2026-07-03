@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 import {
   loopPhase, scrubTo, motionPaused, toggleMotion, onMotionChange,
+  motionSpeed, cycleMotionSpeed,
   SHINY_START, SHINY_END
 } from '../utils/cardMotion';
 
@@ -17,8 +18,12 @@ const MotionBar = ({ className }) => {
   const dotRef = useRef(null);
   const draggingRef = useRef(false);
   const [paused, setPaused] = useState(motionPaused());
+  const [speed, setSpeed] = useState(motionSpeed());
 
-  useEffect(() => onMotionChange(setPaused), []);
+  useEffect(() => onMotionChange(({ paused: p, speed: s }) => {
+    setPaused(p);
+    setSpeed(s);
+  }), []);
 
   // The dot mirrors the clock — cheap DOM write, no re-render per frame.
   useEffect(() => {
@@ -61,6 +66,16 @@ const MotionBar = ({ className }) => {
         <span className="zone" />
         <span className="dot" ref={dotRef} />
       </div>
+      {/* The speed dial: taps step through the stops, everywhere at once. */}
+      <button
+        type="button"
+        className="speed"
+        onClick={cycleMotionSpeed}
+        title="Card motion speed (everywhere) — tap to change"
+        aria-label={`Card motion speed ${speed}x — tap to change`}
+      >
+        {speed}×
+      </button>
       <button
         type="button"
         className="pp"
@@ -80,7 +95,7 @@ const Bar = styled.div`
   .track {
     position: absolute;
     top: 0;
-    bottom: 34px; /* room for the pause/play button at the base */
+    bottom: 64px; /* room for the speed dial + pause/play at the base */
     left: 0;
     right: 0;
     touch-action: none; /* dragging the dot must never scroll the page */
@@ -115,9 +130,8 @@ const Bar = styled.div`
     pointer-events: none;
   }
 
-  .pp {
+  .pp, .speed {
     position: absolute;
-    bottom: 0;
     left: 50%;
     transform: translateX(-50%);
     width: 26px;
@@ -135,6 +149,8 @@ const Bar = styled.div`
 
     &:hover { border-color: var(--gold); color: var(--white); }
   }
+  .speed { bottom: 30px; font-family: var(--font-mono); }
+  .pp { bottom: 0; }
 `;
 
 export default MotionBar;
