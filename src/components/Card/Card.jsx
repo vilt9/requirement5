@@ -400,7 +400,26 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
     if (wowa) {
       if (wowa.angle !== undefined) vars['angle'] = `${wowa.angle}deg`;
       if (wowa.space !== undefined) vars['space'] = pct(wowa.space);
+      if (wowa.brightness !== undefined) vars['wowa-holo-brightness'] = wowa.brightness;
+      if (wowa.contrast !== undefined) vars['wowa-holo-contrast'] = wowa.contrast;
       if (wowa.backgroundImage) vars['wowa-holo-background-image'] = `url(${wowa.backgroundImage})`;
+    }
+
+    // Veil (sheen) parameters — the restored card-wide holo knobs. Every one
+    // has a neutral CSS fallback, so cards saved before these existed render
+    // exactly as they always did.
+    if (effectParams) {
+      if (effectParams.sheenAngle !== undefined) vars['sheen-angle'] = `${effectParams.sheenAngle}deg`;
+      if (effectParams.sheenSpace !== undefined) vars['sheen-space'] = pct(effectParams.sheenSpace);
+      if (effectParams.sheenShine !== undefined) vars['sheen-shine'] = effectParams.sheenShine;
+      if (effectParams.sheenBrightness !== undefined) vars['sheen-brightness'] = effectParams.sheenBrightness;
+      if (effectParams.sheenContrast !== undefined) vars['sheen-contrast'] = effectParams.sheenContrast;
+      if (effectParams.sheenSaturate !== undefined) vars['sheen-saturate'] = effectParams.sheenSaturate;
+      if (effectParams.sheenDrift !== undefined) vars['sheen-drift'] = effectParams.sheenDrift;
+      if (effectParams.veilPresence !== undefined) vars['veil-presence'] = effectParams.veilPresence;
+      // Chromatic aberration finally has a visual: RGB ghosts on the Veil
+      // layer. The field has always fed the authentic-rarity score.
+      if (effectParams.aberrationIntensity !== undefined) vars['sheen-ab'] = effectParams.aberrationIntensity;
     }
 
     // Vmax parameters
@@ -482,7 +501,25 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
   const imageUrl = imagePath === 'custom_image' && customImageUrl
     ? customImageUrl
     : `/assets/card_images/${imagePath}`;
-  
+
+  // Per-system image-layer presentation. Presence (how solid the image sits
+  // at rest), blend mode and gradient-suppression ride on the element itself,
+  // so several systems can each layer their own image at once. Cards saved
+  // before these fields existed hit the CSS fallbacks: invisible at rest,
+  // soft-light, gradient replaced — the old behaviour exactly.
+  const imageLayerProps = (p) => ({
+    style: {
+      ...(p?.imagePresence !== undefined ? { '--holo-image-presence': p.imagePresence } : {}),
+      ...(p?.imageBlendMode ? { '--holo-image-blend': p.imageBlendMode } : {}),
+      // New-style layers drop the old darkening filter (built for faint
+      // soft-light texture) for a gentle tilt-shade that keeps the image legible.
+      ...(p?.imagePresence !== undefined
+        ? { '--holo-image-filter': 'brightness(calc(var(--hyp, 0) * 0.35 + 0.95)) saturate(1.15)' }
+        : {})
+    },
+    'data-layered': p?.layerGradient ? 'true' : undefined
+  });
+
   return (
     <S.CardScene 
       ref={cardSceneRef}
@@ -595,14 +632,16 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
               }}
             />
             
-            {/* Holographic layers. The overlay image is one technique among
-                five — it stacks with the animated systems rather than
-                replacing them. */}
-            {customHoloImageUrl && (
+            {/* Holographic layers. Veil is one technique among five — it
+                stacks with the animated systems rather than replacing them.
+                It runs with its own image OR (new) as a hue-matched sheen
+                gradient with no image; older cards without the explicit
+                toggle are on exactly when they carry an image. */}
+            {(holoEffects?.overlay ?? !!customHoloImageUrl) && (
               <CustomHoloEffect
                 className="custom-holo-effect"
                 $active={true}
-                $imageUrl={customHoloImageUrl}
+                $imageUrl={customHoloImageUrl || null}
                 $blendMode={effectParams?.customHoloBlendMode || 'color-dodge'}
               />
             )}
@@ -649,6 +688,7 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
                           $className="rare-holo-background"
                           $imageUrl={cardData.rareHoloParams.backgroundImage}
                           $active={true}
+                          {...imageLayerProps(cardData.rareHoloParams)}
                         />
                       )}
                       
@@ -686,6 +726,7 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
                           $className="rare-holo-galaxy-background"
                           $imageUrl={cardData.rareHoloGalaxyParams.backgroundImage}
                           $active={true}
+                          {...imageLayerProps(cardData.rareHoloGalaxyParams)}
                         />
                       )}
                       
@@ -694,6 +735,7 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
                           className="wowa-holo-background"
                           $imageUrl={cardData.wowaHoloParams.backgroundImage}
                           $active={true}
+                          {...imageLayerProps(cardData.wowaHoloParams)}
                         />
                       )}
                       
@@ -702,6 +744,7 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
                           className="rare-holo-vmax-background"
                           $imageUrl={cardData.rareHoloVmaxParams.backgroundImage}
                           $active={true}
+                          {...imageLayerProps(cardData.rareHoloVmaxParams)}
                         />
                       )}
                     </>
@@ -755,15 +798,15 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
                 )}
                 <S.HoloShine 
                   className="rare-holo-galaxy holo-shine" 
-                  $active={holoEffects?.rareHoloGalaxy && !cardData.rareHoloGalaxyParams?.backgroundImage} 
+                  $active={holoEffects?.rareHoloGalaxy && (!cardData.rareHoloGalaxyParams?.backgroundImage || cardData.rareHoloGalaxyParams?.layerGradient)} 
                 />
                 <S.HoloShine 
                   className="wowa-holo holo-shine" 
-                  $active={holoEffects?.wowaHolo && !cardData.wowaHoloParams?.backgroundImage} 
+                  $active={holoEffects?.wowaHolo && (!cardData.wowaHoloParams?.backgroundImage || cardData.wowaHoloParams?.layerGradient)} 
                 />
                 <S.HoloShine 
                   className="rare-holo-vmax holo-shine" 
-                  $active={holoEffects?.rareHoloVmax && !cardData.rareHoloVmaxParams?.backgroundImage} 
+                  $active={holoEffects?.rareHoloVmax && (!cardData.rareHoloVmaxParams?.backgroundImage || cardData.rareHoloVmaxParams?.layerGradient)} 
                 />
 
               </>

@@ -372,6 +372,14 @@ const main = async () => {
   ];
   for (const [tab, slot, selector] of uploadTargets) {
     await selectTab(tab);
+    if (slot === 'overlay') {
+      // The Veil picker lives behind the Veil toggle now — switch it on first.
+      const veil = page.locator('.holo-overlay-group input[type="checkbox"]').first();
+      if (await veil.count() && !(await veil.isChecked())) {
+        await veil.evaluate((el) => el.click()); // raw input is visually hidden
+        await page.waitForTimeout(400);
+      }
+    }
     const input = page.locator(selector);
     if (!(await input.count())) {
       report(`file input (${slot})`, 'find', false, `no picker on ${tab} tab`);

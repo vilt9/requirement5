@@ -19,15 +19,57 @@ const HoloEffectToggles = ({
   onOverlaySelect,
   onOverlayClear
 }) => {
-  // Set (or clear, with null) the texture image for one of the four systems.
-  // Every image chosen here also lands in the shared library.
+  // Set (or clear, with null) the image layer for one of the four systems.
+  // A fresh image arrives as a REAL layer: visible at rest, screen-blended,
+  // with the system's gradient kept underneath — the stacking the systems
+  // were always meant to allow. Every image chosen also lands in the library.
   const setEffectImage = (effectName, imageDataUrl) => {
     const paramName = `${effectName}Params`;
     const currentParams = customCard[paramName] || {};
-    const updatedParams = { ...currentParams, backgroundImage: imageDataUrl || undefined };
+    const updatedParams = imageDataUrl
+      ? {
+        ...currentParams,
+        backgroundImage: imageDataUrl,
+        layerGradient: currentParams.layerGradient ?? true,
+        imagePresence: currentParams.imagePresence ?? 0.55,
+        imageBlendMode: currentParams.imageBlendMode ?? 'screen'
+      }
+      : { ...currentParams, backgroundImage: undefined };
     handleParamChange(paramName, updatedParams, false);
     if (imageDataUrl && addToLibrary) addToLibrary(imageDataUrl);
   };
+
+  // The image-layer knobs every system shares once an image is set. A plain
+  // render function (not a component) so re-renders don't remount the
+  // sliders mid-drag.
+  const renderImageLayerControls = (sys, params) => (
+    <>
+      <ParameterControl
+        label="Image Presence"
+        param={`${sys}Params.imagePresence`}
+        value={params.imagePresence ?? 0}
+        min={0}
+        max={1}
+        step={0.05}
+        onChange={handleParamChange}
+        description="How solidly the image sits on the card while it rests — 0 only shows it in motion."
+      />
+      <BlendModeSelector
+        label="Image Blend Mode"
+        param={`${sys}Params.imageBlendMode`}
+        value={params.imageBlendMode || 'soft-light'}
+        onChange={handleParamChange}
+        description="How the image mixes with everything under it — 'normal' keeps it a plain picture."
+      />
+      <ToggleSwitch
+        label="Gradient Underneath"
+        param={`${sys}Params.layerGradient`}
+        checked={!!params.layerGradient}
+        onChange={(param, checked) => handleParamChange(param, checked, false)}
+        description="Keeps the system's own gradient running under your image instead of being replaced by it."
+      />
+    </>
+  );
   if (!customCard) return null;
   
   // Extract holo effect settings or provide defaults
@@ -89,10 +131,11 @@ const HoloEffectToggles = ({
     ]
   };
 
-  // Signal only reads spacing/angle/texture — it has no brightness/contrast.
   const wowaHoloParams = customCard.wowaHoloParams || {
     space: 4,
-    angle: 45
+    angle: 45,
+    brightness: 0.6,
+    contrast: 1.2
   };
 
   const rareHoloVmaxParams = customCard.rareHoloVmaxParams || {
@@ -102,6 +145,11 @@ const HoloEffectToggles = ({
     contrast: 2.0
   };
 
+  // Veil state: cards from before the explicit toggle are on exactly when
+  // they carry an overlay image — same rule the renderer applies.
+  const ep = customCard.effectParams || {};
+  const overlayOn = holoEffects.overlay ?? !!overlayImage;
+
 
   
   return (
@@ -110,35 +158,136 @@ const HoloEffectToggles = ({
         <Dim style={{ fontSize: 11, lineHeight: 1.5 }}>
           Five ways to make a card holographic — combine them freely, and any
           image from your library can drive any of them. {HOLO_NAMES.overlay}{' '}
-          blends your image straight over the card; the four systems below
-          animate their texture as the card tilts, each with its own
-          character. A system without an image uses its built-in gradient.
+          is the standard card-wide sheen (with or without an image); the four
+          systems below animate their texture as the card tilts, each with its
+          own character. Images now LAYER with the gradients — stack several
+          systems, each with its own image, for properly weird cards.
         </Dim>
 
-        {/* Veil: the simplest technique — image + blend mode, no machinery. */}
+        {/* Veil: the standard technique — a card-wide sheen with the full
+            set of restored knobs. Works with no image at all (hue-matched
+            gradient), or blends your image straight over the card. */}
         <ToggleGroup className="holo-overlay-group">
-          <OverlayHead>
-            <span className="name">{HOLO_NAMES.overlay}</span>
-            <Dim style={{ fontSize: 10 }}>
-              Your image blended straight over the card, shining with the pointer.
-            </Dim>
-          </OverlayHead>
-          <HoloImageInput
-            id="holo-image-upload"
-            label={`${HOLO_NAMES.overlay} image`}
-            value={overlayImage || null}
-            onSelect={onOverlaySelect}
-            onClear={onOverlayClear}
-            imageLibrary={imageLibrary}
+          <ToggleSwitch
+            label={HOLO_NAMES.overlay}
+            param="holoEffects.overlay"
+            checked={overlayOn}
+            onChange={(param, checked) => handleParamChange(param, checked, false)}
+            tooltipContent={`${HOLO_NAMES.overlay}: the standard holographic sheen across the whole card — its own gradient, or your image blended over everything.`}
           />
-          {overlayImage && (
-            <BlendModeSelector
-              label="Blend Mode"
-              param="effectParams.customHoloBlendMode"
-              value={customCard.effectParams?.customHoloBlendMode || 'color-dodge'}
-              onChange={handleParamChange}
-              tooltipContent={`How the ${HOLO_NAMES.overlay} image blends with the card. 'color-dodge' for bright shine, 'overlay' for subtle, 'hard-light' for vivid.`}
-            />
+
+          {overlayOn && (
+            <EffectControls>
+              <HoloImageInput
+                id="holo-image-upload"
+                label={`${HOLO_NAMES.overlay} image (optional — without one, a sheen in the card's own colors)`}
+                value={overlayImage || null}
+                onSelect={onOverlaySelect}
+                onClear={onOverlayClear}
+                imageLibrary={imageLibrary}
+              />
+              <BlendModeSelector
+                label="Blend Mode"
+                param="effectParams.customHoloBlendMode"
+                value={customCard.effectParams?.customHoloBlendMode || 'color-dodge'}
+                onChange={handleParamChange}
+                tooltipContent={`How the ${HOLO_NAMES.overlay} blends with the card. 'color-dodge' for bright shine, 'overlay' for subtle, 'hard-light' for vivid.`}
+              />
+              {!overlayImage && (
+                <>
+                  <ParameterControl
+                    label="Sheen Angle"
+                    param="effectParams.sheenAngle"
+                    value={ep.sheenAngle ?? 0}
+                    min={0}
+                    max={360}
+                    step={5}
+                    onChange={handleParamChange}
+                    description="Rotates the sheen bands relative to the tilt — 0 follows the pointer exactly."
+                  />
+                  <ParameterControl
+                    label="Band Spacing"
+                    param="effectParams.sheenSpace"
+                    value={ep.sheenSpace ?? 12}
+                    min={4}
+                    max={40}
+                    step={1}
+                    onChange={handleParamChange}
+                    description="How wide the sheen bands run — low is tight stripes, high is broad washes."
+                  />
+                </>
+              )}
+              <ParameterControl
+                label="Shine Intensity"
+                param="effectParams.sheenShine"
+                value={ep.sheenShine ?? 1}
+                min={0.2}
+                max={1.1}
+                step={0.05}
+                onChange={handleParamChange}
+                description="How strongly the veil glows while the card moves."
+              />
+              <ParameterControl
+                label="Presence at Rest"
+                param="effectParams.veilPresence"
+                value={ep.veilPresence ?? 0}
+                min={0}
+                max={0.8}
+                step={0.05}
+                onChange={handleParamChange}
+                description="Keeps some of the veil visible even when the card sits still."
+              />
+              <ParameterControl
+                label="Aberration"
+                param="effectParams.aberrationIntensity"
+                value={ep.aberrationIntensity ?? 0}
+                min={0}
+                max={1}
+                step={0.05}
+                onChange={handleParamChange}
+                description="Chromatic fringing: red/blue ghosts split apart as the card tilts. Also nudges authentic rarity."
+              />
+              <ParameterControl
+                label="Brightness"
+                param="effectParams.sheenBrightness"
+                value={ep.sheenBrightness ?? 1}
+                min={0.3}
+                max={2}
+                step={0.05}
+                onChange={handleParamChange}
+                description="Lifts or dims the whole veil."
+              />
+              <ParameterControl
+                label="Contrast"
+                param="effectParams.sheenContrast"
+                value={ep.sheenContrast ?? 1}
+                min={0.4}
+                max={2}
+                step={0.05}
+                onChange={handleParamChange}
+                description="Sharpens the split between the veil's glow and shadow."
+              />
+              <ParameterControl
+                label="Color Vividness"
+                param="effectParams.sheenSaturate"
+                value={ep.sheenSaturate ?? 1}
+                min={0}
+                max={2}
+                step={0.05}
+                onChange={handleParamChange}
+                description="Grey and subtle at the low end, neon at the top."
+              />
+              <ParameterControl
+                label="Drift"
+                param="effectParams.sheenDrift"
+                value={ep.sheenDrift ?? 1}
+                min={0}
+                max={3}
+                step={0.1}
+                onChange={handleParamChange}
+                description="How far the veil slides as the card tilts — 0 pins it still, high sweeps it around."
+              />
+            </EffectControls>
           )}
         </ToggleGroup>
 
@@ -156,12 +305,13 @@ const HoloEffectToggles = ({
             <EffectControls>
               <HoloImageInput
                 id="rare-holo-background-upload"
-                label="texture image (replaces the rainbow gradient)"
+                label="image layer (rides the effect; stack it with the gradient below)"
                 value={rareHoloParams.backgroundImage || null}
                 onSelect={(url) => setEffectImage('rareHolo', url)}
                 onClear={() => setEffectImage('rareHolo', null)}
                 imageLibrary={imageLibrary}
               />
+              {rareHoloParams.backgroundImage && renderImageLayerControls('rareHolo', rareHoloParams)}
               <ParameterControl
                 label="Band Width"
                 param="rareHoloParams.space"
@@ -274,12 +424,13 @@ const HoloEffectToggles = ({
             <EffectControls>
               <HoloImageInput
                 id="rare-holo-galaxy-background-upload"
-                label="texture image (replaces the galaxy background)"
+                label="image layer (rides the effect; stack it with the gradient below)"
                 value={rareHoloGalaxyParams.backgroundImage || null}
                 onSelect={(url) => setEffectImage('rareHoloGalaxy', url)}
                 onClear={() => setEffectImage('rareHoloGalaxy', null)}
                 imageLibrary={imageLibrary}
               />
+              {rareHoloGalaxyParams.backgroundImage && renderImageLayerControls('rareHoloGalaxy', rareHoloGalaxyParams)}
               <ParameterControl
                 label="Swirl Scale"
                 param="rareHoloGalaxyParams.space"
@@ -393,12 +544,13 @@ const HoloEffectToggles = ({
             <EffectControls>
               <HoloImageInput
                 id="wowa-holo-background-upload"
-                label="texture image (replaces the illusion background)"
+                label="image layer (rides the effect; stack it with the gradient below)"
                 value={wowaHoloParams.backgroundImage || null}
                 onSelect={(url) => setEffectImage('wowaHolo', url)}
                 onClear={() => setEffectImage('wowaHolo', null)}
                 imageLibrary={imageLibrary}
               />
+              {wowaHoloParams.backgroundImage && renderImageLayerControls('wowaHolo', wowaHoloParams)}
               <ParameterControl
                 label="Stripe Spacing"
                 param="wowaHoloParams.space"
@@ -421,6 +573,28 @@ const HoloEffectToggles = ({
                 description="The angle the stripes travel across the card."
               />
 
+              <ParameterControl
+                label="Brightness"
+                param="wowaHoloParams.brightness"
+                value={wowaHoloParams.brightness ?? 0.6}
+                min={0.1}
+                max={2}
+                step={0.05}
+                onChange={handleParamChange}
+                description="Lifts or dims the whole effect."
+              />
+
+              <ParameterControl
+                label="Contrast"
+                param="wowaHoloParams.contrast"
+                value={wowaHoloParams.contrast ?? 1.2}
+                min={0.5}
+                max={3}
+                step={0.1}
+                onChange={handleParamChange}
+                description="Sharpens the split between glow and shadow."
+              />
+
             </EffectControls>
           )}
         </ToggleGroup>
@@ -439,12 +613,13 @@ const HoloEffectToggles = ({
             <EffectControls>
               <HoloImageInput
                 id="rare-holo-vmax-background-upload"
-                label="texture image (replaces the red/pink gradient)"
+                label="image layer (rides the effect; stack it with the gradient below)"
                 value={rareHoloVmaxParams.backgroundImage || null}
                 onSelect={(url) => setEffectImage('rareHoloVmax', url)}
                 onClear={() => setEffectImage('rareHoloVmax', null)}
                 imageLibrary={imageLibrary}
               />
+              {rareHoloVmaxParams.backgroundImage && renderImageLayerControls('rareHoloVmax', rareHoloVmaxParams)}
               <ParameterControl
                 label="Band Spacing"
                 param="rareHoloVmaxParams.space"
@@ -513,18 +688,6 @@ const ToggleGroup = styled.div`
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 6px;
   background: rgba(0, 0, 0, 0.2);
-`;
-
-const OverlayHead = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-
-  .name {
-    font-family: var(--font-mono);
-    font-size: 12px;
-    color: var(--amber-text);
-  }
 `;
 
 const EffectControls = styled.div`

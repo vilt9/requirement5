@@ -145,12 +145,17 @@ const CardCustomizer = () => {
   };
 
   // The overlay holo image coexists with the four animated systems — it's the
-  // fifth technique, not a replacement for them.
+  // fifth technique, not a replacement for them. Choosing an image switches
+  // the Veil on; clearing it keeps Veil running as its gradient sheen (the
+  // toggle is the off switch, not the image).
   const applyHoloImage = (imageDataUrl) => {
     if (!customCard) return;
     setCustomCard({
       ...customCard,
       customHoloImageUrl: imageDataUrl,
+      holoEffects: imageDataUrl
+        ? { ...(customCard.holoEffects || {}), overlay: true }
+        : customCard.holoEffects,
       // Force a high enough rarity to ensure the holo layer is visible.
       rarity: imageDataUrl ? Math.max(customCard.rarity, 0.7) : customCard.rarity
     });

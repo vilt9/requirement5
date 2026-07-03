@@ -320,8 +320,12 @@ const ShareCard = () => {
     const n = typeof v === 'number' ? v : parseFloat(v);
     return Number.isFinite(n) ? Number(n.toFixed(d)) : null;
   };
-  const activeHolo = Object.entries(cc.holoEffects || {}).filter(([, v]) => v).map(([k]) => HOLO_NAMES[k] || k);
-  const holoLabel = cc.customHoloImageUrl
+  // Veil is on when flagged, or (pre-toggle cards) when it carries an image.
+  const veilOn = cc.holoEffects?.overlay ?? !!cc.customHoloImageUrl;
+  const activeHolo = Object.entries(cc.holoEffects || {})
+    .filter(([k, v]) => v && k !== 'overlay')
+    .map(([k]) => HOLO_NAMES[k] || k);
+  const holoLabel = veilOn
     ? (activeHolo.length ? `${HOLO_NAMES.overlay} + ${activeHolo.join(', ')}` : HOLO_NAMES.overlay)
     : (activeHolo.length ? activeHolo.join(', ') : 'None');
   const palette = [bg.cssVars?.['--color-1'], bg.cssVars?.['--color-2'], bg.cssVars?.['--color-3']].filter(Boolean);

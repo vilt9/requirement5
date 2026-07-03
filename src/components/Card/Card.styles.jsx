@@ -711,8 +711,9 @@ export const HoloShine = styled.div`
     background-size: 200% 200%, 300% 800%, 200% 200%;
     background-position: center, 0% var(--posy), var(--posx) var(--posy);
     
-    /* Significantly reduced brightness and contrast */
-    filter: brightness(0.6) contrast(1.2) saturate(0.9);
+    /* Restored Signal knobs — fallbacks are the old hardcoded values, so
+       cards without them look exactly as before. */
+    filter: brightness(var(--wowa-holo-brightness, 0.6)) contrast(var(--wowa-holo-contrast, 1.2)) saturate(0.9);
     opacity: 0; /* Start with zero opacity - invisible when not hovered */
     mix-blend-mode: soft-light;
     
@@ -769,32 +770,42 @@ export const HoloBackgroundImage = styled.div`
   background-position: center;
   background-size: cover;
   background-repeat: no-repeat;
-  opacity: 0; /* Start invisible like original holo effects */
+  /* Image-layer presentation, per element (several systems can each carry
+     their own image at once). The fallbacks reproduce the original
+     behaviour exactly for cards that predate the knobs: invisible at rest,
+     0.8 while moving, soft-light blend, texture-darkening filter. */
+  opacity: var(--holo-image-presence, 0);
   transition: opacity 0.2s ease;
   transform: translateZ(5px);
   z-index: 6; /* Same as original HoloShine */
   overflow: hidden;
   pointer-events: none;
   display: ${({ $active }) => $active ? 'block' : 'none'};
-  
+
   /* Background image from props */
   background-image: ${({ $imageUrl }) => $imageUrl ? `url("${$imageUrl}")` : 'none'};
-  
-  /* Mimic original holo effect behavior exactly */
-  mix-blend-mode: soft-light; /* Same as original HoloShine */
-  
+
+  mix-blend-mode: var(--holo-image-blend, soft-light);
+
   /* Mouse-responsive positioning like original */
   background-position: var(--posx, 50%) var(--posy, 50%);
-  
-  /* Moving effect - mimic original behavior */
+
+  /* Moving effect - an image with presence never dims below it */
   ${CardContainer}.moving & {
-    opacity: 0.8; /* Same moving opacity as original */
+    opacity: max(var(--holo-image-presence, 0), 0.8);
     transition: opacity 0.3s ease-in-out; /* Same timing as original */
   }
-  
-  /* Apply same filters as original holo effects */
-  filter: brightness(calc((var(--hyp, 0) + 0.7) * 0.7)) contrast(1.2) saturate(1.5);
-  
+
+  /* Whole-value override: new-style layers swap in a gentler filter that
+     keeps the picture legible instead of grinding it into a texture. */
+  filter: var(--holo-image-filter, brightness(calc((var(--hyp, 0) + 0.7) * 0.7)) contrast(1.2) saturate(1.5));
+
+  /* When the system's gradient renders as its own layer, don't also stamp
+     the gradient copy over the image. */
+  &[data-layered='true']::before {
+    content: none;
+  }
+
   /* Add Galaxy Colors gradient layer for rare-holo-galaxy */
   ${({ $className }) => $className === 'rare-holo-galaxy-background' && `
     &::before {
