@@ -26,6 +26,7 @@ const buildBaseBackground = (bg) => {
 const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = false }) => {
   const [isMoving, setIsMoving] = useState(false);
   const [failedSrc, setFailedSrc] = useState(null); // hides an image that 404s, per-src, so it can't flicker
+  const [loadedSrc, setLoadedSrc] = useState(null); // art fades in when its pixels arrive, instead of popping
   const cardRef = useRef(null);
   const cardSceneRef = useRef(null);
   // True while a real pointer is over the card — the loop yields to it.
@@ -545,9 +546,13 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
                 another path, so a 404 can't loop and flicker. */}
             <S.CardImage className="card-image">
               {imageUrl && failedSrc !== imageUrl && (
+                // Invisible until decoded: dropping the inline 0 hands opacity
+                // back to the stylesheet, whose 0.3s transition fades it in.
                 <img
                   src={imageUrl}
                   alt="Card Illustration"
+                  style={loadedSrc === imageUrl ? undefined : { opacity: 0 }}
+                  onLoad={() => setLoadedSrc(imageUrl)}
                   onError={() => setFailedSrc(imageUrl)}
                 />
               )}

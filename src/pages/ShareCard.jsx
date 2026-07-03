@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import styled from 'styled-components';
 import Card from '../components/Card/Card';
@@ -50,9 +50,48 @@ const ShareCard = () => {
   // this card's holo is a keeper or the next Generate beckons. `earned` rides
   // along on every Generate navigation (and never on a shared link), so it's
   // the "arrived via Generate" signal; `discovered` only marks pool finds.
+  //
+  // The rewind waits for the card's art: resetting the moment navigation
+  // lands replays the flat→shiny reveal against the PREVIOUS card's pixels
+  // (the new image is still downloading), and by the time it swaps in the
+  // shiny window has passed. So decode the images first, then rewind — art
+  // and reveal arrive together (the Card fades its image in on load). The
+  // wait is capped so a dead URL can't strand the loop; art-less cards
+  // render from pure math and rewind immediately. Keyed on the art itself,
+  // not the card object: saving a card swaps the record but not the pixels,
+  // and that must not yank the loop back to the top.
+  const rewoundArtRef = useRef(null);
   useEffect(() => {
-    if (earned != null) scrubTo(0);
-  }, [id, earned]);
+    if (earned == null || !card) return undefined;
+    const data = poolCardToCardData(card);
+    const urls = [
+      data?.imagePath === 'custom_image' && data?.customImageUrl
+        ? data.customImageUrl
+        : (data?.imagePath ? `/assets/card_images/${data.imagePath}` : null),
+      data?.customHoloImageUrl,
+      data?.rareHoloParams?.backgroundImage,
+      data?.rareHoloGalaxyParams?.backgroundImage,
+      data?.wowaHoloParams?.backgroundImage,
+      data?.rareHoloVmaxParams?.backgroundImage
+    ].filter(u => typeof u === 'string' && u);
+    const artKey = `${id}|${urls.join('|')}`;
+    if (rewoundArtRef.current === artKey) return undefined;
+
+    let active = true;
+    const settled = (url) => new Promise((resolve) => {
+      const img = new Image();
+      img.onload = resolve;
+      img.onerror = resolve;
+      img.src = url;
+    });
+    const cap = new Promise((resolve) => { setTimeout(resolve, 2500); });
+    Promise.race([Promise.all(urls.map(settled)), cap]).then(() => {
+      if (!active) return;
+      rewoundArtRef.current = artKey;
+      scrubTo(0);
+    });
+    return () => { active = false; };
+  }, [id, earned, card]);
 
   // provisional = we're showing the uuid-seeded card while the server tells us
   // whether a stored card owns this id. Fresh mints skip that check entirely.
