@@ -106,8 +106,10 @@ router.post('/:id/save', requireAuth, async (req, res) => {
       });
     }
 
+    // The cost is stored on the save itself — the price you paid is part of
+    // your collection's story (bands can move; this is what it cost THEN).
     const save = memoryDb.createSave({
-      user_id: req.user.id, card_id: card.id, provenance, value
+      user_id: req.user.id, card_id: card.id, provenance, value, cost
     });
     memoryDb.incrementCardCounter(card.id, 'times_saved');
     memoryDb.incrementCollectionCount(card.id);
@@ -174,7 +176,7 @@ router.post('/save-synthetic', requireAuth, async (req, res) => {
       rarity_score: score,
       times_saved: 1
     });
-    const save = memoryDb.createSave({ user_id: req.user.id, card_id: card.id });
+    const save = memoryDb.createSave({ user_id: req.user.id, card_id: card.id, cost });
 
     res.status(201).json({
       success: true,
@@ -189,16 +191,42 @@ router.post('/save-synthetic', requireAuth, async (req, res) => {
   }
 });
 
-// Your collection: saves joined with their cards.
+// Your collection: saves joined with their cards. Saves made before costs
+// were recorded fall back to the card's seeded price (same formula, current
+// bands — an approximation for historical saves, exact for new ones).
 router.get('/collection/mine', requireAuth, (req, res) => {
   const saves = memoryDb.getSavesByUser(req.user.id);
   const items = saves
     .map(save => {
       const card = memoryDb.getCardById(save.card_id);
-      return card ? { save, card, stats: cardStats(card) } : null;
+      return card ? {
+        save: { ...save, cost: save.cost ?? saveCostFor(save.card_id) },
+        card,
+        stats: cardStats(card)
+      } : null;
     })
     .filter(Boolean);
   res.json({ success: true, data: items });
+});
+
+// Public: one user's save of one card — powers the user-scoped card page
+// (/<username>/card/<id>), where a collector shows off their copy and what
+// they paid for it. 404 when that user hasn't saved that card.
+router.get('/:id/save-of/:username', (req, res) => {
+  const owner = memoryDb.getUserByUsername(req.params.username);
+  const save = owner ? memoryDb.getSave(owner.id, req.params.id) : null;
+  if (!save) {
+    return res.status(404).json({ success: false, error: 'Not in this collection' });
+  }
+  res.json({
+    success: true,
+    data: {
+      username: owner.username,
+      cost: save.cost ?? saveCostFor(save.card_id),
+      provenance: save.provenance || null,
+      saved_at: save.created_at
+    }
+  });
 });
 
 // Remove a card from your collection. No refund — /t26 spent is spent.

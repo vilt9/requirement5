@@ -149,6 +149,9 @@ function App() {
                 <Route path="/account" element={<Account />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/card/:id" element={<ShareCard />} />
+                {/* A collector's copy of a card: same page, plus whose
+                    collection it's in and what they paid. */}
+                <Route path="/:username/card/:id" element={<ShareCard />} />
                 <Route path="/capture/:id" element={<CaptureCard />} />
               </Routes>
             </main>

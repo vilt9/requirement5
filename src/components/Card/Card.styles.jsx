@@ -1,4 +1,5 @@
 import styled, { css, keyframes } from 'styled-components';
+import MotionBar from '../MotionBar';
 
 // Key animations for card effects
 const chromaticShift = keyframes`
@@ -118,42 +119,24 @@ export const CardScene = styled.div`
   }
 `;
 
-// The mobile scrub track: on touch screens this is the only way to drive the
-// card — a vertical line beside it with a draggable dot. The brighter middle
-// stretch (25%–75%) is the shiny zone; the dot rides the auto loop when the
-// user isn't holding it. The wide invisible column is the touch target.
-export const ScrubTrack = styled.div`
+// The motion bar beside the card (see MotionBar.jsx for the look and the
+// behaviour) — this wrapper only places it: a slim column hugging the card's
+// right edge. The wide invisible column is the touch target.
+export const ScrubTrack = styled(MotionBar)`
   position: absolute;
   top: 4%;
   bottom: 4%;
   right: -36px;
   width: 44px;
   z-index: 30;
-  touch-action: none; /* dragging the dot must never scroll the page */
-
-  .line, .zone {
-    position: absolute;
-    left: 50%;
-    width: 2px;
-    transform: translateX(-50%);
-    border-radius: 1px;
-    pointer-events: none;
-  }
-  .line { top: 0; bottom: 0; background: rgba(255, 255, 255, 0.16); }
-  .zone { top: 25%; bottom: 25%; background: rgba(232, 180, 85, 0.45); }
-
-  .dot {
-    position: absolute;
-    left: 50%;
-    top: 0%;
-    width: 22px;
-    height: 22px;
-    transform: translate(-50%, -50%);
-    border-radius: 50%;
-    background: rgba(248, 212, 136, 0.85);
-    border: 2px solid rgba(0, 0, 0, 0.4);
-    box-shadow: 0 0 10px rgba(232, 180, 85, 0.45);
-    pointer-events: none;
+  /* Desktop: the card face lives at translateZ(50px) inside the scene's
+     perspective and its tilted corners come closer still — lift the bar above
+     it so the card never paints over the line or swallows its clicks. The
+     counter-scale cancels the perspective magnification. (Touch screens skip
+     this: the perspective push would shove the bar off narrow viewports, and
+     there the card doesn't take pointer input anyway.) */
+  @media (hover: hover) and (pointer: fine) {
+    transform: translateZ(120px) scale(0.88);
   }
 `;
 

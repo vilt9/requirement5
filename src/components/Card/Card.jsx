@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import * as S from './Card.styles';
 import PropTypes from 'prop-types';
 import { getHolographicEffectClass } from '../../utils/cardGenerator';
+import { loopPhase, inShinyZone } from '../../utils/cardMotion';
 import CustomHoloEffect from './CustomHoloEffect';
 
 // Build the base-background CSS value (behind the card image) from the structured
@@ -22,27 +23,31 @@ const buildBaseBackground = (bg) => {
   return `linear-gradient(${angle}deg, ${stops})`;
 };
 
-const Card = ({ cardData, isInteractive = true, onClick, autoTour = false, touched = true, scrub = false }) => {
+const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = false }) => {
   const [isMoving, setIsMoving] = useState(false);
   const [failedSrc, setFailedSrc] = useState(null); // hides an image that 404s, per-src, so it can't flicker
   const cardRef = useRef(null);
   const cardSceneRef = useRef(null);
-  // True while a real pointer is over the card — the auto tour yields to it.
+  // True while a real pointer is over the card — the loop yields to it.
   const pointerActiveRef = useRef(false);
 
-  // Scrub mode (touch screens only): dragging a finger over the card is janky,
-  // so a vertical track beside the card becomes the ONLY way to drive it —
-  // direct touch on the card is disabled. The dot's position along the track
-  // maps continuously to the card's pose; the middle two quartiles of the run
-  // are the "shiny" zone (holo layers on), the outer quarters are rest. Left
-  // alone, the dot rides the same loop that moves the card.
-  const [scrubOn] = useState(() =>
-    scrub && typeof window !== 'undefined' &&
+  // Driven modes: the card rides the GLOBAL motion clock (see cardMotion.js),
+  // so every driven card on a page moves in sync. `scrub` also renders the
+  // bar beside the card; `loop` rides the clock without its own bar (grids).
+  // The clock's phase maps to the pose — the run is two full orbits, so 0 and
+  // 1 are the same pose and the loop wraps seamlessly. Crossing the shiny
+  // zone fades the holo layers in/out; the motion itself never changes.
+  const driven = (scrub || loop) && isInteractive;
+  // Touch screens can't hover, so in driven mode the bar is the ONLY control
+  // there — direct touch on the card stays off (dragging a finger over the
+  // card is janky). Desktops keep the mouse: hovering takes the card over,
+  // leaving hands it back to the loop.
+  const [coarse] = useState(() =>
+    typeof window !== 'undefined' &&
     window.matchMedia('(hover: none) and (pointer: coarse)').matches
   );
-  const trackRef = useRef(null);
-  const dotRef = useRef(null);
-  const scrubRef = useRef({ p: 0, dragging: false, resumeAt: 0, shiny: false });
+  const directPointer = !(driven && coarse);
+  const shinyRef = useRef(null); // last shiny state; null forces a re-apply
   
   // Helper function to set CSS variables on both CardScene and CardContainer
   // IMPORTANT: CSS variables set on both elements to ensure inheritance works in Chrome
@@ -202,14 +207,10 @@ const Card = ({ cardData, isInteractive = true, onClick, autoTour = false, touch
   // Handle mouse leave to deactivate effects
   const handleMouseLeave = () => {
     pointerActiveRef.current = false;
-    // The tour owns the card while active — hand back to its touched state
-    // instead of snapping to rest.
-    if (autoTour) {
-      if (cardRef.current) {
-        cardRef.current.classList.toggle('moving', touched);
-        cardRef.current.classList.remove('floating');
-        setIsMoving(touched);
-      }
+    // Driven cards hand straight back to the loop — the next frame re-drives
+    // the pose, and a cleared shiny state forces the holo gate to re-apply.
+    if (driven) {
+      shinyRef.current = null;
       return;
     }
     resetToRest();
@@ -349,117 +350,50 @@ const Card = ({ cardData, isInteractive = true, onClick, autoTour = false, touch
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cardData, holoEffects, customHoloImageUrl]);
 
-  // Auto tour: a synthetic pointer orbits the card CONTINUOUSLY, driving the
-  // exact same tilt math as a real hover — the card never sits dead. The
-  // separate `touched` prop gates the effect layers (below), so the state
-  // change is a fade of the holo, not a stop of the motion. A real pointer
-  // pauses the synthetic one.
+  // Driven mode: every frame reads the GLOBAL clock's phase and drives the
+  // same tilt math as a real hover. Pausing the clock freezes the phase, so
+  // the card simply holds its pose; dragging any bar scrubs the clock and the
+  // card follows. Off-screen cards (collection grids) skip the work entirely.
   useEffect(() => {
-    if (!autoTour || scrubOn || !isInteractive || !cardRef.current) return;
+    if (!driven || !cardRef.current) return;
+    cardRef.current.classList.remove('floating');
     let raf;
-    const started = performance.now();
+    let visible = true;
+    let lastP = -1;
+    const io = typeof IntersectionObserver !== 'undefined' && cardSceneRef.current
+      ? new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; })
+      : null;
+    if (io) io.observe(cardSceneRef.current);
+    // The rAF timestamp is shared by every callback in a frame, so all synced
+    // cards compute the IDENTICAL phase — exact sync, not near-sync.
     const tick = (t) => {
       raf = requestAnimationFrame(tick);
-      if (pointerActiveRef.current || !cardRef.current) return;
+      if (!cardRef.current || !visible) return;
+      if (pointerActiveRef.current) return; // a real pointer owns the card
+      const p = loopPhase(t);
+      // Paused clock → same phase → nothing to redraw (unless a hover just
+      // ended and cleared the shiny state to force a re-apply).
+      if (p === lastP && shinyRef.current !== null) return;
+      lastP = p;
       const rect = cardRef.current.getBoundingClientRect();
-      // A slow lissajous sweep — covers corners and edges, never repeats
-      // exactly, and stays gentle enough to read the card.
-      const phase = ((t - started) / 7000) * Math.PI * 2;
-      const nx = Math.sin(phase) * 0.6;
-      const ny = Math.cos(phase * 0.8) * 0.45;
-      drivePointer({
-        clientX: rect.left + rect.width / 2 + nx * (rect.width / 2),
-        clientY: rect.top + rect.height / 2 + ny * (rect.height / 2)
-      });
-    };
-    raf = requestAnimationFrame(tick);
-    return () => {
-      cancelAnimationFrame(raf);
-      // Hand the card back to rest unless a real pointer holds it.
-      if (!pointerActiveRef.current) resetToRest();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoTour, scrubOn, isInteractive]);
-
-  // While touring, `touched` shows or hides the hover-gated effect layers.
-  // The floating class stays off either way — the orbit owns the transform.
-  // (In scrub mode the track position gates the effects instead.)
-  useEffect(() => {
-    if (!autoTour || scrubOn || !isInteractive || !cardRef.current) return;
-    if (pointerActiveRef.current) return; // a real pointer owns the state
-    cardRef.current.classList.toggle('moving', touched);
-    cardRef.current.classList.remove('floating');
-    setIsMoving(touched);
-  }, [touched, autoTour, scrubOn, isInteractive]);
-
-  // Scrub mode: one loop drives everything from the track position p (0..1).
-  // The full track is TWO complete orbits of the card — first quarter = half a
-  // turn, middle half = a full turn, last quarter = half a turn — so p=0 and
-  // p=1 are the SAME pose and the auto loop wraps seamlessly: the card just
-  // keeps rotating, the dot re-enters at the top. The motion is identical
-  // everywhere on the track; crossing the shiny zone only fades the holo
-  // layers in/out (the .moving transitions handle the fade).
-  useEffect(() => {
-    if (!scrubOn || !isInteractive || !cardRef.current) return;
-    cardRef.current.classList.remove('floating');
-    let raf;
-    let last = performance.now();
-    const apply = () => {
-      const s = scrubRef.current;
-      if (!cardRef.current) return;
-      const rect = cardRef.current.getBoundingClientRect();
-      const angle = s.p * Math.PI * 4; // two full orbits over the run
+      const angle = p * Math.PI * 4; // two full orbits over the run
       const nx = Math.sin(angle) * 0.6;
       const ny = Math.cos(angle) * 0.45;
       drivePointer({
         clientX: rect.left + rect.width / 2 + nx * (rect.width / 2),
         clientY: rect.top + rect.height / 2 + ny * (rect.height / 2)
       });
-      const shiny = s.p > 0.25 && s.p < 0.75;
-      if (shiny !== s.shiny) {
-        s.shiny = shiny;
+      const shiny = inShinyZone(p);
+      if (shiny !== shinyRef.current) {
+        shinyRef.current = shiny;
         cardRef.current.classList.toggle('moving', shiny);
         setIsMoving(shiny);
       }
-      if (dotRef.current) dotRef.current.style.top = `${s.p * 100}%`;
-    };
-    const tick = (t) => {
-      raf = requestAnimationFrame(tick);
-      const dt = Math.min(100, t - last); // tab-throttled frames don't leap
-      last = t;
-      const s = scrubRef.current;
-      // Auto loop: the dot runs top→bottom and wraps (paused while dragging,
-      // and for a beat after release so the user's chosen pose holds).
-      if (!s.dragging && t >= s.resumeAt) {
-        s.p = (s.p + dt / 12000) % 1;
-      }
-      apply();
     };
     raf = requestAnimationFrame(tick);
-    return () => { cancelAnimationFrame(raf); resetToRest(); };
+    return () => { cancelAnimationFrame(raf); if (io) io.disconnect(); resetToRest(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scrubOn, isInteractive]);
-
-  // Track interaction: drag (or tap) anywhere on the track to place the dot.
-  const scrubFromEvent = (e) => {
-    if (!trackRef.current) return;
-    const rect = trackRef.current.getBoundingClientRect();
-    const s = scrubRef.current;
-    s.p = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
-  };
-  const onScrubDown = (e) => {
-    e.preventDefault();
-    scrubRef.current.dragging = true;
-    try { trackRef.current.setPointerCapture(e.pointerId); } catch { /* already released */ }
-    scrubFromEvent(e);
-  };
-  const onScrubMove = (e) => {
-    if (scrubRef.current.dragging) scrubFromEvent(e);
-  };
-  const onScrubUp = () => {
-    scrubRef.current.dragging = false;
-    scrubRef.current.resumeAt = performance.now() + 2500;
-  };
+  }, [driven]);
 
   // Early return if no card data
   if (!cardData) return null;
@@ -478,14 +412,15 @@ const Card = ({ cardData, isInteractive = true, onClick, autoTour = false, touch
       // Chrome has problems with 3D transforms and isolation: isolate causing rapid enter/leave events
       // CardScene has stable hit area without 3D transforms, preventing the diamond-shaped hit area bug
       // This fixes both hover detection AND shiny mouse effects in Chrome corners
-      // Scrub mode: the track is the only control — direct touch is off, and
-      // the synthetic mouse events a tap fires must not steal the card either.
-      onMouseMove={scrubOn ? undefined : handleMouseMove}
-      onMouseEnter={scrubOn ? undefined : handleMouseEnter}
-      onMouseLeave={scrubOn ? undefined : handleMouseLeave}
-      onTouchMove={scrubOn ? undefined : handleTouchMove}
-      onTouchStart={scrubOn ? undefined : handleMouseEnter}
-      onTouchEnd={scrubOn ? undefined : handleMouseLeave}
+      // Driven mode on touch screens: the bar is the only control — direct
+      // touch is off, and the synthetic mouse events a tap fires must not
+      // steal the card either. Desktops keep the mouse even while driven.
+      onMouseMove={directPointer ? handleMouseMove : undefined}
+      onMouseEnter={directPointer ? handleMouseEnter : undefined}
+      onMouseLeave={directPointer ? handleMouseLeave : undefined}
+      onTouchMove={directPointer ? handleTouchMove : undefined}
+      onTouchStart={directPointer ? handleMouseEnter : undefined}
+      onTouchEnd={directPointer ? handleMouseLeave : undefined}
     >
       <S.CardContainer
         ref={cardRef}
@@ -495,6 +430,10 @@ const Card = ({ cardData, isInteractive = true, onClick, autoTour = false, touch
         className={`card-container ${holoShineClass}`}
         style={{
           '--effect-intensity': isMoving ? '1' : '0',
+          // Touch screens in driven mode take no direct input on the card, so
+          // it must not compete for hits either: the tilted 3D face otherwise
+          // beats the bar in hit-testing and swallows taps on the track.
+          pointerEvents: !directPointer && !onClick ? 'none' : undefined,
         }}
       >
         <S.EdgeHighlight
@@ -765,22 +704,9 @@ const Card = ({ cardData, isInteractive = true, onClick, autoTour = false, touch
         </S.CardElement>
       </S.CardContainer>
 
-      {/* The mobile scrub track: a line with a draggable dot beside the card.
-          The brighter middle stretch is the shiny zone. */}
-      {scrubOn && (
-        <S.ScrubTrack
-          ref={trackRef}
-          className="scrub-track"
-          onPointerDown={onScrubDown}
-          onPointerMove={onScrubMove}
-          onPointerUp={onScrubUp}
-          onPointerCancel={onScrubUp}
-        >
-          <span className="line" />
-          <span className="zone" />
-          <span className="dot" ref={dotRef} />
-        </S.ScrubTrack>
-      )}
+      {/* The motion bar beside the card: dot rides the global clock, dragging
+          scrubs it, the button at the base pauses card motion everywhere. */}
+      {scrub && isInteractive && <S.ScrubTrack className="scrub-track" />}
     </S.CardScene>
   );
 };

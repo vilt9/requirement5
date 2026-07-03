@@ -204,6 +204,30 @@ describe('save economics', () => {
     expect(res.status).toBe(402);
   });
 
+  test('a save remembers what it cost, and the owner\'s copy is publicly visible', async () => {
+    const { saver, card } = await publishAndDraw();
+    await request(app).post(`/api/cards/${card.id}/save`).set(auth(saver.token));
+
+    // The collection carries the price paid on each save record.
+    const collection = await request(app)
+      .get('/api/cards/collection/mine')
+      .set(auth(saver.token));
+    expect(collection.body.data[0].save.cost).toBe(saveCostFor(card.id));
+
+    // The public save-of lookup powers /<username>/card/<id>.
+    const savedOf = await request(app).get(`/api/cards/${card.id}/save-of/saver`);
+    expect(savedOf.status).toBe(200);
+    expect(savedOf.body.data.username).toBe('saver');
+    expect(savedOf.body.data.cost).toBe(saveCostFor(card.id));
+    expect(savedOf.body.data.saved_at).toBeTruthy();
+
+    // Someone who never saved it (or doesn't exist) → 404.
+    const notSaved = await request(app).get(`/api/cards/${card.id}/save-of/creator`);
+    expect(notSaved.status).toBe(404);
+    const noUser = await request(app).get(`/api/cards/${card.id}/save-of/ghost`);
+    expect(noUser.status).toBe(404);
+  });
+
   test('collection lists saved cards; removal gives no refund', async () => {
     const { saver, card } = await publishAndDraw();
     await request(app).post(`/api/cards/${card.id}/save`).set(auth(saver.token));

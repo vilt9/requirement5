@@ -55,33 +55,6 @@ const CardCustomizer = () => {
   // viewport we dock the card as a small fixed preview so feedback stays live.
   const previewRef = useRef(null);
   const [previewDocked, setPreviewDocked] = useState(false);
-  // A card has two states: resting (floating, effects quiet) and touched
-  // (hovered/held — tilt and holo alive). Desktop shows both naturally via
-  // the mouse; touch screens can't hold a hover, so the preview cycles
-  // between the states on its own. The "touch" chip shows which state is
-  // playing; tapping it pins touched on, then off, then back to auto.
-  const [touchOverride, setTouchOverride] = useState(null); // null=auto, true/false=pinned
-  const [touchPhase, setTouchPhase] = useState(true);
-
-  useEffect(() => {
-    if (touchOverride !== null) return;
-    let cancelled = false;
-    let timer;
-    const cycle = (on) => {
-      if (cancelled) return;
-      setTouchPhase(on);
-      timer = setTimeout(() => cycle(!on), on ? 6000 : 3000);
-    };
-    cycle(true);
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, [touchOverride]);
-
-  const touched = touchOverride ?? touchPhase;
-  const touchMode = touchOverride === null ? 'auto' : touchOverride ? 'on' : 'off';
-  const cycleTouch = () => setTouchOverride(
-    touchOverride === null ? true : touchOverride ? false : null
-  );
-
   useEffect(() => {
     const el = previewRef.current;
     if (!el || typeof IntersectionObserver === 'undefined') return;
@@ -336,20 +309,14 @@ const CardCustomizer = () => {
           ref={previewRef}
           className={`card-preview-section${previewDocked ? ' preview-docked' : ''}`}
         >
-          {customCard && <Card cardData={customCard} autoTour touched={touched} />}
+          {/* The bar beside the card drives the preview: drag the dot to pose
+              the card, the gold stretch is the shiny zone, ❚❚ pauses motion
+              everywhere. Replaces the old touch on/off chip. */}
+          {customCard && <Card cardData={customCard} scrub />}
           <PreviewTools className="preview-tools">
-            <button
-              type="button"
-              data-mode={touchMode}
-              className={touched ? 'active' : ''}
-              onClick={cycleTouch}
-              title="The card's touched (hovered) state. Auto-cycles; tap to pin on, again for off, again to resume."
-            >
-              touch{touchMode !== 'auto' && <span className="pin"> · {touchMode}</span>}
-            </button>
             <Dim className="hint">
-              a card has two states — resting and touched (hover). the preview
-              cycles between them; tap to pin one.
+              the bar beside the card drives it — drag the dot; the gold
+              stretch is where the holo shows. ❚❚ pauses card motion.
             </Dim>
           </PreviewTools>
         </CardPreviewSection>

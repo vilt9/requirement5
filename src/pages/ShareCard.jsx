@@ -21,7 +21,9 @@ import { ensureTags } from '../utils/tags';
 // Below the card we surface the underlying generation parameters — the things the
 // customizer actually controls — because users care about every detail.
 const ShareCard = () => {
-  const { id } = useParams();
+  // With a :username in the URL this is a collector's copy of the card —
+  // same page, plus whose collection it's in and what they paid for it.
+  const { id, username } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const { user, config, setBalance, refreshBalance, nextCard } = useAuth();
@@ -42,25 +44,22 @@ const ShareCard = () => {
   const [rendering, setRendering] = useState(null); // 'gif' | 'mp4' while a moving image renders
   const [renderError, setRenderError] = useState(null);
 
-  // The card lives on its page like the customizer preview: always in motion,
-  // cycling between resting and touched so the holo shows itself without a
-  // pointer (on phones there is no hover to discover it with).
-  const [touchPhase, setTouchPhase] = useState(true);
-  useEffect(() => {
-    let cancelled = false;
-    let timer;
-    const cycle = (on) => {
-      if (cancelled) return;
-      setTouchPhase(on);
-      timer = setTimeout(() => cycle(!on), on ? 6000 : 3000);
-    };
-    cycle(true);
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, []);
-
   // provisional = we're showing the uuid-seeded card while the server tells us
   // whether a stored card owns this id. Fresh mints skip that check entirely.
   const [provisional, setProvisional] = useState(false);
+
+  // The owner's save record when viewing /<username>/card/<id> — what this
+  // collector paid, and when. Silently absent if they never saved it.
+  const [ownerSave, setOwnerSave] = useState(null);
+  useEffect(() => {
+    setOwnerSave(null);
+    if (!username) return undefined;
+    let active = true;
+    api(`/api/cards/${id}/save-of/${encodeURIComponent(username)}`)
+      .then(data => { if (active) setOwnerSave(data); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [id, username]);
 
   const synthFromSeed = (seed) => ({
     id: seed,
@@ -305,7 +304,7 @@ const ShareCard = () => {
             // Keyed on identity: swapping provisional→stored (or card→card)
             // remounts with a soft fade instead of a hard cut.
             <FadeSwap key={`${id}:${synthetic ? 'synth' : 'stored'}`}>
-              <Card cardData={cardData} autoTour touched={touchPhase} scrub />
+              <Card cardData={cardData} scrub />
             </FadeSwap>
           )
           : <Panel><Dim>This card has no renderable data.</Dim></Panel>}
@@ -318,6 +317,15 @@ const ShareCard = () => {
           <Meta>
             <div className="name">{card.name || 'Untitled card'}</div>
             <div className="sub"><Dim>{card.creator_id === 'cloud' ? 'synthetic' : `by ${card.creator_id}`}</Dim></div>
+            {ownerSave && (
+              <div className="sub">
+                <Dim>
+                  in <span className="owner">{ownerSave.username}</span>’s collection
+                  {ownerSave.cost != null && <> — saved for {fmtT26(ownerSave.cost)} /t26</>}
+                  {ownerSave.saved_at && <> on {new Date(ownerSave.saved_at).toISOString().slice(0, 10)}</>}
+                </Dim>
+              </div>
+            )}
             {tags.length > 0 && <div className="tags"><TagList tags={tags} /></div>}
           </Meta>
         )}
@@ -490,6 +498,7 @@ const Column = styled.div`
 const Meta = styled.div`
   .name { font-size: 13px; color: var(--amber-text); }
   .sub { margin-top: 2px; font-size: 13px; }
+  .sub .owner { color: var(--gold-bright); }
   .tags { margin-top: 6px; }
 `;
 
