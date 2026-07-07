@@ -104,6 +104,19 @@ export function AuthProvider({ children }) {
     return data.user;
   };
 
+  // Redeem a claim link for a "gift" account: sets the artist's password on the
+  // server and logs them straight in, exactly like signup/login.
+  const claim = async (token, password) => {
+    const data = await api('/api/auth/claim', {
+      method: 'POST',
+      body: { token, password }
+    });
+    setToken(data.token);
+    setUser(data.user);
+    clearStash();
+    return data.user;
+  };
+
   const logout = () => {
     setToken(null);
     setUser(null);
@@ -194,7 +207,7 @@ export function AuthProvider({ children }) {
   return (
     <AuthContext.Provider value={{
       user, config, yieldRemaining, loading,
-      signup, login, logout, refreshBalance, setBalance,
+      signup, login, claim, logout, refreshBalance, setBalance,
       stash, bumpStash, nextCard, earnFlash
     }}>
       {children}

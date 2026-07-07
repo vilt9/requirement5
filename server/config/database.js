@@ -262,6 +262,9 @@ const memoryDb = {
   getUserByUsername: (username) =>
     db.users.find(u => u.username.toLowerCase() === String(username).toLowerCase()),
 
+  getUserByClaimToken: (token) =>
+    token ? db.users.find(u => u.claim_token && u.claim_token === token) : undefined,
+
   updateUser: (id, updateData) => {
     const index = db.users.findIndex(u => u.id === id);
     if (index !== -1) {

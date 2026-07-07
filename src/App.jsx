@@ -8,6 +8,7 @@ import Pool from './pages/Pool';
 import Collection from './pages/Collection';
 import CardCustomizer from './pages/CardCustomizer';
 import Account from './pages/Account';
+import ClaimAccount from './pages/ClaimAccount';
 import ShareCard from './pages/ShareCard';
 import CaptureCard from './pages/CaptureCard';
 import About from './pages/About';
@@ -147,6 +148,7 @@ function App() {
                 <Route path="/collection" element={<Collection />} />
                 <Route path="/customize" element={<CardCustomizer />} />
                 <Route path="/account" element={<Account />} />
+                <Route path="/claim/:token" element={<ClaimAccount />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/card/:id" element={<ShareCard />} />
                 {/* A collector's copy of a card: same page, plus whose
