@@ -28,7 +28,11 @@ export const PATTERN_TYPES = [
 
 export const MASK_TYPES = ['vignette', 'horizontal-fade', 'vertical-fade', 'diagonal-fade'];
 
-export const HOLO_EFFECTS = ['rareHolo', 'rareHoloGalaxy', 'wowaHolo', 'rareHoloVmax'];
+// 'overlay' is the Veil — the card-wide "standard" holo. It carries no *Params
+// block of its own: it reads the sheen* knobs under effectParams and, when a
+// holoImage is supplied, blends that. The four rareHolo* keys are the animated
+// texture systems, each with its own params block.
+export const HOLO_EFFECTS = ['overlay', 'rareHolo', 'rareHoloGalaxy', 'wowaHolo', 'rareHoloVmax'];
 
 const SPEC_KEYS = ['name', 'tier', 'rarityScore', 'tags', 'image', 'holoImage', 'card'];
 
@@ -296,6 +300,10 @@ export function buildPublishPayload(spec, baseDir) {
   }
   if (spec.holoImage) {
     customCard.customHoloImageUrl = resolveImageRef(spec.holoImage, baseDir, 'holoImage');
+    // A holoImage is only ever seen through the Veil, so turn it on unless the
+    // spec explicitly opted out — mirrors the web customizer's behaviour.
+    customCard.holoEffects = { ...customCard.holoEffects };
+    if (customCard.holoEffects.overlay === undefined) customCard.holoEffects.overlay = true;
   }
 
   // Enabling a holo effect without its params gets that effect's defaults.

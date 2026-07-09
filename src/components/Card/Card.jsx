@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import * as S from './Card.styles';
 import PropTypes from 'prop-types';
 import { getHolographicEffectClass } from '../../utils/cardGenerator';
-import { loopPhase, inShinyZone, FLAT_FRAC } from '../../utils/cardMotion';
+import { loopPhase, inShinyZone, FLAT_FRAC, beginHoverHold, endHoverHold } from '../../utils/cardMotion';
 import CustomHoloEffect from './CustomHoloEffect';
 
 // Build the base-background CSS value (behind the card image) from the structured
@@ -22,6 +22,12 @@ const buildBaseBackground = (bg) => {
   if (type === 'conic') return `conic-gradient(from ${angle}deg at ${posX}% ${posY}%, ${stops})`;
   return `linear-gradient(${angle}deg, ${stops})`;
 };
+
+// The card rests slightly smaller and grows to full size as it comes to life:
+// it pulls FORWARD across the loop's rotating stretch and on hover, so motion
+// "pops". REST_SHRINK is how much smaller the flat/rest pose is; the moving and
+// hover states are full size (the size before any of this).
+const REST_SHRINK = 0.05;
 
 const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = false }) => {
   const [isMoving, setIsMoving] = useState(false);
@@ -95,7 +101,7 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
   // Apply one pose to the DOM. `shine: false` (card fully rested — every
   // shine consumer is invisible) skips down to the edge gradients and the
   // transform, which is nearly free by comparison.
-  const applyPose = (x, y, hyp, angle, nx, ny, rotateY, rotateX, shine) => {
+  const applyPose = (x, y, hyp, angle, nx, ny, rotateY, rotateX, shine, scale = 1) => {
     const layers = getFrameLayers();
     if (!layers || !cardRef.current) return;
     if (shine) {
@@ -112,11 +118,15 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
       });
     }
     writeFrameVars(layers.edges, { '--edge-angle': `${angle + 90}deg` });
-    // Apply transform directly to match the working HTML version
+    // Apply transform directly to match the working HTML version. The card
+    // rests slightly smaller (scale < 1 at the flat ends) and grows to full
+    // size through the rotating stretch and on hover, so it "pops" forward as
+    // it comes to life.
     cardRef.current.style.transform = `
       rotateY(${rotateY}deg)
       rotateX(${rotateX}deg)
       translateZ(50px)
+      scale(${scale})
     `;
   };
   
@@ -184,7 +194,7 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
 
     // (Param-derived variables — including the gradient's companion hues —
     // are applied by the cardData effect; here only the pointer-driven ones.)
-    applyPose(x, y, hyp, angle, distanceX, distanceY, rotateY, rotateX, true);
+    applyPose(x, y, hyp, angle, distanceX, distanceY, rotateY, rotateX, true, 1);
   };
 
   // Drive the same tilt + shine math from a NORMALISED pose (nx, ny in
@@ -195,13 +205,13 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
   // by the card's fixed aspect ratio (420/300 = 364/260 = 1.4 at every
   // size), so the output is pixel-identical.
   const CARD_ASPECT = 1.4;
-  const drivePose = (nx, ny, shine = true) => {
+  const drivePose = (nx, ny, shine = true, scale = 1) => {
     if (!isInteractive || !cardRef.current) return;
     const x = (nx + 1) * 50;
     const y = (ny + 1) * 50;
     const hyp = Math.sqrt(nx * nx + ny * ny);
     const angle = Math.atan2(ny * CARD_ASPECT, nx) * (180 / Math.PI);
-    applyPose(x, y, hyp, angle, nx, ny, nx * 15, ny * -15, shine);
+    applyPose(x, y, hyp, angle, nx, ny, nx * 15, ny * -15, shine, scale);
   };
 
   // The motion bar overflows the card face but lives inside the scene, so
@@ -230,6 +240,10 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
     pointerActiveRef.current = true;
     if (!isInteractive || !cardRef.current) return;
 
+    // On the card-page card (has the scrub bar): a hand on the card parks the
+    // loop at the flat top and freezes it, so the bar doesn't keep looping under
+    // the mouse while you drive the holo yourself.
+    if (scrub) beginHoverHold();
 
     // Add moving class and remove floating class
     cardRef.current.classList.add('moving');
@@ -275,6 +289,9 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
     // the pose, and a cleared shiny state forces the holo gate to re-apply.
     if (driven) {
       shinyRef.current = null;
+      // Card-page card: keep the loop parked at the flat top for a beat before
+      // it carries on, so leaving the card doesn't snap it back into motion.
+      if (scrub) endHoverHold();
       return;
     }
     resetToRest();
@@ -323,6 +340,10 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
       if (effectParams.space !== undefined) vars['space'] = pct(effectParams.space);
       if (effectParams.holoAngle !== undefined) vars['holo-angle'] = `${effectParams.holoAngle}deg`;
       if (effectParams.parallaxDepth !== undefined) vars['parallax-depth'] = effectParams.parallaxDepth;
+      // The built-in motion gloss (image-shine + the image's own ::before/::after
+      // highlights) multiplies by this: 1 = the original look, lower tames the
+      // sheen so dark/cinematic art keeps its mood instead of blowing out.
+      if (effectParams.imageShineIntensity !== undefined) vars['image-shine-intensity'] = effectParams.imageShineIntensity;
       // The generic filter sliders drive the tier-specific filter variables
       if (effectParams.filterBrightness !== undefined) {
         vars['rare-holo-galaxy-brightness'] = effectParams.filterBrightness;
@@ -499,7 +520,9 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
       // Shine variables keep updating through the fade-out (grace window >
       // the longest .moving transition), then stop while fully rested.
       const shineLive = shiny || (t - shinyExitAt) < SHINE_FADE_GRACE_MS;
-      drivePose(Math.sin(angle) * 0.6 * env, Math.cos(angle) * 0.45 * env, shineLive);
+      // Grow with the envelope: ~5% smaller at the flat ends, full size through
+      // the rotating stretch — the card swells forward as it comes to life.
+      drivePose(Math.sin(angle) * 0.6 * env, Math.cos(angle) * 0.45 * env, shineLive, 1 - (1 - env) * REST_SHRINK);
     };
     raf = requestAnimationFrame(tick);
     return () => { cancelAnimationFrame(raf); if (io) io.disconnect(); resetToRest(); };

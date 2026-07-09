@@ -4,7 +4,7 @@ import {
   loopPhase, scrubTo, beginScrub, endScrub,
   motionPaused, toggleMotion, onMotionChange,
   motionSpeed, cycleMotionSpeed,
-  FLAT_FRAC, SHINY_END
+  FLAT_FRAC, SHINY_END, resumeCountdown
 } from '../utils/cardMotion';
 
 // The universal card-motion bar: a vertical track whose dot rides the global
@@ -19,6 +19,7 @@ import {
 const MotionBar = ({ className }) => {
   const trackRef = useRef(null);
   const dotRef = useRef(null);
+  const timerRef = useRef(null);
   const draggingRef = useRef(false);
   const [paused, setPaused] = useState(motionPaused());
   const [speed, setSpeed] = useState(motionSpeed());
@@ -42,9 +43,26 @@ const MotionBar = ({ className }) => {
     if (ro) ro.observe(track);
     let raf;
     let last = '';
+    let lastRing = '';
     const tick = (t) => {
       raf = requestAnimationFrame(tick);
       if (!dotRef.current) return;
+      // Countdown ring: drains over the parked delay so you can see the loop is
+      // about to carry on. Updated BEFORE the dot's early-out, because the clock
+      // is frozen during a hold (same phase every frame) and would skip it.
+      if (timerRef.current) {
+        const rc = resumeCountdown(t);
+        if (rc == null) {
+          if (lastRing !== '') { timerRef.current.style.opacity = '0'; lastRing = ''; }
+        } else {
+          const ring = `conic-gradient(var(--gold-bright) ${(rc * 360).toFixed(0)}deg, rgba(255,255,255,0.14) 0deg)`;
+          if (ring !== lastRing) {
+            timerRef.current.style.background = ring;
+            timerRef.current.style.opacity = '1';
+            lastRing = ring;
+          }
+        }
+      }
       const next = `translate(-50%, ${(loopPhase(t) * trackH).toFixed(1)}px) translateY(-50%)`;
       if (next === last) return;
       last = next;
@@ -93,7 +111,9 @@ const MotionBar = ({ className }) => {
         <span className="zone" />
         <span className="line" />
         <span className="dots dots-bottom" />
-        <span className="dot" ref={dotRef} />
+        <span className="dot" ref={dotRef}>
+          <span className="dot-ring" ref={timerRef} />
+        </span>
       </div>
       {/* The speed dial: taps step through the stops, everywhere at once. */}
       <button
@@ -173,6 +193,20 @@ const Bar = styled.div`
     border: 2px solid rgba(0, 0, 0, 0.4);
     box-shadow: 0 0 10px rgba(232, 180, 85, 0.45);
     pointer-events: none;
+  }
+
+  /* Countdown ring around the parked dot: a gold arc that drains as the loop's
+     auto-resume approaches. Hidden (opacity 0) except during that window; the
+     conic-gradient + opacity are written per frame by the tick. */
+  .dot .dot-ring {
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+    -webkit-mask: radial-gradient(farthest-side, transparent 62%, #000 64%);
+    mask: radial-gradient(farthest-side, transparent 62%, #000 64%);
   }
 
   .pp, .speed {

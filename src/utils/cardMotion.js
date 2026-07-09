@@ -34,6 +34,7 @@ let lastResume = performance.now();
 const RESUME_DELAY_MS = 3000;
 let held = false;
 let resumeAt = 0; // a released grip keeps the clock frozen until this time
+let resumeFrom = 0; // when the current delay was armed (for the countdown UI)
 
 const listeners = new Set();
 const notify = () => listeners.forEach((fn) => fn({ paused, speed }));
@@ -55,7 +56,33 @@ export const beginScrub = () => {
 export const endScrub = () => {
   if (!held) return;
   held = false;
-  resumeAt = performance.now() + RESUME_DELAY_MS;
+  resumeFrom = performance.now();
+  resumeAt = resumeFrom + RESUME_DELAY_MS;
+};
+
+// Hovering the card to drive the holo by hand: snap the loop to the flat top and
+// freeze it, so the bar stops looping under your mouse and the card sits in its
+// natural rest pose for interaction. After the pointer leaves, the loop stays
+// parked a short beat (with a visible countdown on the bar) before carrying on.
+const HOVER_RESUME_DELAY_MS = 4000;
+export const beginHoverHold = () => {
+  scrubTo(0);   // move the loop to the top (flat) — the bar dot parks there
+  held = true;  // freeze it while the hand is on the card
+};
+
+export const endHoverHold = () => {
+  if (!held) return;
+  held = false;
+  resumeFrom = performance.now();
+  resumeAt = resumeFrom + HOVER_RESUME_DELAY_MS;
+};
+
+// Fraction of the parked delay STILL REMAINING (1 → 0), or null when the clock
+// isn't in a transient hold. Drives the countdown ring on the motion bar. A
+// held grip (hand still down) shows no countdown — it hasn't started yet.
+export const resumeCountdown = (t = performance.now()) => {
+  if (paused || held || !resumeAt || t >= resumeAt || resumeAt <= resumeFrom) return null;
+  return (resumeAt - t) / (resumeAt - resumeFrom);
 };
 
 // The shared phase, 0..1. Same value for every caller at the same instant.
@@ -69,7 +96,15 @@ export const motionPaused = () => paused;
 export const setMotionPaused = (next) => {
   if (next === paused) return;
   const t = performance.now();
-  if (next) acc = virtualNow(t); else lastResume = t;
+  if (next) {
+    acc = virtualNow(t);
+  } else {
+    // Explicit play cancels any transient hold (a scrub/hover park) so motion
+    // begins the instant the button is pressed, not after the countdown.
+    held = false;
+    resumeAt = 0;
+    lastResume = t;
+  }
   paused = next;
   try { localStorage.setItem(PAUSE_KEY, next ? '1' : '0'); } catch { /* private mode */ }
   notify();

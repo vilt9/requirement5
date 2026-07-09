@@ -174,6 +174,12 @@ NOTES
   - The published card lives at <api-url>/card/<id>.
   - Design loop: publish → \`r5c preview <id> --out shots/\` → look → edit spec →
     \`r5c update <id> spec.json\` → preview again.
+
+TASTE
+  This is the knob reference. For HOW to choose them — turning an image into a
+  card that's subtly stunning rather than garish (the motion gloss, dark-image
+  pitfalls, when to use each holo system, palette matching) — read
+  cli/CARD_DESIGN.md. Do that before designing a card from real artwork.
 `;
 
 export const COMMAND_HELP = {

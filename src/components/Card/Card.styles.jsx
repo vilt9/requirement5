@@ -875,7 +875,7 @@ export const CardImage = styled.div`
       rgba(255,255,255,0) 100%
     );
     mix-blend-mode: overlay;
-    opacity: 0.7;
+    opacity: calc(0.7 * var(--image-shine-intensity, 1));
     z-index: 3;
     pointer-events: none;
     filter: blur(0.5px);
@@ -916,9 +916,9 @@ export const ImageShine = styled.div`
   z-index: 10; /* Ensure it's above all other elements */
   
   ${CardContainer}.moving & {
-    opacity: 0.7;
+    opacity: calc(0.7 * var(--image-shine-intensity, 1));
   }
-  
+
   &::after {
     content: '';
     position: absolute;
@@ -929,7 +929,7 @@ export const ImageShine = styled.div`
       rgba(255,255,255,0) 60%
     );
     mix-blend-mode: overlay;
-    opacity: var(--effect-intensity, 0);
+    opacity: calc(var(--effect-intensity, 0) * var(--image-shine-intensity, 1));
     /* --effect-intensity flips 0↔1; without a transition this was the one
        layer that jolted when the shiny state changed. */
     transition: opacity 0.4s ease;
