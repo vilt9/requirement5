@@ -89,19 +89,19 @@ const Letter = styled.div`
 `;
 
 // In-world terms: the surrounding colour at rest (so they blend in), blooming to
-// white while the page scrolls and easing back over 1.5s.
+// white while the page scrolls (1.5s in) and easing back over 5s.
 const Term = styled.span`
   color: ${p => (p.$active ? 'var(--white)' : 'inherit')};
-  transition: color 1.5s ease;
+  transition: color ${p => (p.$active ? '1.5s' : '5s')} ease;
 `;
 
-// Standard amber at rest; blooms to white while the page scrolls, easing back over
-// 1.5s — same mechanic as the in-world terms.
+// Standard amber at rest; blooms to white while the page scrolls (1.5s in) and eases
+// back over 5s — same mechanic as the in-world terms.
 const Sign = styled.div`
   margin: 18px 0 0;
   color: ${p => (p.$active ? 'var(--white)' : 'var(--amber-text)')};
   line-height: 1.5;
-  transition: color 1.5s ease;
+  transition: color ${p => (p.$active ? '1.5s' : '5s')} ease;
 `;
 
 const Dates = styled.div`
