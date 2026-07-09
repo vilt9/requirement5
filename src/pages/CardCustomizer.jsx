@@ -11,6 +11,7 @@ import BaseBackgroundControls from '../components/CardCustomizer/BaseBackgroundC
 import StartStage from '../components/CardCustomizer/StartStage';
 import ImagePicker from '../components/CardCustomizer/ImagePicker';
 import PublishStage from '../components/CardCustomizer/PublishStage';
+import CodingAgentGuide from '../components/CardCustomizer/CodingAgentGuide';
 import { generateBaseBackground, generateCardAttributes } from '../utils/cardGenerator';
 import { applyPreset } from '../utils/presets';
 import { Dim } from '../components/UI';
@@ -22,6 +23,14 @@ const STAGES = [
   { key: 'start', label: 'Start' },
   { key: 'design', label: 'Design' },
   { key: 'publish', label: 'Publish' },
+];
+
+// Two ways to make a card: click through the stages here, or drive the r5c CLI
+// from a terminal. Manual is the default; the agent mode swaps the stepper for
+// a short how-to aimed at developers using coding agents.
+const MODES = [
+  { key: 'manual', label: 'Manual creation' },
+  { key: 'agent', label: 'Coding agent creation' },
 ];
 
 // Design tabs, ordered by how obviously they change the card: the artwork
@@ -40,6 +49,7 @@ const CardCustomizer = () => {
     imageLibrary, addToLibrary, removeFromLibrary
   } = useCards();
   const [customCard, setCustomCard] = useState(null);
+  const [mode, setMode] = useState('manual');
   const [stage, setStage] = useState('start');
   // The in-progress design is precious: publishing needs an account, and the
   // signup link navigates away from this page. Drafts persist to local storage
@@ -327,6 +337,30 @@ const CardCustomizer = () => {
         </CardPreviewSection>
 
         <ControlsSection className="controls-section">
+          {/* Creation mode: hand-build here, or use the CLI. Sits above the
+              stage stepper because it decides whether the stepper shows at all. */}
+          <ModeToggle className="customizer-mode">
+            {MODES.map((m) => (
+              <ModeButton
+                key={m.key}
+                type="button"
+                className="customizer-mode-btn"
+                data-mode={m.key}
+                $active={mode === m.key}
+                onClick={() => setMode(m.key)}
+              >
+                {m.label}
+              </ModeButton>
+            ))}
+          </ModeToggle>
+
+          {mode === 'agent' && (
+            <StageBody>
+              <CodingAgentGuide />
+            </StageBody>
+          )}
+
+          {mode === 'manual' && <>
           {/* The three-stage stepper. Click any stage; nothing is locked. */}
           <Stepper className="customizer-stepper">
             {STAGES.map((s, i) => (
@@ -457,6 +491,7 @@ const CardCustomizer = () => {
               />
             </StageBody>
           )}
+          </>}
         </ControlsSection>
       </CustomizerLayout>
     </CustomizerContainer>
@@ -570,6 +605,31 @@ const ControlsSection = styled.div`
   @media (max-width: 768px) {
     max-height: none;
     padding: 10px;
+  }
+`;
+
+const ModeToggle = styled.div`
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+`;
+
+const ModeButton = styled.button`
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 8px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid ${({ $active }) => ($active ? 'var(--gold)' : 'var(--panel-border)')};
+  background: ${({ $active }) => ($active ? 'var(--panel-hover)' : 'var(--field-bg)')};
+  color: ${({ $active }) => ($active ? 'var(--gold-bright)' : 'var(--amber-dim)')};
+  transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+
+  &:hover {
+    color: var(--white);
+    border-color: var(--gold);
   }
 `;
 
