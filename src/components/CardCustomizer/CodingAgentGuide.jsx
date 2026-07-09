@@ -38,8 +38,8 @@ const CodingAgentGuide = () => (
   <Guide>
     <Dim className="who">
       For developers who build with coding agents (Claude Code, Cursor, and the
-      like) — set the CLI up once, then hand your agent the skill or prompt below
-      and it designs cards on its own.
+      like) — set the CLI up once, then hand your agent the briefing or prompt
+      below and it designs cards on its own.
     </Dim>
 
     <p>
@@ -68,16 +68,16 @@ export R5C_TOKEN=…   # from ~/.r5c/config.json`}</pre>
     <Divider>Get your agent up to speed</Divider>
 
     <CopyBlock
-      title="A · Drop in the skill"
-      copyLabel="Copy skill"
-      blurb="Save as .claude/skills/r5c/SKILL.md in your project and Claude Code loads it automatically — the agent then knows the commands, the spec, and the publish→preview→update loop without being told."
+      title="A · Hand your agent the briefing"
+      copyLabel="Copy briefing"
+      blurb="One markdown file that teaches any agent the commands, the spec, and the publish→preview→update loop. Drop it where your agent looks — Claude Code: .claude/skills/r5c/SKILL.md · Codex / Cursor / Gemini CLI & others: append to your AGENTS.md (the top frontmatter is only used by Claude Code; harmless elsewhere)."
       content={skillMd}
     />
 
     <CopyBlock
       title="B · Or paste a kickoff prompt"
       copyLabel="Copy prompt"
-      blurb="No skills support? Paste this into any agent to have it install r5c, learn the spec from the CLI's own help, and build your first card — pausing before it spends any currency."
+      blurb="Nothing to set up — paste this straight into any agent's chat (Claude Code, Codex, Cursor…) to have it install r5c, learn the spec from the CLI's own help, and build your first card, pausing before it spends any currency."
       content={kickoffPrompt}
     />
 
