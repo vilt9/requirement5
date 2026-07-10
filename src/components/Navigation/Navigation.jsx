@@ -48,6 +48,7 @@ const Navigation = () => {
               </span>
             );
           })}
+          <span className="slash">//</span>
         </Brand>
         <Links>
           {LINKS.map(link => (
@@ -132,6 +133,14 @@ const Brand = styled(Link)`
   &:hover { text-decoration: none; color: var(--gold-bright); }
 
   span { display: inline-block; }
+  /* The trailing "//" — always shown, sitting just after the last letter so it
+     rides along as the word grows (R5c// → Requirement5cards//). */
+  span.slash {
+    color: var(--amber-dim);
+    font-weight: 400;
+    font-family: var(--font-mono);
+    margin-left: 3px;
+  }
   /* The letters that fill out "Requirement…cards": collapsed at rest, unrolled
      on hover. max-width animates the reveal; each carries its own delay for the
      one-at-a-time cascade. */
