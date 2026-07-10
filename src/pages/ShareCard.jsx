@@ -632,7 +632,7 @@ const SaveButton = styled(PillButton)`
   padding: 6px 16px;
   gap: 1px;
   .main { font-size: 13px; display: inline-flex; align-items: center; gap: 5px; }
-  .main svg { font-size: 15px; }
+  .main svg { font-size: 15px; margin-top: -4px; }
   .sub { font-size: 11px; font-weight: 600; letter-spacing: 0; opacity: 0.85; }
 `;
 
