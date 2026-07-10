@@ -3,11 +3,14 @@
 // number of cards on a page move in perfect sync — and every scrub bar drives
 // the same clock, so dragging one scrubs them all. Pause/play is a global
 // setting persisted in the browser.
-const LOOP_MS = 12000;
+// 6s per run — the default 1× pace. (This used to be 12s; the baseline was
+// doubled so what read as "2×" before is now the 1× default, every dial stop
+// scaling from there.)
+const LOOP_MS = 6000;
 const PAUSE_KEY = 'r5c_motion_paused';
 const SPEED_KEY = 'r5c_motion_speed';
 
-// The speed dial's stops, in loop-runs relative to the 12s base.
+// The speed dial's stops, in loop-runs relative to the 6s base.
 export const SPEEDS = [0.5, 1, 2, 4];
 
 let paused = (() => {
