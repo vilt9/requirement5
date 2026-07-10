@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { createGlobalStyle } from 'styled-components';
 import { CardProvider } from './context/CardContext';
 import { AuthProvider } from './context/AuthContext';
@@ -149,7 +149,10 @@ function App() {
                 <Route path="/collection" element={<Collection />} />
                 {/* Someone else's collection, read-only (from Discover) */}
                 <Route path="/u/:username" element={<UserCollection />} />
-                <Route path="/customize" element={<CardCustomizer />} />
+                {/* The create flow (roll → design → publish). /customize is the
+                    old path, kept as a redirect. */}
+                <Route path="/create" element={<CardCustomizer />} />
+                <Route path="/customize" element={<Navigate to="/create" replace />} />
                 <Route path="/account" element={<Account />} />
                 <Route path="/claim/:token" element={<ClaimAccount />} />
                 <Route path="/about" element={<About />} />

@@ -129,7 +129,7 @@ const Collection = () => {
         <Panel className="creations-panel">
           Created by you: {creations.length} card{creations.length === 1 ? '' : 's'}
           {loaded && creations.length === 0 && (
-            <> — nothing yet. <Link to="/customize">Design and publish a card</Link> and it will live here.</>
+            <> — nothing yet. <Link to="/create">Design and publish a card</Link> and it will live here.</>
           )}
         </Panel>
       )}

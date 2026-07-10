@@ -292,7 +292,7 @@ const ShareCard = () => {
             <h2>Card not found</h2>
             <Dim>This card doesn’t exist or was removed.</Dim>
             <div style={{ marginTop: 10 }}>
-              <PillButton onClick={() => navigate('/customize')}>Make your own card →</PillButton>
+              <PillButton onClick={() => navigate('/create')}>Make your own card →</PillButton>
             </div>
           </Panel>
         </Column>

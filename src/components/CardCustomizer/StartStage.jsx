@@ -1,24 +1,53 @@
 import styled from 'styled-components';
+import { LuCircleArrowRight } from 'react-icons/lu';
 import { Select, PillButton, Dim } from '../UI';
+import { fmtT26 } from '../../utils/economyRandom';
 
-// Stage 1 of the customizer: pick the base design to build on — a saved set
-// (your reusable design defaults) or a freshly rolled design. Images are part
-// of designing and live in the Design stage.
+// Stage 1 of the customizer: the roll. Every card starts as a rolled base —
+// a random background + the fixed signature image + default holo + a rolled
+// rarity. Regenerate rerolls the background and the rarity (the signature and
+// holo stay). Start commits to the card (costs /t26) and moves into design; you
+// can also start from a saved set — that swaps the design in without touching
+// the rolled rarity.
 const StartStage = ({
+  rarity,
+  tierName,
+  rolls,
+  regenCost,
+  createCost,
+  onRegenerate,
   presets,
   selectedPresetId,
   onLoadPreset,
   onDeletePreset,
-  onRandomizeDesign,
   onNext
 }) => (
   <Wrap className="start-stage">
     <Block>
-      <BlockTitle>Base design</BlockTitle>
+      <BlockTitle>Roll your card</BlockTitle>
+      <Roll>
+        <span className="label"><Dim>Rolled rarity</Dim></span>
+        <span className="score">{(rarity ?? 0).toFixed(3)}</span>
+        {tierName && <span className="tier"><Dim>{tierName}</Dim></span>}
+      </Roll>
       <Dim>
-        Every card builds on a base design — the colours, background, effects and
-        default tags. Load one of your saved sets, or roll a fresh design to react to.
-        You can save the design you end up with as a new set at the publish step.
+        Regenerate rerolls the background and the rarity — the signature image and
+        holo stay, so it always reads as an R5c card. Each reroll costs a little
+        more; minting resets it.
+      </Dim>
+      <RollRow>
+        <PillButton $secondary type="button" className="regenerate" onClick={onRegenerate}>
+          Regenerate <span className="cost">−{fmtT26(regenCost)} /t26</span>
+        </PillButton>
+      </RollRow>
+      {rolls > 0 && <Dim className="rolls">{rolls} reroll{rolls === 1 ? '' : 's'} this card</Dim>}
+    </Block>
+
+    <Block>
+      <BlockTitle>Start from a saved set</BlockTitle>
+      <Dim>
+        Load one of your base sets to build on — this swaps the design in, but
+        never changes your rolled rarity.
       </Dim>
       <StartFromRow>
         <Select
@@ -40,9 +69,6 @@ const StartStage = ({
             title="Delete this set"
           >✕</PillButton>
         )}
-        <PillButton $secondary type="button" onClick={onRandomizeDesign}>
-          Random design
-        </PillButton>
       </StartFromRow>
       {presets.length === 0 && (
         <Dim style={{ fontStyle: 'italic' }}>
@@ -53,7 +79,7 @@ const StartStage = ({
 
     <NextRow>
       <PillButton type="button" className="stage-next" onClick={onNext}>
-        Next: design →
+        Start <span className="cost">−{fmtT26(createCost)} /t26</span> <LuCircleArrowRight />
       </PillButton>
     </NextRow>
   </Wrap>
@@ -78,6 +104,38 @@ const BlockTitle = styled.div`
   color: var(--gold-bright);
 `;
 
+// The rolled rarity, front and centre — the number the gamble is about.
+const Roll = styled.div`
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 2px 0 2px;
+  .score {
+    font-family: var(--font-mono);
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--gold-bright);
+    font-variant-numeric: tabular-nums;
+  }
+  .tier { font-size: 12px; }
+`;
+
+const RollRow = styled.div`
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+  align-items: center;
+  flex-wrap: wrap;
+
+  button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .cost { font-size: 11px; font-weight: 600; opacity: 0.8; }
+`;
+
 const StartFromRow = styled.div`
   display: flex;
   gap: 8px;
@@ -92,6 +150,14 @@ const NextRow = styled.div`
   display: flex;
   justify-content: flex-end;
   padding-top: 4px;
+
+  .stage-next {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .stage-next .cost { font-size: 11px; font-weight: 600; opacity: 0.85; }
+  .stage-next svg { font-size: 15px; }
 `;
 
 export default StartStage;

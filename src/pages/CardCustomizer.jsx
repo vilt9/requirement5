@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import localforage from 'localforage';
 import styled from 'styled-components';
+import { LuCircleArrowRight, LuRotateCcw } from 'react-icons/lu';
 import Card from '../components/Card/Card';
 import { useCards } from '../context/CardContext';
 import HoloEffectToggles from '../components/CardCustomizer/HoloEffectToggles';
@@ -14,16 +15,41 @@ import PublishStage from '../components/CardCustomizer/PublishStage';
 import CodingAgentGuide from '../components/CardCustomizer/CodingAgentGuide';
 import { generateBaseBackground, generateCardAttributes } from '../utils/cardGenerator';
 import { applyPreset } from '../utils/presets';
+import { useAuth, tierForScore } from '../context/AuthContext';
 import { Dim } from '../components/UI';
+import sigImage from '../assets/img/r5c_signature.png';
 
-// The creation flow runs in three stages, mirroring how a card actually comes
-// together: pick images → design → tag and publish. The stepper is free
-// navigation, not a locked wizard — designing means going back and forth.
+// The creation flow runs in three stages: roll a base card (Start) → design →
+// tag and publish. The stepper is free navigation, not a locked wizard —
+// designing means going back and forth.
 const STAGES = [
   { key: 'start', label: 'Start' },
   { key: 'design', label: 'Design' },
   { key: 'publish', label: 'Publish' },
 ];
+const STAGE_KEYS = STAGES.map(s => s.key);
+
+// Every rolled card wears the same signature image + default holo overlay —
+// constant across rolls, so a card always reads as "an R5c card". Only the
+// background and the rolled rarity change when you regenerate.
+const DEFAULT_HOLO = { overlay: true, rareHolo: false, rareHoloGalaxy: false, wowaHolo: false, rareHoloVmax: false };
+
+const rollBaseCard = () => ({
+  ...generateCardAttributes(),
+  tags: [],
+  imagePath: 'custom_image',
+  customImageUrl: sigImage,
+  customHoloImageUrl: null,
+  holoEffects: DEFAULT_HOLO
+});
+
+// Costs climb linearly with the reroll count (the gambling tax): each reroll a
+// little more, and minting the finished card a little more the more you fished.
+// The count only resets on a successful mint — Reset preserves it, so you can't
+// dodge the price by resetting.
+const round2 = (n) => Math.round(n * 100) / 100;
+const regenPrice = (rolls) => round2(1 + rolls);   // 1, 2, 3, …
+const createPrice = (rolls) => round2(2 + rolls);  // 2, 3, 4, …
 
 // Two ways to make a card: click through the stages here, or drive the r5c CLI
 // from a terminal. Manual is the default; the agent mode swaps the stepper for
@@ -44,13 +70,17 @@ const TABS = [
 
 const CardCustomizer = () => {
   const {
-    currentCard, generateNewCard, updateCustomCard,
+    updateCustomCard,
     presets, savePreset, deletePreset,
     imageLibrary, addToLibrary, removeFromLibrary
   } = useCards();
+  const { config } = useAuth();
   const [customCard, setCustomCard] = useState(null);
   const [mode, setMode] = useState('manual');
   const [stage, setStage] = useState('start');
+  // Reroll counter for this card — drives the escalating reroll price and
+  // resets on mint / reset. Persisted in the draft so it survives a reload.
+  const [rolls, setRolls] = useState(0);
   // The in-progress design is precious: publishing needs an account, and the
   // signup link navigates away from this page. Drafts persist to local storage
   // so the design survives the login round-trip (and reloads) — checked before
@@ -80,15 +110,18 @@ const CardCustomizer = () => {
     return () => observer.disconnect();
   }, []);
 
-  // Restore a saved draft before anything else can seed the design.
+  // Restore a saved draft before anything else can seed the design — resuming
+  // at the exact stage you left (a fresh roll navigated away from comes back to
+  // Start, not mid-design).
   useEffect(() => {
     let cancelled = false;
-    localforage.getItem('customizerDraft')
+    localforage.getItem('r5cCreateDraft')
       .then((draft) => {
         if (cancelled) return;
         if (draft?.customCard) {
           setCustomCard(draft.customCard);
-          setStage(draft.stage === 'publish' ? 'publish' : 'design');
+          setStage(STAGE_KEYS.includes(draft.stage) ? draft.stage : 'start');
+          setRolls(Number.isFinite(draft.rolls) ? draft.rolls : 0);
         }
         setDraftChecked(true);
       })
@@ -100,37 +133,18 @@ const CardCustomizer = () => {
   useEffect(() => {
     if (!draftChecked || !customCard) return;
     const timer = setTimeout(() => {
-      localforage.setItem('customizerDraft', { customCard, stage, savedAt: Date.now() }).catch(() => {});
+      localforage.setItem('r5cCreateDraft', { customCard, stage, rolls, savedAt: Date.now() }).catch(() => {});
     }, 400);
     return () => clearTimeout(timer);
-  }, [customCard, stage, draftChecked]);
+  }, [customCard, stage, rolls, draftChecked]);
 
-  // Initialize with a card if none exists (only once the draft check settled,
-  // and only when no draft claimed the slot).
+  // No draft claimed the slot → start a fresh roll at the Start stage.
   useEffect(() => {
     if (!draftChecked || customCard) return;
-    if (!currentCard) {
-      generateNewCard();
-    } else {
-      // Ensure the customCard has all the necessary properties
-      const initializedCard = {
-        ...currentCard,
-        customHoloImageUrl: currentCard.customHoloImageUrl || null,
-        tags: Array.isArray(currentCard.tags) ? currentCard.tags : [],
-        // Seed a base background for older cards saved before this field existed.
-        baseBackground: currentCard.baseBackground
-          || generateBaseBackground(currentCard.backgroundColor?.baseHue),
-        holoEffects: currentCard.holoEffects || {
-          rareHolo: false,
-          rareHoloGalaxy: false,
-          wowaHolo: false,
-          rareHoloVmax: false
-        }
-      };
-      setCustomCard(initializedCard);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentCard, draftChecked]);
+    setCustomCard(rollBaseCard());
+    setStage('start');
+    setRolls(0);
+  }, [draftChecked, customCard]);
 
   // The upload previews ARE the card's images — derived, never separately
   // stored. A fresh card starts with empty slots; a set loaded with images
@@ -165,9 +179,8 @@ const CardCustomizer = () => {
       customHoloImageUrl: imageDataUrl,
       holoEffects: imageDataUrl
         ? { ...(customCard.holoEffects || {}), overlay: true }
-        : customCard.holoEffects,
-      // Force a high enough rarity to ensure the holo layer is visible.
-      rarity: imageDataUrl ? Math.max(customCard.rarity, 0.7) : customCard.rarity
+        : customCard.holoEffects
+      // Rarity is locked by the roll — designing never moves it.
     });
     if (imageDataUrl) addToLibrary(imageDataUrl);
   };
@@ -185,17 +198,29 @@ const CardCustomizer = () => {
 
   const handleMainImageChange = (e) => readFileAsDataUrl(e, applyMainImage);
 
-  // Roll a fresh design (colours, background, effects) but keep the images —
-  // starting over shouldn't cost you your uploads.
-  const handleRandomizeDesign = () => {
+  // The reroll: a fresh background + effects AND a fresh rolled rarity. The
+  // signature image (or whatever you've loaded) and the holo carry over — the
+  // gamble is the backdrop and the rarity, not the picture.
+  const handleRegenerate = () => {
     const fresh = generateCardAttributes();
-    setCustomCard({
+    setCustomCard(prev => ({
       ...fresh,
-      tags: customCard?.tags || [],
-      ...(mainImagePreview ? { customImageUrl: mainImagePreview, imagePath: 'custom_image' } : {}),
-      ...(holoImagePreview ? { customHoloImageUrl: holoImagePreview } : {})
-    });
-    flash('Rolled a fresh design (images kept).');
+      tags: prev?.tags || [],
+      customImageUrl: prev?.customImageUrl || sigImage,
+      imagePath: 'custom_image',
+      customHoloImageUrl: prev?.customHoloImageUrl || null,
+      holoEffects: prev?.holoEffects || DEFAULT_HOLO
+    }));
+    setRolls(n => n + 1);
+  };
+
+  // Reset (from the Design stage): drop back to the roll, keeping the current
+  // card AND its accrued reroll count — a way back to rolling, not a way to
+  // dodge the climbing price.
+  const handleResetToStart = () => {
+    setStage('start');
+    setActiveTab('image');
+    flash('Back to the roll — your card is kept.');
   };
 
   // Roll a fresh coherent base background (palette + fade + texture) in one click.
@@ -381,11 +406,16 @@ const CardCustomizer = () => {
           {stage === 'start' && (
             <StageBody>
               <StartStage
+                rarity={customCard?.rarity}
+                tierName={tierForScore(config, customCard?.rarity)?.name}
+                rolls={rolls}
+                regenCost={regenPrice(rolls)}
+                createCost={createPrice(rolls)}
+                onRegenerate={handleRegenerate}
                 presets={presets}
                 selectedPresetId={selectedPresetId}
                 onLoadPreset={handleLoadPreset}
                 onDeletePreset={async () => { await deletePreset(selectedPresetId); setSelectedPresetId(''); }}
-                onRandomizeDesign={handleRandomizeDesign}
                 onNext={() => setStage('design')}
               />
               {feedback && <Dim className="customizer-feedback">{feedback}</Dim>}
@@ -470,9 +500,14 @@ const CardCustomizer = () => {
 
               <StageFooter className="controls-footer">
                 {feedback && <Dim className="customizer-feedback">{feedback}</Dim>}
-                <NextButton type="button" className="stage-next" onClick={() => setStage('publish')}>
-                  Next: publish →
-                </NextButton>
+                <FooterActions>
+                  <ResetButton type="button" className="stage-reset" onClick={handleResetToStart}>
+                    <LuRotateCcw /> Reset
+                  </ResetButton>
+                  <NextButton type="button" className="stage-next" onClick={() => setStage('publish')}>
+                    Publish <LuCircleArrowRight />
+                  </NextButton>
+                </FooterActions>
               </StageFooter>
             </>
           )}
@@ -724,8 +759,16 @@ const StageFooter = styled.div`
   gap: 10px;
 `;
 
-const NextButton = styled.button`
+// Design-stage footer buttons, kept together on the right — Reset sits to the
+// left of Publish.
+const FooterActions = styled.div`
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const NextButton = styled.button`
   font-family: var(--font-mono);
   font-weight: 600;
   font-size: 12px;
@@ -736,7 +779,29 @@ const NextButton = styled.button`
   background: var(--gold);
   color: #140d03;
   transition: background 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  svg { font-size: 15px; }
   &:hover { background: var(--gold-bright); }
+`;
+
+const ResetButton = styled.button`
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 12px;
+  padding: 7px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  border: 1px solid var(--panel-border);
+  background: transparent;
+  color: var(--gold-bright);
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  svg { font-size: 14px; }
+  &:hover { background: var(--panel-hover); border-color: var(--gold-bright); color: var(--white); }
 `;
 
 export default CardCustomizer;

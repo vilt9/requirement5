@@ -108,7 +108,7 @@ const Account = () => {
         Erosion: suppressed on this platform
         <Divider />
         Your cards: <Link to="/collection">creations &amp; collection</Link>
-        {' · '}<Link to="/customize">design a new one</Link>
+        {' · '}<Link to="/create">design a new one</Link>
         <Divider />
         <PillButton $secondary onClick={logout}>Log out</PillButton>
       </Panel>

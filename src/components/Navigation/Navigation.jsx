@@ -12,7 +12,7 @@ const REPO_URL = 'https://github.com/vilt9/requirement5';
 const LINKS = [
   { to: '/', label: 'Discover' },
   { to: '/collection', label: 'Collections' },
-  { to: '/customize', label: 'Create' },
+  { to: '/create', label: 'Create' },
   { to: '/about', label: 'About' }
 ];
 
