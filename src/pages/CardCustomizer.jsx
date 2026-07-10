@@ -84,6 +84,9 @@ const CardCustomizer = () => {
   // True once a reroll has happened while logged OUT (free). Logging in then
   // discards the card — you can't fish a rare roll for free and bank it.
   const [anonRolls, setAnonRolls] = useState(false);
+  // True once the create fee has been paid for THIS card, so stepping back and
+  // forth to Design never double-charges. Cleared on a new roll.
+  const [paidCreate, setPaidCreate] = useState(false);
   // The in-progress design is precious: publishing needs an account, and the
   // signup link navigates away from this page. Drafts persist to local storage
   // so the design survives the login round-trip (and reloads) — checked before
@@ -126,6 +129,7 @@ const CardCustomizer = () => {
           setStage(STAGE_KEYS.includes(draft.stage) ? draft.stage : 'start');
           setRolls(Number.isFinite(draft.rolls) ? draft.rolls : 0);
           setAnonRolls(!!draft.anonRolls);
+          setPaidCreate(!!draft.paidCreate);
         }
         setDraftChecked(true);
       })
@@ -137,10 +141,10 @@ const CardCustomizer = () => {
   useEffect(() => {
     if (!draftChecked || !customCard) return;
     const timer = setTimeout(() => {
-      localforage.setItem('r5cCreateDraft', { customCard, stage, rolls, anonRolls, savedAt: Date.now() }).catch(() => {});
+      localforage.setItem('r5cCreateDraft', { customCard, stage, rolls, anonRolls, paidCreate, savedAt: Date.now() }).catch(() => {});
     }, 400);
     return () => clearTimeout(timer);
-  }, [customCard, stage, rolls, anonRolls, draftChecked]);
+  }, [customCard, stage, rolls, anonRolls, paidCreate, draftChecked]);
 
   // No draft claimed the slot → start a fresh roll at the Start stage.
   useEffect(() => {
@@ -149,6 +153,7 @@ const CardCustomizer = () => {
     setStage('start');
     setRolls(0);
     setAnonRolls(false);
+    setPaidCreate(false);
   }, [draftChecked, customCard]);
 
   // Logged-out fishing can't be banked: once a card that was rerolled while
@@ -162,6 +167,7 @@ const CardCustomizer = () => {
       setCustomCard(rollBaseCard());
       setRolls(0);
       setAnonRolls(false);
+      setPaidCreate(false);
       setStage('start');
       setSelectedPresetId('');
       flash('Logged in — fresh roll. Rerolls made while logged out don’t carry over.');
@@ -238,6 +244,7 @@ const CardCustomizer = () => {
       holoEffects: prev?.holoEffects || DEFAULT_HOLO
     }));
     setRolls(n => n + 1);
+    setPaidCreate(false); // a new card → the create fee applies again
   };
 
   const handleRegenerate = async () => {
@@ -259,6 +266,30 @@ const CardCustomizer = () => {
       setAnonRolls(true); // free while logged out; wiped on login
     }
     doReroll();
+  };
+
+  // Start: commit this rolled card into the design flow. Costs the (gently
+  // climbing) create fee once per card, when logged in — charged once, so
+  // stepping back to Start and forward again doesn't double-bill. Logged out
+  // it's free (publishing needs an account, and logging in restarts the roll).
+  const handleStart = async () => {
+    if (user && !paidCreate) {
+      try {
+        const res = await api('/api/economy/create', {
+          method: 'POST',
+          body: { rolls, seed: customCard?.id }
+        });
+        setBalance(res.balance);
+        flashSpend(res.charged);
+        setPaidCreate(true);
+      } catch (error) {
+        flash(error?.status === 402
+          ? 'Not enough /t26 to create this card.'
+          : 'Could not charge the create fee — try again.');
+        return;
+      }
+    }
+    setStage('design');
   };
 
   // Reset (from the Design stage): drop back to the roll, keeping the current
@@ -459,8 +490,9 @@ const CardCustomizer = () => {
                 regenCost={regenCostFor(rolls, customCard?.id)}
                 createCost={createCostFor(rolls, customCard?.id)}
                 loggedIn={!!user}
+                paidCreate={paidCreate}
                 onRegenerate={handleRegenerate}
-                onNext={() => setStage('design')}
+                onNext={handleStart}
               />
               {feedback && <Dim className="customizer-feedback">{feedback}</Dim>}
             </StageBody>

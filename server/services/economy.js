@@ -80,11 +80,13 @@ export const drawYieldFor = (seed) =>
 // Create-flow pricing: a linear base that climbs with the reroll count, plus a
 // seeded uniform fraction so the /t26 reads in the currency's fractional style.
 // Mirrored in src/utils/economyRandom.js — keep the two in sync.
+// Regenerate climbs steeply (+1 per reroll — the gambling tax); creating climbs
+// gently (+0.2 per reroll), so fishing costs you at the reroll, not at the mint.
 const rand01 = (seed) => mulberry32(fnv1a(seed))();
 export const regenCostFor = (rolls, seed) =>
-  round2(1 + (Number(rolls) || 0) + rand01(`${seed}:regen`));   // 1.xx, 2.xx, …
+  round2(1 + 1.0 * (Number(rolls) || 0) + rand01(`${seed}:regen`));   // 1.xx, 2.xx, 3.xx …
 export const createCostFor = (rolls, seed) =>
-  round2(2 + (Number(rolls) || 0) + rand01(`${seed}:create`));  // 2.xx, 3.xx, …
+  round2(2 + 0.2 * (Number(rolls) || 0) + rand01(`${seed}:create`));  // 2.xx, then slow
 
 export const rollPublishStake = (rand = Math.random) =>
   round2(logBand((rand() + rand() + rand()) / 3, PRICE_BANDS.publishStake));

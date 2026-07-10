@@ -43,11 +43,13 @@ export const drawYieldFor = (seed) =>
 // Create-flow pricing: linear base climbing with the reroll count + a seeded
 // uniform fraction so it reads in the currency's fractional style. EXACT mirror
 // of server/services/economy.js — the price shown must equal the price charged.
+// Regenerate climbs steeply (+1 per reroll); creating climbs gently (+0.2), so
+// fishing costs you at the reroll, not at the mint.
 const rand01 = (seed) => mulberry32(fnv1a(seed))();
 export const regenCostFor = (rolls, seed) =>
-  Math.round((1 + (Number(rolls) || 0) + rand01(`${seed}:regen`)) * 100) / 100;
+  Math.round((1 + 1.0 * (Number(rolls) || 0) + rand01(`${seed}:regen`)) * 100) / 100;
 export const createCostFor = (rolls, seed) =>
-  Math.round((2 + (Number(rolls) || 0) + rand01(`${seed}:create`)) * 100) / 100;
+  Math.round((2 + 0.2 * (Number(rolls) || 0) + rand01(`${seed}:create`)) * 100) / 100;
 
 // Display: whole-ish amounts read with 2 decimals (3 for running totals, via
 // dp); sub-1 amounts keep their full 6-decimal precision (that's the texture

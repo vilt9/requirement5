@@ -14,6 +14,7 @@ const StartStage = ({
   regenCost,
   createCost,
   loggedIn,
+  paidCreate,
   onRegenerate,
   onNext
 }) => (
@@ -45,7 +46,9 @@ const StartStage = ({
 
     <NextRow>
       <PillButton type="button" className="stage-next" onClick={onNext}>
-        Start <span className="cost">−{fmtT26(createCost)} /t26</span> <LuCircleArrowRight />
+        {paidCreate
+          ? <>Continue <LuCircleArrowRight /></>
+          : <>Start <span className="cost">−{fmtT26(createCost)} /t26</span> <LuCircleArrowRight /></>}
       </PillButton>
     </NextRow>
   </Wrap>

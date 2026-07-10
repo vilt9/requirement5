@@ -1,6 +1,6 @@
 import express from 'express';
 import { memoryDb } from '../config/database.js';
-import { economyConfig, TIERS, regenCostFor } from '../services/economy.js';
+import { economyConfig, TIERS, regenCostFor, createCostFor } from '../services/economy.js';
 import { yieldRemainingToday, absorb, InsufficientFundsError } from '../services/ledger.js';
 import { requireAuth } from '../middleware/auth.js';
 import { storageInfo } from '../storage/index.js';
@@ -38,6 +38,25 @@ router.post('/reroll', requireAuth, (req, res) => {
       return res.status(402).json({ success: false, error: 'Not enough /t26 to regenerate' });
     }
     console.error('Reroll charge error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// Charge the create fee — pressing "Start" to commit a rolled card into the
+// design flow. Priced server-side from (rolls, seed) via createCostFor (a gentle
+// climb, unlike the reroll). 402 when the balance can't cover it.
+router.post('/create', requireAuth, (req, res) => {
+  const rolls = Math.max(0, Math.min(9999, parseInt(req.body?.rolls, 10) || 0));
+  const seed = String(req.body?.seed || '');
+  const charged = createCostFor(rolls, seed);
+  try {
+    absorb(req.user.id, 'create_stake', charged);
+    res.json({ success: true, data: { charged, balance: memoryDb.getUserById(req.user.id).balance } });
+  } catch (error) {
+    if (error instanceof InsufficientFundsError) {
+      return res.status(402).json({ success: false, error: 'Not enough /t26 to create this card' });
+    }
+    console.error('Create charge error:', error);
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });
