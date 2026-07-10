@@ -16,6 +16,8 @@ import CodingAgentGuide from '../components/CardCustomizer/CodingAgentGuide';
 import { generateBaseBackground, generateCardAttributes } from '../utils/cardGenerator';
 import { applyPreset } from '../utils/presets';
 import { useAuth, tierForScore } from '../context/AuthContext';
+import { api } from '../utils/api';
+import { regenCostFor, createCostFor } from '../utils/economyRandom';
 import { Dim, Select, PillButton } from '../components/UI';
 import sigImage from '../assets/img/r5c_signature.png';
 
@@ -43,24 +45,11 @@ const rollBaseCard = () => ({
   holoEffects: DEFAULT_HOLO
 });
 
-// Costs climb linearly with the reroll count (the gambling tax), plus a random
-// fraction seeded off the card so the /t26 reads with the fractional flavour of
-// the rest of the economy (2.37, not a flat 2) — stable per roll, fresh each
-// reroll. The linear part only resets on a successful mint; Reset preserves it,
-// so you can't dodge the price by resetting.
-const round2 = (n) => Math.round(n * 100) / 100;
-
-// Tiny deterministic hash → [0, 1). Same seed always yields the same fraction,
-// so the shown price never jitters between renders.
-const frac01 = (seed) => {
-  let h = 2166136261;
-  const s = String(seed);
-  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
-  return ((h >>> 0) % 100000) / 100000;
-};
-
-const regenPrice = (rolls, seed) => round2(1 + rolls + frac01(`${seed}:regen`));   // 1.xx, 2.xx, …
-const createPrice = (rolls, seed) => round2(2 + rolls + frac01(`${seed}:create`)); // 2.xx, 3.xx, …
+// Costs (regenCostFor / createCostFor) live in utils/economyRandom.js so the
+// price the page shows is exactly the price the server charges. They climb
+// linearly with the reroll count plus a seeded fraction; the count only resets
+// on a fresh card / successful mint — Reset preserves it, so you can't dodge the
+// price by resetting.
 
 // Two ways to make a card: click through the stages here, or drive the r5c CLI
 // from a terminal. Manual is the default; the agent mode swaps the stepper for
@@ -85,13 +74,16 @@ const CardCustomizer = () => {
     presets, savePreset, deletePreset,
     imageLibrary, addToLibrary, removeFromLibrary
   } = useCards();
-  const { config } = useAuth();
+  const { config, user, loading, setBalance, flashSpend } = useAuth();
   const [customCard, setCustomCard] = useState(null);
   const [mode, setMode] = useState('manual');
   const [stage, setStage] = useState('start');
   // Reroll counter for this card — drives the escalating reroll price and
   // resets on mint / reset. Persisted in the draft so it survives a reload.
   const [rolls, setRolls] = useState(0);
+  // True once a reroll has happened while logged OUT (free). Logging in then
+  // discards the card — you can't fish a rare roll for free and bank it.
+  const [anonRolls, setAnonRolls] = useState(false);
   // The in-progress design is precious: publishing needs an account, and the
   // signup link navigates away from this page. Drafts persist to local storage
   // so the design survives the login round-trip (and reloads) — checked before
@@ -133,6 +125,7 @@ const CardCustomizer = () => {
           setCustomCard(draft.customCard);
           setStage(STAGE_KEYS.includes(draft.stage) ? draft.stage : 'start');
           setRolls(Number.isFinite(draft.rolls) ? draft.rolls : 0);
+          setAnonRolls(!!draft.anonRolls);
         }
         setDraftChecked(true);
       })
@@ -144,10 +137,10 @@ const CardCustomizer = () => {
   useEffect(() => {
     if (!draftChecked || !customCard) return;
     const timer = setTimeout(() => {
-      localforage.setItem('r5cCreateDraft', { customCard, stage, rolls, savedAt: Date.now() }).catch(() => {});
+      localforage.setItem('r5cCreateDraft', { customCard, stage, rolls, anonRolls, savedAt: Date.now() }).catch(() => {});
     }, 400);
     return () => clearTimeout(timer);
-  }, [customCard, stage, rolls, draftChecked]);
+  }, [customCard, stage, rolls, anonRolls, draftChecked]);
 
   // No draft claimed the slot → start a fresh roll at the Start stage.
   useEffect(() => {
@@ -155,7 +148,25 @@ const CardCustomizer = () => {
     setCustomCard(rollBaseCard());
     setStage('start');
     setRolls(0);
+    setAnonRolls(false);
   }, [draftChecked, customCard]);
+
+  // Logged-out fishing can't be banked: once a card that was rerolled while
+  // logged out belongs to a signed-in user (they logged in, here or via the
+  // account round-trip), discard it and start on a clean, paid-for roll. Waits
+  // for auth to settle so a normal logged-in reload isn't caught.
+  useEffect(() => {
+    if (loading || !draftChecked) return;
+    if (user && anonRolls) {
+      localforage.removeItem('r5cCreateDraft').catch(() => {});
+      setCustomCard(rollBaseCard());
+      setRolls(0);
+      setAnonRolls(false);
+      setStage('start');
+      setSelectedPresetId('');
+      flash('Logged in — fresh roll. Rerolls made while logged out don’t carry over.');
+    }
+  }, [user, anonRolls, loading, draftChecked]);
 
   // The upload previews ARE the card's images — derived, never separately
   // stored. A fresh card starts with empty slots; a set loaded with images
@@ -212,7 +223,11 @@ const CardCustomizer = () => {
   // The reroll: a fresh background + effects AND a fresh rolled rarity. The
   // signature image (or whatever you've loaded) and the holo carry over — the
   // gamble is the backdrop and the rarity, not the picture.
-  const handleRegenerate = () => {
+  //
+  // Logged in, the reroll costs /t26: charge the server first (it computes the
+  // price from the reroll count + seed), and a failed / unaffordable charge
+  // aborts the reroll. Logged out it's free — but marked, so logging in wipes it.
+  const doReroll = () => {
     const fresh = generateCardAttributes();
     setCustomCard(prev => ({
       ...fresh,
@@ -223,6 +238,27 @@ const CardCustomizer = () => {
       holoEffects: prev?.holoEffects || DEFAULT_HOLO
     }));
     setRolls(n => n + 1);
+  };
+
+  const handleRegenerate = async () => {
+    if (user) {
+      try {
+        const res = await api('/api/economy/reroll', {
+          method: 'POST',
+          body: { rolls, seed: customCard?.id }
+        });
+        setBalance(res.balance);
+        flashSpend(res.charged);
+      } catch (error) {
+        flash(error?.status === 402
+          ? 'Not enough /t26 to regenerate.'
+          : 'Could not charge the reroll — try again.');
+        return;
+      }
+    } else {
+      setAnonRolls(true); // free while logged out; wiped on login
+    }
+    doReroll();
   };
 
   // Reset (from the Design stage): drop back to the roll, keeping the current
@@ -420,8 +456,9 @@ const CardCustomizer = () => {
                 rarity={customCard?.rarity}
                 tierName={tierForScore(config, customCard?.rarity)?.name}
                 rolls={rolls}
-                regenCost={regenPrice(rolls, customCard?.id)}
-                createCost={createPrice(rolls, customCard?.id)}
+                regenCost={regenCostFor(rolls, customCard?.id)}
+                createCost={createCostFor(rolls, customCard?.id)}
+                loggedIn={!!user}
                 onRegenerate={handleRegenerate}
                 onNext={() => setStage('design')}
               />

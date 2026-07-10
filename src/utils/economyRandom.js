@@ -40,6 +40,15 @@ export const saveCostFor = (cardId) =>
 export const drawYieldFor = (seed) =>
   Math.round(logBand(bell01(`${seed}:yield`), PRICE_BANDS.drawYield) * 1e6) / 1e6;
 
+// Create-flow pricing: linear base climbing with the reroll count + a seeded
+// uniform fraction so it reads in the currency's fractional style. EXACT mirror
+// of server/services/economy.js — the price shown must equal the price charged.
+const rand01 = (seed) => mulberry32(fnv1a(seed))();
+export const regenCostFor = (rolls, seed) =>
+  Math.round((1 + (Number(rolls) || 0) + rand01(`${seed}:regen`)) * 100) / 100;
+export const createCostFor = (rolls, seed) =>
+  Math.round((2 + (Number(rolls) || 0) + rand01(`${seed}:create`)) * 100) / 100;
+
 // Display: whole-ish amounts read with 2 decimals (3 for running totals, via
 // dp); sub-1 amounts keep their full 6-decimal precision (that's the texture
 // of the currency).

@@ -13,6 +13,7 @@ const StartStage = ({
   rolls,
   regenCost,
   createCost,
+  loggedIn,
   onRegenerate,
   onNext
 }) => (
@@ -34,6 +35,12 @@ const StartStage = ({
         </PillButton>
       </RollRow>
       {rolls > 0 && <Dim className="rolls">{rolls} regeneration{rolls === 1 ? '' : 's'}</Dim>}
+      {!loggedIn && (
+        <Dim className="anon-note">
+          Logged out, regenerating is free — but logging in starts you on a fresh
+          roll, so bank a card you like by logging in before you fish for more.
+        </Dim>
+      )}
     </Block>
 
     <NextRow>

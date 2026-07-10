@@ -79,7 +79,9 @@ const Navigation = () => {
           {/* The earn, made visible — quietly: a small tick under the total
               that fades in and out. Re-keyed per generate. */}
           {earnFlash && (
-            <EarnTick key={earnFlash.seq} aria-hidden>+{fmtT26(earnFlash.amount)}</EarnTick>
+            <EarnTick key={earnFlash.seq} $negative={earnFlash.amount < 0} aria-hidden>
+              {earnFlash.amount < 0 ? '−' : '+'}{fmtT26(Math.abs(earnFlash.amount))}
+            </EarnTick>
           )}
         </Balance>
       </Inner>
@@ -212,7 +214,7 @@ const EarnTick = styled.span`
   right: 0;
   font-size: 10px;
   font-family: var(--font-mono);
-  color: var(--gold-bright);
+  color: ${p => (p.$negative ? '#ff8a8a' : 'var(--gold-bright)')};
   pointer-events: none;
   opacity: 0;
   animation: earnTick 2.4s ease-out forwards;

@@ -77,6 +77,15 @@ export const saveCostFor = (cardId) =>
 export const drawYieldFor = (seed) =>
   round6(logBand(bell01(`${seed}:yield`), PRICE_BANDS.drawYield));
 
+// Create-flow pricing: a linear base that climbs with the reroll count, plus a
+// seeded uniform fraction so the /t26 reads in the currency's fractional style.
+// Mirrored in src/utils/economyRandom.js — keep the two in sync.
+const rand01 = (seed) => mulberry32(fnv1a(seed))();
+export const regenCostFor = (rolls, seed) =>
+  round2(1 + (Number(rolls) || 0) + rand01(`${seed}:regen`));   // 1.xx, 2.xx, …
+export const createCostFor = (rolls, seed) =>
+  round2(2 + (Number(rolls) || 0) + rand01(`${seed}:create`));  // 2.xx, 3.xx, …
+
 export const rollPublishStake = (rand = Math.random) =>
   round2(logBand((rand() + rand() + rand()) / 3, PRICE_BANDS.publishStake));
 

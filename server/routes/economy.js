@@ -1,7 +1,7 @@
 import express from 'express';
 import { memoryDb } from '../config/database.js';
-import { economyConfig, TIERS } from '../services/economy.js';
-import { yieldRemainingToday } from '../services/ledger.js';
+import { economyConfig, TIERS, regenCostFor } from '../services/economy.js';
+import { yieldRemainingToday, absorb, InsufficientFundsError } from '../services/ledger.js';
 import { requireAuth } from '../middleware/auth.js';
 import { storageInfo } from '../storage/index.js';
 
@@ -20,6 +20,26 @@ router.get('/balance', requireAuth, (req, res) => {
       yieldRemainingToday: yieldRemainingToday(req.user)
     }
   });
+});
+
+// Charge a card regeneration (reroll) for the signed-in creator. The price is
+// computed server-side from the reroll count + card seed (mirrored formula), so
+// the client can't undercut it. Card generation itself is client-side; this is
+// purely the /t26 charge. 402 when the balance can't cover it.
+router.post('/reroll', requireAuth, (req, res) => {
+  const rolls = Math.max(0, Math.min(9999, parseInt(req.body?.rolls, 10) || 0));
+  const seed = String(req.body?.seed || '');
+  const charged = regenCostFor(rolls, seed);
+  try {
+    absorb(req.user.id, 'reroll', charged);
+    res.json({ success: true, data: { charged, balance: memoryDb.getUserById(req.user.id).balance } });
+  } catch (error) {
+    if (error instanceof InsufficientFundsError) {
+      return res.status(402).json({ success: false, error: 'Not enough /t26 to regenerate' });
+    }
+    console.error('Reroll charge error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
 });
 
 router.get('/transactions', requireAuth, (req, res) => {

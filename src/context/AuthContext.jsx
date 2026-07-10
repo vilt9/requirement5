@@ -32,6 +32,14 @@ export function AuthProvider({ children }) {
     setEarnFlash({ amount, seq: earnSeqRef.current });
   }, []);
 
+  // The same tick, in the other direction: a spend shows a red −amount under the
+  // balance (used by the create flow's reroll charge).
+  const flashSpend = useCallback((amount) => {
+    if (!(amount > 0)) return;
+    earnSeqRef.current += 1;
+    setEarnFlash({ amount: -amount, seq: earnSeqRef.current });
+  }, []);
+
   const bumpStash = useCallback((amount = 1) => {
     setStash(current => {
       const next = round6(current + amount);
@@ -208,7 +216,7 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider value={{
       user, config, yieldRemaining, loading,
       signup, login, claim, logout, refreshBalance, setBalance,
-      stash, bumpStash, nextCard, earnFlash
+      stash, bumpStash, nextCard, earnFlash, flashSpend
     }}>
       {children}
     </AuthContext.Provider>

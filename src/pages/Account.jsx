@@ -12,7 +12,8 @@ const TXN_LABELS = {
   claimed_yield: 'Claimed logged-out stash',
   save: 'Card saved',
   dividend: 'Creator dividend',
-  publish_stake: 'Publish stake'
+  publish_stake: 'Publish stake',
+  reroll: 'Card regeneration'
 };
 
 const AuthForm = ({ title, submitLabel, onSubmit }) => {
