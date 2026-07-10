@@ -49,6 +49,19 @@ function openUrl(url) {
 
 const cardUrl = (id) => `${apiUrl()}/card/${id}`;
 
+// A balance line for any command that moves /t26 — and, when the balance is
+// negative, a short explainer of the overdraft rules (mirrors the server:
+// -1000 floor, 1.47%/day interest).
+function balanceReport(balance) {
+  if (typeof balance !== 'number') return '';
+  if (balance >= 0) return `  Balance: ${balance} /t26`;
+  return [
+    `  Balance: ${balance} /t26  (in debt)`,
+    `    Debt accrues 1.47%/day interest, compounding. You can spend down to`,
+    `    −1000 /t26; at the floor, spending is blocked until you earn back (generate).`
+  ].join('\n');
+}
+
 async function promptHidden(label) {
   // Password prompt that works in pipes too (agents pass --password instead).
   process.stderr.write(label);
@@ -122,6 +135,28 @@ async function cmdTransactions({ flags }) {
   out(data);
 }
 
+// A card's rarity is a server-owned gamble. `roll` starts (or shows) your one
+// free roll for the next card; `reroll` draws a fresh rarity for a climbing fee.
+// Publishing consumes the roll and charges the (gentle) create fee.
+async function cmdRoll({ flags }) {
+  const { data } = await api.post('/api/economy/roll', {}, { auth: true });
+  if (flags.json) return out(data);
+  const r = data.roll;
+  out(`Rarity roll: ${r.rarityScore}  (${r.tier?.name || '—'})${r.committed ? ' · committed' : ''}`);
+  out(`  rerolls so far: ${r.rerolls}`);
+  out(`  reroll: −${data.prices.reroll} /t26   ·   create (at publish): −${data.prices.create} /t26`);
+  out(balanceReport(data.balance));
+}
+
+async function cmdReroll({ flags }) {
+  const { data } = await api.post('/api/economy/roll/reroll', {}, { auth: true });
+  if (flags.json) return out(data);
+  const r = data.roll;
+  out(`Rerolled → ${r.rarityScore}  (${r.tier?.name || '—'})   [−${data.charged} /t26]`);
+  out(`  next reroll: −${data.prices.reroll} /t26   ·   create: −${data.prices.create} /t26`);
+  out(balanceReport(data.balance));
+}
+
 async function cmdConfig({ positional, flags }) {
   if (flags['api-url']) {
     setApiUrl(flags['api-url']);
@@ -147,15 +182,19 @@ async function cmdPublish({ positional, flags }) {
   }
 
   const payload = buildPublishPayload(spec, path.dirname(path.resolve(specPath)));
+  // A card's rarity is a server roll. Ensure one exists (idempotent) — run
+  // `r5c reroll` first to gamble; otherwise this uses your current free roll.
+  await api.post('/api/economy/roll', {}, { auth: true });
   const { data } = await api.post('/api/cards/publish', payload, { auth: true });
 
   const url = cardUrl(data.card.id);
   if (flags.json) {
     out({ ...data, url });
   } else {
-    out(`Published "${data.card.name}" (${data.card.tier}, rarity ${data.card.rarity_score})`);
+    out(`Published "${data.card.name}" — rarity ${data.card.rarity_score} (${data.card.tier})`);
     out(`  ${url}`);
-    out(`  Stake: ${data.stake} /t26 — balance now ${data.balance} /t26 — images stored: ${data.imagesStored}`);
+    out(`  Create fee: ${data.createStake} /t26 — images stored: ${data.imagesStored}`);
+    out(balanceReport(data.balance));
   }
   if (flags.open) openUrl(url);
 }
@@ -275,7 +314,10 @@ const COMMANDS = {
   balance: cmdBalance,
   transactions: cmdTransactions,
   config: cmdConfig,
+  roll: cmdRoll,
+  reroll: cmdReroll,
   publish: cmdPublish,
+  create: cmdPublish, // alias — matches the web's "Create"
   update: cmdUpdate,
   preview: cmdPreview,
   get: cmdGet,

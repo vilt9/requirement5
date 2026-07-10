@@ -1,21 +1,21 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, tierForScore } from '../context/AuthContext';
 import { api } from '../utils/api';
-import { Panel, PillButton, TextInput, Select, Divider, Dim, ErrorText, TagList } from './UI';
+import { Panel, PillButton, TextInput, Divider, Dim, ErrorText, TagList } from './UI';
 
-// Publish the card being customized into the pool. Costs the publish stake;
-// the chosen tier sets how often it appears and what each save pays you.
-const PublishPanel = ({ customCard }) => {
+// Publish the card being customized into the pool. The rarity (and so the tier
+// and odds) is NOT chosen here — it's the rolled value from the Start stage.
+const PublishPanel = ({ customCard, onPublished }) => {
   const { user, config, setBalance } = useAuth();
   const [name, setName] = useState('');
-  const [tierKey, setTierKey] = useState('common');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(null);
   const [published, setPublished] = useState(null); // the created card record
   const [error, setError] = useState(null);
 
-  const tier = config?.tiers?.find(t => t.key === tierKey);
+  const rarity = customCard?.rarity;
+  const tier = tierForScore(config, rarity);
 
   const publish = async () => {
     if (!customCard) return;
@@ -27,7 +27,6 @@ const PublishPanel = ({ customCard }) => {
         method: 'POST',
         body: {
           name: name || 'Untitled card',
-          tier: tierKey,
           tags: customCard.tags || [],
           stateData: {
             customCard,
@@ -38,8 +37,9 @@ const PublishPanel = ({ customCard }) => {
       });
       setBalance(result.balance);
       setPublished(result.card);
-      setMessage(`Published to the pool. −${result.stake} /t26 stake. ` +
-        `Your card now appears at ${tier?.odds ? `1 : ${tier.odds.toLocaleString()}` : 'common'} odds.`);
+      setMessage(`Published to the pool — rarity ${Number(result.rarityScore).toFixed(3)} (${result.card.tier}).` +
+        (result.createStake ? ` −${result.createStake} /t26 create fee.` : ''));
+      if (onPublished) onPublished(result);
     } catch (err) {
       setError(err.message);
     }
@@ -67,16 +67,10 @@ const PublishPanel = ({ customCard }) => {
           value={name}
           onChange={e => setName(e.target.value)}
         />
-        <Select value={tierKey} onChange={e => setTierKey(e.target.value)}>
-          {config?.tiers?.map(t => (
-            <option key={t.key} value={t.key}>
-              {t.name}{t.odds ? ` — 1 : ${t.odds.toLocaleString()}` : ''}
-            </option>
-          ))}
-        </Select>
-        {tier && (
+        {rarity != null && (
           <div>
-            <Dim>Appears at {tier.odds ? `1 : ${tier.odds.toLocaleString()}` : 'common'} odds.
+            <Dim>Rolled rarity <b style={{ color: 'var(--gold-bright)' }}>{Number(rarity).toFixed(3)}</b>
+            {tier && <> — {tier.name}{tier.odds ? `, appears at 1 : ${tier.odds.toLocaleString()}` : ''}</>}.
             Every card rolls its own save price
             ({config?.pricing?.saveCost ? `${config.pricing.saveCost.min}–${config.pricing.saveCost.max}` : '1.5–48'} /t26);
             you earn {Math.round((config?.pricing?.dividendRate ?? 0.2) * 100)}% of it per save.</Dim>
@@ -89,10 +83,8 @@ const PublishPanel = ({ customCard }) => {
           </div>
         )}
         <div>
-          <Dim>Stake: {config?.pricing?.publishStake
-            ? `${config.pricing.publishStake.min}–${config.pricing.publishStake.max}`
-            : '1–4'} /t26 (rolled at publish), absorbed by the cloud. Pick the tier
-          that fits the card — rarer tiers circulate less.</Dim>
+          <Dim>The create fee was paid at Start — publishing is free and just
+          releases the card into the pool at its rolled rarity.</Dim>
         </div>
         {error && <ErrorText>{error}</ErrorText>}
         {message && <div className="publish-success">{message}</div>}
@@ -105,9 +97,7 @@ const PublishPanel = ({ customCard }) => {
         )}
         <div>
           <PillButton onClick={publish} disabled={busy || !customCard}>
-            {busy ? 'Publishing…' : `Publish (−${config?.pricing?.publishStake
-              ? `${config.pricing.publishStake.min}–${config.pricing.publishStake.max}`
-              : '1–4'} /t26)`}
+            {busy ? 'Publishing…' : 'Publish'}
           </PillButton>
         </div>
       </Stack>

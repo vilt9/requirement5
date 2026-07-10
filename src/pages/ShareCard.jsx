@@ -338,7 +338,10 @@ const ShareCard = () => {
   // and the tier it's counted in always agree.
   const tierOf = (score) => (config?.tiers || []).find(t => score >= t.scoreRange[0] && score <= t.scoreRange[1])
     || config?.tiers?.find(t => t.key === 'common') || null;
-  const rarity = scoreCard(cc);
+  // Rarity is the server roll (stored on the card), not something recomputed
+  // from the look — you can't design your way to a better score. Fall back to
+  // the params only for cards with no stored score (unsaved/synthetic draws).
+  const rarity = typeof card.rarity_score === 'number' ? card.rarity_score : scoreCard(cc);
   const tier = tierOf(rarity);
   const totalPublished = rarities ? rarities.length : null;
   const tierPeers = rarities && tier ? rarities.filter(r => tierOf(r)?.key === tier.key).length : null;

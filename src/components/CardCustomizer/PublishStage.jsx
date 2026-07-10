@@ -6,6 +6,7 @@ import { TagInput, TextInput, PillButton, Dim } from '../UI';
 // the pool, and optionally keep the design as a reusable set.
 const PublishStage = ({
   customCard,
+  onPublished,
   onTagsChange,
   presetName,
   onPresetNameChange,
@@ -21,7 +22,7 @@ const PublishStage = ({
       <TagInput value={customCard?.tags || []} onChange={onTagsChange} />
     </Block>
 
-    <PublishPanel customCard={customCard} />
+    <PublishPanel customCard={customCard} onPublished={onPublished} />
 
     <Block>
       <BlockTitle>Keep this design as a set</BlockTitle>

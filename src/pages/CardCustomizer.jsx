@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import localforage from 'localforage';
 import styled from 'styled-components';
 import { LuCircleArrowRight, LuRotateCcw } from 'react-icons/lu';
@@ -36,13 +36,17 @@ const STAGE_KEYS = STAGES.map(s => s.key);
 // background and the rolled rarity change when you regenerate.
 const DEFAULT_HOLO = { overlay: true, rareHolo: false, rareHoloGalaxy: false, wowaHolo: false, rareHoloVmax: false };
 
-const rollBaseCard = () => ({
-  ...generateCardAttributes(),
+// Build a base card's visuals. When a rarity is given (the server roll), the
+// look is generated to match it; otherwise a client rarity is drawn (logged
+// out, where rarity is honour-system until login).
+const rollBaseCard = (rarity) => ({
+  ...generateCardAttributes(rarity != null ? { rarityRange: [rarity, rarity] } : {}),
   tags: [],
   imagePath: 'custom_image',
   customImageUrl: sigImage,
   customHoloImageUrl: null,
-  holoEffects: DEFAULT_HOLO
+  holoEffects: DEFAULT_HOLO,
+  ...(rarity != null ? { rarity } : {})
 });
 
 // Costs (regenCostFor / createCostFor) live in utils/economyRandom.js so the
@@ -85,8 +89,25 @@ const CardCustomizer = () => {
   // discards the card — you can't fish a rare roll for free and bank it.
   const [anonRolls, setAnonRolls] = useState(false);
   // True once the create fee has been paid for THIS card, so stepping back and
-  // forth to Design never double-charges. Cleared on a new roll.
+  // forth to Design never double-charges. Cleared on a new roll. (Logged-out
+  // only — logged in, the roll's `committed` flag is authoritative.)
   const [paidCreate, setPaidCreate] = useState(false);
+  // The server-owned rarity roll (logged in): { id, rarityScore, rerolls,
+  // committed, tier } + its { reroll, create } prices. Null when logged out.
+  const [roll, setRoll] = useState(null);
+  const [prices, setPrices] = useState(null);
+
+  // Fetch (or create) the active server roll and sync the card's rarity to it.
+  const fetchRoll = useCallback(async () => {
+    try {
+      const data = await api('/api/economy/roll', { method: 'POST' });
+      setRoll(data.roll);
+      setPrices(data.prices);
+      setCustomCard(prev => (prev ? { ...prev, rarity: data.roll.rarityScore } : prev));
+    } catch (error) {
+      console.error('Could not fetch rarity roll:', error);
+    }
+  }, []);
   // The in-progress design is precious: publishing needs an account, and the
   // signup link navigates away from this page. Drafts persist to local storage
   // so the design survives the login round-trip (and reloads) — checked before
@@ -168,11 +189,20 @@ const CardCustomizer = () => {
       setRolls(0);
       setAnonRolls(false);
       setPaidCreate(false);
+      setRoll(null); // force a fresh server roll
       setStage('start');
       setSelectedPresetId('');
       flash('Logged in — fresh roll. Rerolls made while logged out don’t carry over.');
     }
   }, [user, anonRolls, loading, draftChecked]);
+
+  // Logged in with no active roll loaded → pull one from the server (the source
+  // of truth for rarity). Logged out clears it (client-side rolls apply).
+  useEffect(() => {
+    if (loading || !draftChecked || !customCard) return;
+    if (!user) { setRoll(null); setPrices(null); return; }
+    if (!roll) fetchRoll();
+  }, [user, loading, draftChecked, customCard, roll, fetchRoll]);
 
   // The upload previews ARE the card's images — derived, never separately
   // stored. A fresh card starts with empty slots; a set loaded with images
@@ -233,38 +263,42 @@ const CardCustomizer = () => {
   // Logged in, the reroll costs /t26: charge the server first (it computes the
   // price from the reroll count + seed), and a failed / unaffordable charge
   // aborts the reroll. Logged out it's free — but marked, so logging in wipes it.
-  const doReroll = () => {
-    const fresh = generateCardAttributes();
+  // Regenerate the card's look; force `rarity` when the server hands one back so
+  // the preview matches the rolled value.
+  const doReroll = (rarity) => {
+    const fresh = generateCardAttributes(rarity != null ? { rarityRange: [rarity, rarity] } : {});
     setCustomCard(prev => ({
       ...fresh,
       tags: prev?.tags || [],
       customImageUrl: prev?.customImageUrl || sigImage,
       imagePath: 'custom_image',
       customHoloImageUrl: prev?.customHoloImageUrl || null,
-      holoEffects: prev?.holoEffects || DEFAULT_HOLO
+      holoEffects: prev?.holoEffects || DEFAULT_HOLO,
+      ...(rarity != null ? { rarity } : {})
     }));
-    setRolls(n => n + 1);
     setPaidCreate(false); // a new card → the create fee applies again
   };
 
   const handleRegenerate = async () => {
     if (user) {
+      // Server owns the rarity: reroll draws a fresh one and charges the fee.
       try {
-        const res = await api('/api/economy/reroll', {
-          method: 'POST',
-          body: { rolls, seed: customCard?.id }
-        });
-        setBalance(res.balance);
-        flashSpend(res.charged);
+        const data = await api('/api/economy/roll/reroll', { method: 'POST' });
+        setRoll(data.roll);
+        setPrices(data.prices);
+        setBalance(data.balance);
+        flashSpend(data.charged);
+        doReroll(data.roll.rarityScore);
       } catch (error) {
         flash(error?.status === 402
           ? (error.message || 'Debt limit reached — pay down /t26 first.')
-          : 'Could not charge the reroll — try again.');
-        return;
+          : 'Could not reroll — try again.');
       }
-    } else {
-      setAnonRolls(true); // free while logged out; wiped on login
+      return;
     }
+    // Logged out: free client reroll, marked so login wipes it.
+    setAnonRolls(true);
+    setRolls(n => n + 1);
     doReroll();
   };
 
@@ -273,23 +307,32 @@ const CardCustomizer = () => {
   // stepping back to Start and forward again doesn't double-bill. Logged out
   // it's free (publishing needs an account, and logging in restarts the roll).
   const handleStart = async () => {
-    if (user && !paidCreate) {
-      try {
-        const res = await api('/api/economy/create', {
-          method: 'POST',
-          body: { rolls, seed: customCard?.id }
-        });
-        setBalance(res.balance);
-        flashSpend(res.charged);
-        setPaidCreate(true);
-      } catch (error) {
-        flash(error?.status === 402
-          ? (error.message || 'Debt limit reached — pay down /t26 first.')
-          : 'Could not charge the create fee — try again.');
-        return;
+    if (user) {
+      // Commit the roll (pay the create fee) unless it's already committed.
+      if (!roll?.committed) {
+        try {
+          const data = await api('/api/economy/roll/commit', { method: 'POST' });
+          setRoll(data.roll);
+          setPrices(data.prices);
+          setBalance(data.balance);
+          flashSpend(data.charged);
+        } catch (error) {
+          flash(error?.status === 402
+            ? (error.message || 'Debt limit reached — pay down /t26 first.')
+            : 'Could not charge the create fee — try again.');
+          return;
+        }
       }
     }
     setStage('design');
+  };
+
+  // A published card consumes its roll — clear the draft and drop the stale
+  // roll so the next card pulls a fresh one.
+  const handlePublished = () => {
+    localforage.removeItem('r5cCreateDraft').catch(() => {});
+    setRoll(null);
+    setPrices(null);
   };
 
   // Reset (from the Design stage): drop back to the roll, keeping the current
@@ -478,13 +521,13 @@ const CardCustomizer = () => {
           {stage === 'start' && (
             <StageBody>
               <StartStage
-                rarity={customCard?.rarity}
-                tierName={tierForScore(config, customCard?.rarity)?.name}
-                rolls={rolls}
-                regenCost={regenCostFor(rolls, customCard?.id)}
-                createCost={createCostFor(rolls, customCard?.id)}
+                rarity={user ? roll?.rarityScore : customCard?.rarity}
+                tierName={user ? roll?.tier?.name : tierForScore(config, customCard?.rarity)?.name}
+                rolls={user ? (roll?.rerolls ?? 0) : rolls}
+                regenCost={user ? (prices?.reroll ?? 0) : regenCostFor(rolls, customCard?.id)}
+                createCost={user ? (prices?.create ?? 0) : createCostFor(rolls, customCard?.id)}
                 loggedIn={!!user}
-                paidCreate={paidCreate}
+                paidCreate={user ? !!roll?.committed : paidCreate}
                 onRegenerate={handleRegenerate}
                 onNext={handleStart}
               />
@@ -625,6 +668,7 @@ const CardCustomizer = () => {
             <StageBody className="controls-footer">
               <PublishStage
                 customCard={customCard}
+                onPublished={handlePublished}
                 onTagsChange={setTags}
                 presetName={presetName}
                 onPresetNameChange={setPresetName}

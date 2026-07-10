@@ -18,32 +18,47 @@ you only specify what you care about.
   them to run `r5c signup --username <name>` / `r5c login`, or to set
   `R5C_TOKEN`. Never invent credentials or sign up on their behalf.
 
+## Rarity is a gamble, not a choice
+
+A card's rarity is a **server roll**, not a spec field. You cannot pick the
+tier — you roll for it.
+
+- `r5c roll` → your free rarity for the next card (idempotent — one per card).
+- `r5c reroll` → draws a fresh rarity for a climbing /t26 fee (the gambling tax).
+- Publishing stamps the current roll onto the card and charges the (gentle)
+  create fee. The spec only describes the **look**.
+
+Never promise the user a specific tier — surface the rolled number and let them
+decide whether to reroll (which spends /t26).
+
 ## Learn the spec FIRST
 
 Run `r5c help spec` and `r5c template full` before hand-writing a card. They are
 the authoritative reference for every field, its range, and its default — do not
 guess field names from memory.
 
-A minimal spec:
+A minimal spec (look only — no tier/rarity):
 
 ```json
-{ "name": "My card", "tier": "holo", "image": "./art.png" }
+{ "name": "My card", "image": "./art.png" }
 ```
 
-Only `tier` is required — one of `common | holo | galaxy | wowa | ultra | vmax`.
 Everything omitted gets coherent defaults. Add a `card` object to override any
 visual system (background, patterns, the holo effects, borders). `image` is a
 local path or a URL.
 
 ## Workflow
 
-1. Write `card.json` (start from `r5c template`).
-2. `r5c publish card.json --json` → prints the card id and live URL. Costs 1–4 /t26.
-3. `r5c preview <id> --out shots/` → writes PNG stills (one at rest, the others
+1. `r5c roll` → see the rolled rarity. `r5c reroll` to gamble (spends /t26) —
+   confirm with the user before rerolling.
+2. Write `card.json` (start from `r5c template`) — the look only.
+3. `r5c publish card.json --json` → publishes at the rolled rarity; prints the
+   card id + URL. Charges the create fee.
+4. `r5c preview <id> --out shots/` → writes PNG stills (one at rest, the others
    mid-orbit with the holo awake). **Open and look at these images** to judge it.
-4. Edit the spec, then `r5c update <id> card.json` → redesigns the *same* card
-   with no new stake.
-5. Repeat 3–4 until it looks right. `r5c open <id>` shows it in the browser.
+5. Edit the spec, then `r5c update <id> card.json` → redesigns the *same* card,
+   free, rarity unchanged.
+6. Repeat 4–5 until it looks right. `r5c open <id>` shows it in the browser.
 
 ## Other commands
 
@@ -56,6 +71,10 @@ local path or a URL.
 ## Rules
 
 - `r5c help spec` before writing fields — the spec is the source of truth.
-- Confirm the user is authed before publishing; it spends /t26.
-- Iterate with `update`, not fresh `publish` calls — each new card costs a stake.
-- Keep the user in the loop before anything that spends currency.
+- Rarity comes from `r5c roll` / `reroll`, never the spec. Don't set tier.
+- Confirm the user is authed before rerolling or publishing; both spend /t26.
+- `reroll` costs a climbing fee — always confirm before spending it.
+- Iterate the LOOK with `update`, not fresh `publish` calls (a new card needs a
+  new roll + create fee).
+- Balances may go into the red down to -1000 /t26 (1.47%/day interest). Keep the
+  user in the loop before anything that spends currency.

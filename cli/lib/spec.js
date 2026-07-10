@@ -246,11 +246,11 @@ function validate(spec, customCard) {
       problems.push(`unknown top-level key "${key}" (allowed: ${SPEC_KEYS.join(', ')})`);
     }
   }
-  if (!spec.tier || !TIERS.includes(spec.tier)) {
-    problems.push(`"tier" must be one of: ${TIERS.join(', ')} (got ${JSON.stringify(spec.tier)})`);
-  }
-  if (spec.rarityScore !== undefined && (typeof spec.rarityScore !== 'number' || spec.rarityScore < 0 || spec.rarityScore > 1)) {
-    problems.push('"rarityScore" must be a number between 0 and 1');
+  // tier / rarityScore are no longer set here — a card's rarity comes from a
+  // server rarity roll (r5c roll / reroll), not the spec. If present they're
+  // accepted but ignored, so old specs don't break.
+  if (spec.tier !== undefined && !TIERS.includes(spec.tier)) {
+    problems.push(`"tier" (ignored — rarity comes from your roll) must be one of: ${TIERS.join(', ')} if set`);
   }
   if (spec.tags !== undefined && (!Array.isArray(spec.tags) || spec.tags.some((t) => typeof t !== 'string'))) {
     problems.push('"tags" must be an array of strings');
@@ -287,6 +287,8 @@ function validate(spec, customCard) {
 export function buildPublishPayload(spec, baseDir) {
   if (!isPlainObject(spec)) throw new SpecError('spec must be a JSON object');
 
+  // Only a default for the visual params (holo intensity etc.); the card's real
+  // rarity is stamped from the server roll at publish.
   const rarityScore = spec.rarityScore ?? TIER_MID_SCORE[spec.tier] ?? 0.5;
   const tags = spec.tags || [];
   const overrides = spec.card || {};
@@ -316,8 +318,6 @@ export function buildPublishPayload(spec, baseDir) {
 
   return {
     name: spec.name || 'Untitled card',
-    tier: spec.tier,
-    rarityScore,
     tags,
     stateData: {
       customCard,
@@ -331,15 +331,12 @@ export function buildPublishPayload(spec, baseDir) {
 
 const MINIMAL_TEMPLATE = {
   name: 'My first card',
-  tier: 'holo',
   tags: ['example'],
   image: './artwork.png'
 };
 
 const FULL_TEMPLATE = {
   name: 'Neon Reliquary',
-  tier: 'ultra',
-  rarityScore: 0.94,
   tags: ['cosmic', 'portrait', 'gold'],
   image: './artwork.png',
   holoImage: './holo-overlay.png',

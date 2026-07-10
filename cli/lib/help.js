@@ -16,9 +16,13 @@ ACCOUNT
   balance                                      Show /t26 balance
   transactions                                 Show your /t26 ledger
 
+RARITY (a card's rarity is a server gamble, not something you pick)
+  roll                                         Start / show your rarity roll for the next card (free)
+  reroll                                       Draw a fresh rarity — costs a climbing /t26 fee
 CARDS
-  publish <spec.json> [--open] [--json]        Build + publish a card from a spec file (stake: 1–4 /t26, rolled)
-  update <id> <spec.json> [--json]             Re-design a card you own from a spec (no new stake)
+  publish <spec.json> [--open] [--json]        Publish a card at your rolled rarity (charges the create fee)
+  create  <spec.json> [--open] [--json]        Alias for publish
+  update <id> <spec.json> [--json]             Re-design a card you own from a spec (free; rarity unchanged)
   preview <id> [--frames N] [--out <dir>]      Capture still PNGs of the live card (rest + orbit poses)
   template [minimal|full]                      Print an example spec to start from
   get <id>                                     Fetch a card as JSON
@@ -47,18 +51,16 @@ MORE
 
 const SPEC_HELP = `THE CARD SPEC (r5c publish <spec.json>)
 
-A spec is a JSON file. Only "tier" is required; add "image" for a real card.
-Start from \`r5c template\` (minimal) or \`r5c template full\` (every knob).
+A spec describes a card's LOOK. Its RARITY is not in the spec — it's a server
+roll (\`r5c roll\` / \`r5c reroll\`), stamped on publish. Nothing here is
+required; add "image" for a real card. Start from \`r5c template\`.
 
 TOP LEVEL
   name        string    Card title
-  tier        string    ${TIERS.join(' | ')}
-                        (common→vmax = rarest; save cost & creator dividends scale with tier)
-  rarityScore number    0–1, clamped into the tier's band by the server. Optional:
-                        defaults to the middle of the tier's band.
-                        Bands: common 0–.7, holo .7–.8, galaxy .8–.85,
-                        wowa .85–.9, ultra .9–.98, vmax .98–1
   tags        string[]  Search/discovery tags
+  (tier / rarityScore are ignored if present — rarity comes from your roll.
+   Tier bands, for reference: common 0–.7, holo .7–.8, galaxy .8–.85,
+   wowa .85–.9, ultra .9–.98, vmax .98–1)
   image       path|URL  Main artwork. Local paths are inlined and the server
                         stores them (downscaled to 1200px, WebP) on its CDN.
   holoImage   path|URL  Optional overlay artwork for the holo layer
@@ -169,11 +171,14 @@ NOTES
   - Enabling a holo effect without its params block applies that effect's defaults.
   - Any local image path anywhere in spec.card (e.g. rareHoloParams.backgroundImage)
     is inlined automatically if the file exists (relative to the spec file).
-  - Publishing stakes 1–4 /t26, rolled per publish (new accounts start with 50). When others save your
-    card you earn a dividend scaled by tier. Updating a published card is free.
+  - Rarity is a gamble: \`r5c roll\` gives a free rarity for the next card;
+    \`r5c reroll\` draws a fresh one for a climbing /t26 fee. Publishing charges
+    the (gentle) create fee and stamps the current roll onto the card.
+  - New accounts start with 50 /t26. You may spend into the red down to -1000
+    (debt accrues 1.47%/day). When others save your card you earn a dividend.
   - The published card lives at <api-url>/card/<id>.
-  - Design loop: publish → \`r5c preview <id> --out shots/\` → look → edit spec →
-    \`r5c update <id> spec.json\` → preview again.
+  - Loop: roll → (reroll to taste) → publish → \`r5c preview <id> --out shots/\`
+    → look → \`r5c update <id> spec.json\` (free; rarity stays) → preview again.
 
 TASTE
   This is the knob reference. For HOW to choose them — turning an image into a
@@ -184,28 +189,39 @@ TASTE
 
 export const COMMAND_HELP = {
   spec: SPEC_HELP,
-  publish: `r5c publish <spec.json> [--open] [--json]
+  roll: `r5c roll
 
-Builds a complete card from the spec file and publishes it into the public pool.
-Costs the publish stake (1–4 /t26, rolled at publish). Local image paths in the spec are resolved
-relative to the spec file, inlined, and offloaded to the server's image store.
+Starts (or shows) your rarity roll for the NEXT card — a server-owned random
+0–1 score that decides the card's tier. Free, and idempotent: you get one roll
+per card, so calling it again returns the same roll (not a new free one).
+To gamble for a better number, \`r5c reroll\`. Publishing consumes the roll.`,
+  reroll: `r5c reroll
 
-Prints the card's public URL. --open additionally opens it in the browser.
---json prints the full server response (card, stats, balance) plus "url".
+Draws a FRESH random rarity onto your active roll and charges the reroll fee
+(climbs each time — the gambling tax). Prints the new rarity, the next reroll
+price, and the create fee you'll pay at publish. Run \`r5c roll\` first if you
+have no active roll.`,
+  publish: `r5c publish <spec.json> [--open] [--json]   (alias: r5c create)
 
-See \`r5c help spec\` for the spec format and \`r5c template full\` for a
-maximal example.`,
+Publishes a card into the pool at your ROLLED rarity (\`r5c roll\` / \`reroll\`).
+If you have no active roll, one is created for you (a free first roll). Charges
+the create fee unless you already paid it. The spec provides only the LOOK —
+rarity/tier come from the roll. Local image paths are inlined and offloaded to
+the server's image store.
+
+Prints the card's public URL. --open opens it; --json prints the full response.
+See \`r5c help spec\` for the spec format.`,
   update: `r5c update <id> <spec.json> [--json]
 
-Rebuilds a card YOU created from the spec file and replaces its design —
-name, tier, tags, images, every visual parameter. No new stake: you already
-paid to publish it. The spec is expanded exactly like \`r5c publish\`, so the
-iterate loop is:
+Rebuilds a card YOU created from the spec file and replaces its LOOK — name,
+tags, images, every visual parameter. Free, and the rarity does NOT change
+(that was the roll). Iterate loop:
 
+  r5c roll                       # (or reroll to gamble)
   r5c publish card.json          # first version (prints the id)
   r5c preview <id> --out shots/  # look at it
   # edit card.json...
-  r5c update <id> card.json      # same card, new design
+  r5c update <id> card.json      # same card, new look
   r5c preview <id> --out shots/  # look again (fresh frames after updates)`,
   preview: `r5c preview <id> [--frames N] [--out <dir>] [--json]
 
@@ -229,7 +245,8 @@ visual knob including all four holo effect systems. Reference: r5c help spec`,
 Creates an account and stores the session token in ~/.r5c/config.json.
 Username: 3-24 chars (letters, numbers, underscore). Password: min 8 chars —
 prompted interactively if omitted (or piped via stdin).
-New accounts are granted 50 /t26; publishing costs 10.`,
+New accounts are granted 50 /t26; rerolling and publishing spend from it (you
+may go into the red down to -1000, which accrues 1.47%/day interest).`,
   login: `r5c login --username <name> [--password <pw>]
 
 Logs in and stores the session token (valid 30 days) in ~/.r5c/config.json.
