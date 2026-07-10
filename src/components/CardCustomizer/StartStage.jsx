@@ -26,7 +26,7 @@ const StartStage = ({
     <Block>
       <BlockTitle>Randomly generated Rarity Value:</BlockTitle>
       <Roll>
-        <span className="label"><Dim>Rarity Value:</Dim></span>
+        <span className="label"><Dim>RV:</Dim></span>
         <span className="score">{(rarity ?? 0).toFixed(3)}</span>
         {tierName && <span className="tier"><Dim>{tierName}</Dim></span>}
       </Roll>
