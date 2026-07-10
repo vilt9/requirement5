@@ -2,7 +2,7 @@ import express from 'express';
 import Card from '../models/Card.js';
 import { memoryDb } from '../config/database.js';
 import crypto from 'node:crypto';
-import { getTier, saveCostFor, saveValueFor, dividendFor, rollPublishStake, normalizeProvenance, round2, round6, tierForScore, TIERS } from '../services/economy.js';
+import { getTier, saveCostFor, saveValueFor, dividendFor, rollPublishStake, normalizeProvenance, round2, round6, tierForScore } from '../services/economy.js';
 import { absorb, issue, InsufficientFundsError } from '../services/ledger.js';
 import { cardStats } from '../services/drawEngine.js';
 import { requireAuth, optionalAuth } from '../middleware/auth.js';
@@ -239,27 +239,26 @@ router.delete('/collection/:cardId', requireAuth, (req, res) => {
 });
 
 // ---------- Discover collections ----------
-// Tier rarity rank (higher = rarer) — TIERS is ordered rarest-first.
-const TIER_RANK = new Map(TIERS.map((t, i) => [t.key, TIERS.length - i]));
-
 // A collection's makeup: total spent building it (sum of what was paid per
-// save) and the rarity breakdown as per-tier shares, rarest tier first.
+// save) and the rarity scores of its rarest few cards, highest first. The
+// rarity score is the card's own auto-generated 0..1 rating.
+const TOP_N = 3;
 const collectionStats = (userId) => {
   const saves = memoryDb.getSavesByUser(userId);
   let value = 0;
-  const byTier = new Map();
+  const scores = [];
   for (const s of saves) {
     const card = memoryDb.getCardById(s.card_id);
     if (!card) continue;
     value += (s.cost ?? saveCostFor(s.card_id));
-    const key = card.tier || 'common';
-    byTier.set(key, (byTier.get(key) || 0) + 1);
+    scores.push(Number(card.rarity_score) || 0);
   }
-  const total = [...byTier.values()].reduce((a, b) => a + b, 0) || 1;
-  const rarity = [...byTier.entries()]
-    .map(([key, count]) => ({ key, count, pct: Math.round((count / total) * 1000) / 10 }))
-    .sort((a, b) => (TIER_RANK.get(b.key) || 0) - (TIER_RANK.get(a.key) || 0));
-  return { count: saves.length, value: round2(value), rarity };
+  scores.sort((a, b) => b - a);
+  return {
+    count: saves.length,
+    value: round2(value),
+    topScores: scores.slice(0, TOP_N).map(n => Math.round(n * 1000) / 1000)
+  };
 };
 
 // The public roster shape for one collection owner.
@@ -355,7 +354,7 @@ router.get('/collections/:username', optionalAuth, (req, res) => {
       username: owner.username,
       count: items.length,
       value: stats.value,
-      rarity: stats.rarity,
+      topScores: stats.topScores,
       stars: memoryDb.countStarsForOwner(owner.id),
       starredByMe: req.user ? !!memoryDb.getStar(req.user.id, owner.id) : false,
       items

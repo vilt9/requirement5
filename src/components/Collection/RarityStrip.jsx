@@ -2,17 +2,15 @@ import styled from 'styled-components';
 import { fmtT26 } from '../../utils/economyRandom';
 import { Dim } from '../UI';
 
-// A colourless read of a collection: its rarest few tiers as plain percents,
-// plus the total spent building it. Rarity used to be shown as coloured dots /
-// bars, but the colour→rarity code confused people, so it's words and numbers
-// now. `tierName` maps a tier key to its display name (from the economy config).
-const RarityStrip = ({ rarity = [], value, count, tierName }) => (
+// A colourless read of a collection: the rarity scores of its rarest few cards
+// (each card carries an auto-generated 0..1 score), plus the total spent
+// building it. No colours — the tier colour code confused people.
+const RarityStrip = ({ topScores = [], value, count }) => (
   <Wrap>
-    {rarity.length > 0 && (
-      <div className="pcts">
-        {rarity.slice(0, 3).map(r => (
-          <span key={r.key}>{tierName(r.key)} <b>{r.pct}%</b></span>
-        ))}
+    {topScores.length > 0 && (
+      <div className="scores">
+        <Dim>Top rarity</Dim>
+        {topScores.map((s, i) => <b key={i}>{s.toFixed(3)}</b>)}
       </div>
     )}
     <Dim className="meta">
@@ -28,9 +26,8 @@ const Wrap = styled.div`
   gap: 3px;
   font-size: 11px;
 
-  .pcts { display: flex; flex-wrap: wrap; gap: 3px 10px; color: var(--amber-text); }
-  .pcts span { white-space: nowrap; }
-  .pcts b { color: var(--gold-bright); font-weight: 600; }
+  .scores { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 8px; }
+  .scores b { color: var(--gold-bright); font-weight: 600; font-variant-numeric: tabular-nums; }
   .meta { font-size: 11px; }
 `;
 

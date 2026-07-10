@@ -14,7 +14,7 @@ import RarityStrip from './RarityStrip';
 // Shape of the data: /discover hands back light roster entries (name, counts,
 // rarity tiers for the dots). Peeking one lazy-loads that owner's full cards.
 const DiscoverCollections = () => {
-  const { user, config } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const [starred, setStarred] = useState([]);     // collections you've starred
@@ -22,11 +22,6 @@ const DiscoverCollections = () => {
   const [remaining, setRemaining] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-
-  const tierName = useCallback(
-    (key) => config?.tiers?.find(t => t.key === key)?.name || key,
-    [config]
-  );
 
   // First page (and a reshuffle whenever the viewer changes — self is excluded
   // server-side, and starred state is viewer-specific).
@@ -119,10 +114,9 @@ const DiscoverCollections = () => {
             </StarButton>
           </div>
           <RarityStrip
-            rarity={entry.rarity}
+            topScores={entry.topScores}
             value={entry.value}
             count={entry.count}
-            tierName={tierName}
           />
         </RosterCard>
       ))}

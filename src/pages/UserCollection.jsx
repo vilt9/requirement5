@@ -57,7 +57,6 @@ const UserCollection = () => {
   };
 
   const tierOf = (key) => config?.tiers?.find(t => t.key === key);
-  const tierName = (key) => tierOf(key)?.name || key;
 
   if (loaded && notFound) {
     return (
@@ -90,7 +89,7 @@ const UserCollection = () => {
         {data && data.items.length > 0 && (
           <>
             <Divider />
-            <RarityStrip rarity={data.rarity} value={data.value} count={data.count} tierName={tierName} />
+            <RarityStrip topScores={data.topScores} value={data.value} count={data.count} />
           </>
         )}
       </Panel>
