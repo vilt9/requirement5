@@ -16,9 +16,9 @@ import About from './pages/About';
 import './App.css';
 
 // The design language (refreshed, after midjourney.com/medical): JetBrains Mono
-// body text in warm amber on pure black, DM Sans for headings in white/gold,
-// gold accents for links and primary actions. Tokens live in :root so the whole
-// system reskins from one place.
+// everywhere — warm amber body on pure black, white/gold headings, gold accents
+// for links and primary actions. Tokens live in :root so the whole system
+// reskins from one place.
 const GlobalStyle = createGlobalStyle`
   /* Clear the fixed nav on desktop; on phones the nav is static (scrolls with
      the page), so reserving the height would just be blank space. */
@@ -58,8 +58,7 @@ const GlobalStyle = createGlobalStyle`
     --panel-border: rgba(156, 138, 104, 0.28);
     --field-bg: rgba(255, 255, 255, 0.04);
 
-    /* Type */
-    --font-sans: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    /* Type — one font, everywhere. */
     --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Courier New', monospace;
   }
 
@@ -90,7 +89,7 @@ const GlobalStyle = createGlobalStyle`
   }
 
   h1, h2, h3, h4 {
-    font-family: var(--font-sans);
+    font-family: var(--font-mono);
     color: var(--white);
     font-weight: 600;
     letter-spacing: -0.03em;

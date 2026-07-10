@@ -41,7 +41,7 @@ export const PillButton = styled.button`
   border: 1px solid ${props => (props.$secondary ? 'var(--panel-border)' : 'var(--gold)')};
   padding: 8px 16px;
   border-radius: 20px;
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-weight: 700;
   font-size: 12px;
   letter-spacing: -0.01em;

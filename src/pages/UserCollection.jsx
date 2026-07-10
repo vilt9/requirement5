@@ -166,7 +166,7 @@ const StarButton = styled.button`
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-weight: 700;
   font-size: 12px;
   padding: 7px 14px;
