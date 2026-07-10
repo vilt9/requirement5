@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import styled from 'styled-components';
+import { LuCircleArrowRight } from 'react-icons/lu';
 import Card from '../components/Card/Card';
 import { useAuth } from '../context/AuthContext';
 import { api, ApiError, apiBase } from '../utils/api';
@@ -386,7 +387,7 @@ const ShareCard = () => {
             always visible, so the next card is one tap away from anywhere. */}
         <FixedDock className="card-actions">
           <SaveButton onClick={generate} disabled={busy}>
-            <span className="main">{busy ? 'Working…' : 'Generate'}</span>
+            <span className="main">{busy ? 'Working…' : 'Generate'} <LuCircleArrowRight aria-hidden /></span>
             <span className="sub">{earned != null ? `+${fmtT26(earned)} /t26` : '+ /t26'}</span>
           </SaveButton>
           <SaveButton
@@ -539,12 +540,17 @@ const Column = styled.div`
   width: 100%;
   max-width: 460px;
   margin: 0 auto;
-  /* Extra bottom clearance: the fixed Generate/Save dock floats over the page. */
-  padding: 8px 14px 96px;
+  padding: 8px 14px 28px;
   text-align: left;
   display: flex;
   flex-direction: column;
   gap: 12px;
+
+  /* Phones lift Generate/Save into a fixed dock — clear space so it never
+     covers the last of the page. */
+  @media (max-width: 640px) {
+    padding-bottom: 96px;
+  }
 `;
 
 const Meta = styled.div`
@@ -563,52 +569,56 @@ const Actions = styled.div`
   button { font-family: var(--font-mono); font-weight: 600; font-size: 13px; }
 `;
 
-// Generate + Save, fixed to the bottom of the screen — always visible, so a
-// user can chain generates without ever scrolling. The translucent panel keeps
-// it readable over whatever it floats above.
+// Generate + Save. On desktop they sit inline, directly under the card, in the
+// normal page flow. On phones — where vertical space is scarce and chaining
+// generates matters — they lift into a fixed dock at the bottom of the screen,
+// always a thumb away, with a translucent panel and a gentle glow.
 const FixedDock = styled.div`
-  position: fixed;
-  bottom: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 40;
   display: flex;
   gap: 10px;
   align-items: stretch;
-  padding: 8px 10px;
-  border-radius: 12px;
-  background: rgba(8, 6, 3, 0.85);
-  backdrop-filter: blur(6px);
-  border: 1px solid var(--panel-border);
   button {
     font-family: var(--font-mono);
     font-weight: 600;
     font-size: 13px;
     position: relative;
   }
-  /* A slow, gentle glow — enough to draw the eye, never enough to nag.
-     The shadow is painted ONCE on a pseudo-layer and pulsed via opacity
-     (compositor-only); animating box-shadow itself repainted the dock on
-     every frame of the 3.2s loop, forever. */
-  button::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    box-shadow: 0 0 10px 1px rgba(232, 180, 85, 0.3);
-    opacity: 0;
-    pointer-events: none;
-    animation: dockPulse 3.2s ease-in-out infinite;
-  }
-  button:disabled::after { animation: none; opacity: 0; }
 
-  @keyframes dockPulse {
-    0%, 100% { opacity: 0; }
-    50%      { opacity: 1; }
-  }
+  @media (max-width: 640px) {
+    position: fixed;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 40;
+    padding: 8px 10px;
+    border-radius: 12px;
+    background: rgba(8, 6, 3, 0.85);
+    backdrop-filter: blur(6px);
+    border: 1px solid var(--panel-border);
 
-  @media (prefers-reduced-motion: reduce) {
-    button::after { animation: none; opacity: 0; }
+    /* A slow, gentle glow — enough to draw the eye, never enough to nag.
+       The shadow is painted ONCE on a pseudo-layer and pulsed via opacity
+       (compositor-only); animating box-shadow itself repainted the dock on
+       every frame of the 3.2s loop, forever. */
+    button::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      box-shadow: 0 0 10px 1px rgba(232, 180, 85, 0.3);
+      opacity: 0;
+      pointer-events: none;
+      animation: dockPulse 3.2s ease-in-out infinite;
+    }
+    button:disabled::after { animation: none; opacity: 0; }
+
+    @keyframes dockPulse {
+      0%, 100% { opacity: 0; }
+      50%      { opacity: 1; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      button::after { animation: none; opacity: 0; }
+    }
   }
 `;
 
@@ -621,7 +631,8 @@ const SaveButton = styled(PillButton)`
   line-height: 1.1;
   padding: 6px 16px;
   gap: 1px;
-  .main { font-size: 13px; }
+  .main { font-size: 13px; display: inline-flex; align-items: center; gap: 5px; }
+  .main svg { font-size: 15px; }
   .sub { font-size: 11px; font-weight: 600; letter-spacing: 0; opacity: 0.85; }
 `;
 
