@@ -92,6 +92,10 @@ export const regenCostFor = (rolls, seed) =>
 export const createCostFor = (rolls, seed) =>
   round2(2 + 0.2 * (Number(rolls) || 0) + rand01(`${seed}:create`));  // 2.xx, then slow
 
+// The rarity gamble: a uniform 0..1 draw the SERVER owns, so neither the web
+// nor the CLI can self-declare a card's rarity. The tier follows from the score.
+export const rollRarity = () => round6(Math.random());
+
 export const rollPublishStake = (rand = Math.random) =>
   round2(logBand((rand() + rand() + rand()) / 3, PRICE_BANDS.publishStake));
 

@@ -2,7 +2,7 @@ import express from 'express';
 import Card from '../models/Card.js';
 import { memoryDb } from '../config/database.js';
 import crypto from 'node:crypto';
-import { getTier, saveCostFor, saveValueFor, dividendFor, rollPublishStake, normalizeProvenance, round2, round6, tierForScore } from '../services/economy.js';
+import { getTier, saveCostFor, saveValueFor, dividendFor, createCostFor, normalizeProvenance, round2, round6, tierForScore } from '../services/economy.js';
 import { absorb, issue, InsufficientFundsError } from '../services/ledger.js';
 import { cardStats } from '../services/drawEngine.js';
 import { requireAuth, optionalAuth } from '../middleware/auth.js';
@@ -14,28 +14,36 @@ const router = express.Router();
 
 // Publish a card into the pool. Costs the publish stake; embedded data-URL images
 // are offloaded to storage (S3 or local) and replaced with URLs.
+// Publish a card into the pool. The rarity is NOT chosen — it comes from the
+// creator's active server roll (see /api/economy/roll), so neither the web nor
+// the CLI can self-declare it. Publishing consumes that roll and charges the
+// create fee if it wasn't already committed (the web pays it at "Start"; the
+// CLI pays it here). The tier follows from the rolled score. Embedded data-URL
+// images are offloaded to storage and replaced with URLs.
 router.post('/publish', requireAuth, async (req, res) => {
   try {
-    const { name, stateData, tier: tierKey, rarityScore, tags } = req.body || {};
-    const tier = getTier(tierKey);
-    if (!tier) {
-      return res.status(400).json({ success: false, error: `Unknown tier: ${tierKey}` });
-    }
+    const { name, stateData, tags } = req.body || {};
     if (!stateData || typeof stateData !== 'object') {
       return res.status(400).json({ success: false, error: 'stateData is required' });
     }
 
-    const [low, high] = tier.scoreRange;
-    const score = typeof rarityScore === 'number'
-      ? Math.min(high, Math.max(low, rarityScore))
-      : Math.round(((low + high) / 2) * 1000) / 1000;
+    const roll = memoryDb.getActiveRollByUser(req.user.id);
+    if (!roll) {
+      return res.status(400).json({
+        success: false,
+        error: 'No active rarity roll — roll one first (POST /api/economy/roll)'
+      });
+    }
+
+    // Rarity + tier come from the roll.
+    const score = roll.rarity_score;
+    const tier = tierForScore(score) || getTier('common');
+
+    // Create fee: charged now unless already committed (web "Start").
+    const createStake = roll.committed ? 0 : createCostFor(roll.rerolls, roll.id);
+    if (createStake > 0) absorb(req.user.id, 'create_stake', createStake);
 
     const { value: offloadedState, stored } = await offloadImages(stateData, req.user.username);
-
-    // The stake is rolled per publish within its band — small, and a little
-    // different every time.
-    const stake = rollPublishStake();
-    absorb(req.user.id, 'publish_stake', stake);
 
     const result = await Card.create({
       name: name || 'Untitled card',
@@ -52,12 +60,17 @@ router.post('/publish', requireAuth, async (req, res) => {
       image_keys: stored.map(s => s.key)
     });
 
+    // Roll consumed — the next card starts a fresh one.
+    memoryDb.deleteRoll(roll.id);
+
     res.status(201).json({
       success: true,
       data: {
         card,
         stats: cardStats(card),
-        stake,
+        rarityScore: score,
+        rerolls: roll.rerolls,
+        createStake,
         balance: memoryDb.getUserById(req.user.id).balance,
         imagesStored: stored.length
       }

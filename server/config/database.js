@@ -30,6 +30,10 @@ const db = {
   saves: [],
   // A user starring another user's collection (user_id starrer, owner_id owner).
   stars: [],
+  // In-progress rarity rolls (one active per user). Ephemeral — deliberately
+  // NOT persisted: a restart just means designers re-roll. The server owns the
+  // rolled rarity so neither the web nor the CLI can self-declare it.
+  rolls: [],
   // The cloud (system treasury). total_issued counts grants + yields,
   // total_absorbed counts save remainders + publish stakes.
   cloud: { total_issued: 0, total_absorbed: 0 }
@@ -361,6 +365,39 @@ const memoryDb = {
 
   getStarsByUser: (userId) => db.stars.filter(s => s.user_id === userId),
 
+  // ---------- rolls (in-progress rarity gamble; ephemeral, not persisted) ----
+  createRoll: (roll) => {
+    const newRoll = {
+      rerolls: 0,
+      committed: false,
+      ...roll,
+      id: roll.id || crypto.randomUUID(),
+      created_at: now(),
+      updated_at: now()
+    };
+    db.rolls.push(newRoll);
+    return newRoll;
+  },
+
+  getRollById: (id) => db.rolls.find(r => r.id === id),
+
+  // The user's single active (unconsumed) roll, if any.
+  getActiveRollByUser: (userId) => db.rolls.find(r => r.user_id === userId),
+
+  updateRoll: (id, updateData) => {
+    const index = db.rolls.findIndex(r => r.id === id);
+    if (index === -1) return null;
+    db.rolls[index] = { ...db.rolls[index], ...updateData, updated_at: now() };
+    return db.rolls[index];
+  },
+
+  deleteRoll: (id) => {
+    const index = db.rolls.findIndex(r => r.id === id);
+    if (index === -1) return null;
+    const [deleted] = db.rolls.splice(index, 1);
+    return deleted;
+  },
+
   // ---------- cloud ----------
   getCloud: () => ({ ...db.cloud }),
 
@@ -381,6 +418,7 @@ const memoryDb = {
     db.transactions.length = 0;
     db.saves.length = 0;
     db.stars.length = 0;
+    db.rolls.length = 0;
     db.cloud = { total_issued: 0, total_absorbed: 0 };
     if (USE_PG) {
       truncateRequested = true;
