@@ -1,6 +1,6 @@
-// The design language (after midjourney.com/medical). JetBrains Mono body in
-// warm amber on black, DM Sans for headings, gold for accents and the primary
-// action. One panel style, one divider. Palette tokens come from :root in App.jsx.
+// The design language (after midjourney.com/medical). JetBrains Mono everywhere,
+// warm amber on black, gold for accents and the primary action. One panel style,
+// one divider. Palette tokens come from :root in App.jsx.
 // If you can see one panel and one button, you know the whole system.
 import { useState } from 'react';
 import styled from 'styled-components';
