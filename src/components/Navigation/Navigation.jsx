@@ -1,7 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import styled from 'styled-components';
 import { FiGithub } from 'react-icons/fi';
-import { LuUserRound } from 'react-icons/lu';
 import { useAuth } from '../../context/AuthContext';
 import { fmtT26 } from '../../utils/economyRandom';
 
@@ -70,7 +69,6 @@ const Navigation = () => {
           <FiGithub />
         </GitHubLink>
         <Balance to="/account" className="nav-balance" aria-label="Your account">
-          <LuUserRound className="usericon" aria-hidden />
           <span className="body">
             {user
               ? <><span className="who">{user.username} · </span><b>{fmtT26(user.balance, 3)} /t26</b></>
@@ -123,7 +121,7 @@ const Inner = styled.div`
 
 const Brand = styled(Link)`
   color: var(--white);
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-weight: 400;
   letter-spacing: -0.01em;
   white-space: nowrap;
@@ -198,9 +196,6 @@ const Balance = styled(Link)`
   b { color: var(--gold-bright); }
   .dim { color: var(--amber-dim); }
   .short { display: none; }
-  /* The account glyph — always present, so on phones (where the text trims to
-     a bare balance) there's still a clear tap target for the account. */
-  .usericon { font-size: 15px; flex-shrink: 0; }
 
   /* Phones: keep the balance, drop the username / long label. */
   @media (max-width: 640px) {
