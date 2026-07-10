@@ -1,10 +1,12 @@
 import { Link, useLocation } from 'react-router-dom';
 import styled from 'styled-components';
 import { FiGithub } from 'react-icons/fi';
+import { FaDiscord } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
 import { fmtT26 } from '../../utils/economyRandom';
 
 const REPO_URL = 'https://github.com/vilt9/requirement5';
+const DISCORD_URL = 'https://discord.gg/ywRCSATau3';
 
 // Account lives on the right (username / log-in), so it's out of the centre
 // list. Discovery happens through Discover (draws surface published cards), so
@@ -61,15 +63,26 @@ const Navigation = () => {
             </NavLink>
           ))}
         </Links>
-        <GitHubLink
-          href={REPO_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          title="Source on GitHub"
-          aria-label="Source on GitHub"
-        >
-          <FiGithub />
-        </GitHubLink>
+        <IconLinks>
+          <IconLink
+            href={DISCORD_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Join us on Discord"
+            aria-label="Join us on Discord"
+          >
+            <FaDiscord />
+          </IconLink>
+          <IconLink
+            href={REPO_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Source on GitHub"
+            aria-label="Source on GitHub"
+          >
+            <FiGithub />
+          </IconLink>
+        </IconLinks>
         <Balance to="/account" className="nav-balance" aria-label="Your account">
           <span className="body">
             {user
@@ -184,16 +197,22 @@ const NavLink = styled(Link)`
   &.active { color: var(--gold-bright); font-weight: 700; }
 `;
 
-const GitHubLink = styled.a`
+const IconLinks = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  @media (max-width: 640px) {
+    display: none;
+  }
+`;
+
+const IconLink = styled.a`
   display: flex;
   align-items: center;
   color: var(--amber-dim);
   font-size: 16px;
   &:hover { color: var(--white); text-decoration: none; }
-
-  @media (max-width: 640px) {
-    display: none;
-  }
 `;
 
 const Balance = styled(Link)`
