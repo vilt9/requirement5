@@ -431,12 +431,6 @@ const CardCustomizer = () => {
               the card, the gold stretch is the shiny zone, ❚❚ pauses motion
               everywhere. Replaces the old touch on/off chip. */}
           {customCard && <Card cardData={customCard} scrub />}
-          <PreviewTools className="preview-tools">
-            <Dim className="hint">
-              the bar beside the card drives it — drag the dot; the gold
-              stretch is where the holo shows. ❚❚ pauses card motion.
-            </Dim>
-          </PreviewTools>
         </CardPreviewSection>
 
         <ControlsSection className="controls-section">
@@ -701,41 +695,6 @@ const CardPreviewSection = styled.div`
   }
 `;
 
-const PreviewTools = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  max-width: 340px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-
-  button {
-    flex-shrink: 0;
-    font-family: var(--font-mono);
-    font-size: 10px;
-    padding: 3px 10px;
-    border-radius: 10px;
-    border: 1px solid var(--panel-border);
-    background: var(--field-bg);
-    color: var(--amber-dim);
-    cursor: pointer;
-    transition: color 0.2s, border-color 0.2s, background 0.2s;
-
-    .pin { opacity: 0.8; }
-    &:hover { color: var(--white); border-color: var(--gold); }
-    &.active {
-      color: #140d03;
-      background: var(--gold);
-      border-color: var(--gold);
-    }
-  }
-
-  .hint {
-    font-size: 9px;
-    line-height: 1.5;
-    text-align: left;
-  }
-`;
 
 const ControlsSection = styled.div`
   background: var(--panel);
