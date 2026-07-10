@@ -39,6 +39,17 @@ CREATE TABLE IF NOT EXISTS saves (
 );
 CREATE INDEX IF NOT EXISTS saves_user_idx ON saves (user_id);
 
+-- A user starring another user's collection. user_id is the starrer, owner_id
+-- is the collection owner. Powers "Discover collections" star counts.
+CREATE TABLE IF NOT EXISTS stars (
+  id       text PRIMARY KEY,
+  data     jsonb NOT NULL,
+  user_id  text GENERATED ALWAYS AS (data ->> 'user_id') STORED,
+  owner_id text GENERATED ALWAYS AS (data ->> 'owner_id') STORED
+);
+CREATE INDEX IF NOT EXISTS stars_user_idx  ON stars (user_id);
+CREATE INDEX IF NOT EXISTS stars_owner_idx ON stars (owner_id);
+
 -- Small key/value rows for the counters and the cloud (system treasury).
 CREATE TABLE IF NOT EXISTS singletons (
   key   text PRIMARY KEY,

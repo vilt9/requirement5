@@ -28,6 +28,8 @@ const db = {
   users: [],
   transactions: [],
   saves: [],
+  // A user starring another user's collection (user_id starrer, owner_id owner).
+  stars: [],
   // The cloud (system treasury). total_issued counts grants + yields,
   // total_absorbed counts save remainders + publish stakes.
   cloud: { total_issued: 0, total_absorbed: 0 }
@@ -37,8 +39,8 @@ const db = {
 // Track which rows changed since the last flush so we only upsert the deltas
 // (transactions are append-only and unbounded — a full-snapshot flush would grow
 // linearly). Counters + cloud are tiny and rewritten every flush.
-const dirty = { cards: new Set(), users: new Set(), transactions: new Set(), saves: new Set() };
-const removed = { cards: new Set(), users: new Set(), saves: new Set() };
+const dirty = { cards: new Set(), users: new Set(), transactions: new Set(), saves: new Set(), stars: new Set() };
+const removed = { cards: new Set(), users: new Set(), saves: new Set(), stars: new Set() };
 let truncateRequested = false;
 
 const markDirty = (table, id) => {
@@ -114,7 +116,7 @@ const load = () => {
   if (IS_TEST || !fs.existsSync(DB_FILE)) return;
   try {
     const loaded = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-    for (const key of ['cards', 'users', 'transactions', 'saves']) {
+    for (const key of ['cards', 'users', 'transactions', 'saves', 'stars']) {
       if (Array.isArray(loaded[key])) db[key] = loaded[key];
     }
     if (loaded.cloud) db.cloud = { ...db.cloud, ...loaded.cloud };
@@ -322,6 +324,43 @@ const memoryDb = {
     return null;
   },
 
+  // Owners of collections with more than `min` saved cards — the pool the
+  // "Discover collections" strip samples from. Returns [{ userId, count }].
+  getCollectionOwners: (min = 0) => {
+    const counts = new Map();
+    for (const s of db.saves) counts.set(s.user_id, (counts.get(s.user_id) || 0) + 1);
+    return [...counts.entries()]
+      .filter(([, count]) => count > min)
+      .map(([userId, count]) => ({ userId, count }));
+  },
+
+  // ---------- stars (a user starring another user's collection) ----------
+  createStar: (userId, ownerId) => {
+    const existing = db.stars.find(s => s.user_id === userId && s.owner_id === ownerId);
+    if (existing) return existing;
+    const star = { id: crypto.randomUUID(), user_id: userId, owner_id: ownerId, created_at: now() };
+    db.stars.push(star);
+    markDirty('stars', star.id);
+    persistSoon();
+    return star;
+  },
+
+  getStar: (userId, ownerId) =>
+    db.stars.find(s => s.user_id === userId && s.owner_id === ownerId),
+
+  deleteStar: (userId, ownerId) => {
+    const index = db.stars.findIndex(s => s.user_id === userId && s.owner_id === ownerId);
+    if (index === -1) return null;
+    const [deleted] = db.stars.splice(index, 1);
+    markRemoved('stars', deleted.id);
+    persistSoon();
+    return deleted;
+  },
+
+  countStarsForOwner: (ownerId) => db.stars.filter(s => s.owner_id === ownerId).length,
+
+  getStarsByUser: (userId) => db.stars.filter(s => s.user_id === userId),
+
   // ---------- cloud ----------
   getCloud: () => ({ ...db.cloud }),
 
@@ -341,6 +380,7 @@ const memoryDb = {
     db.users.length = 0;
     db.transactions.length = 0;
     db.saves.length = 0;
+    db.stars.length = 0;
     db.cloud = { total_issued: 0, total_absorbed: 0 };
     if (USE_PG) {
       truncateRequested = true;

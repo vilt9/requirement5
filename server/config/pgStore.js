@@ -39,6 +39,7 @@ export const hydrate = async (db) => {
   db.users = await rows('users');
   db.transactions = await rows('transactions');
   db.saves = await rows('saves');
+  db.stars = await rows('stars');
 
   const singles = (await pool.query('SELECT key, data FROM singletons')).rows;
   for (const { key, data } of singles) {
@@ -62,7 +63,7 @@ export const flush = async ({ db, dirty, removed, truncate }) => {
     await client.query('BEGIN');
 
     if (truncate) {
-      await client.query('TRUNCATE cards, users, transactions, saves, singletons');
+      await client.query('TRUNCATE cards, users, transactions, saves, stars, singletons');
     } else {
       for (const [table, ids] of Object.entries(removed)) {
         for (const id of ids) await client.query(`DELETE FROM ${table} WHERE id = $1`, [id]);
@@ -73,7 +74,8 @@ export const flush = async ({ db, dirty, removed, truncate }) => {
       cards: db.cards,
       users: db.users,
       transactions: db.transactions,
-      saves: db.saves
+      saves: db.saves,
+      stars: db.stars
     };
     for (const [table, ids] of Object.entries(dirty)) {
       const list = source[table];

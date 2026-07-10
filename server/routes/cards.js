@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import { getTier, saveCostFor, saveValueFor, dividendFor, rollPublishStake, normalizeProvenance, round6, tierForScore } from '../services/economy.js';
 import { absorb, issue, InsufficientFundsError } from '../services/ledger.js';
 import { cardStats } from '../services/drawEngine.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, optionalAuth } from '../middleware/auth.js';
 import path from 'path';
 import { offloadImages, storeBuffer, UPLOADS_DIR } from '../storage/index.js';
 import { renderCard, renderStills, MIME } from '../services/capture.js';
@@ -236,6 +236,116 @@ router.delete('/collection/:cardId', requireAuth, (req, res) => {
     return res.status(404).json({ success: false, error: 'Not in your collection' });
   }
   res.json({ success: true, data: deleted });
+});
+
+// ---------- Discover collections ----------
+// A card's tier, most-striking first — for the little rarity dots on a
+// collection's roster card.
+const topTiers = (userId, max = 6) =>
+  memoryDb.getSavesByUser(userId)
+    .map(s => memoryDb.getCardById(s.card_id))
+    .filter(Boolean)
+    .sort((a, b) => (b.rarity_score || 0) - (a.rarity_score || 0))
+    .slice(0, max)
+    .map(c => c.tier || 'common');
+
+// The public roster shape for one collection owner.
+const rosterEntry = (owner, viewerId, countOverride) => ({
+  username: owner.username,
+  count: countOverride ?? memoryDb.getSavesByUser(owner.id).length,
+  stars: memoryDb.countStarsForOwner(owner.id),
+  starredByMe: viewerId ? !!memoryDb.getStar(viewerId, owner.id) : false,
+  tiers: topTiers(owner.id)
+});
+
+// Fisher-Yates, in place.
+const shuffle = (arr) => {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+};
+
+// A random sample of collections worth browsing — owners holding more than five
+// saved cards. Public (discovery works logged out). `exclude` (comma-separated
+// usernames) lets "show more" pull a fresh batch; `limit` caps the batch.
+router.get('/collections/discover', optionalAuth, (req, res) => {
+  const exclude = new Set(String(req.query.exclude || '')
+    .split(',').map(s => s.trim().toLowerCase()).filter(Boolean));
+  const limit = Math.max(1, Math.min(12, parseInt(req.query.limit, 10) || 6));
+  const MIN_CARDS = 5;
+
+  const pool = memoryDb.getCollectionOwners(MIN_CARDS)
+    .map(o => ({ owner: memoryDb.getUserById(o.userId), count: o.count }))
+    .filter(({ owner }) => owner &&
+      !exclude.has(owner.username.toLowerCase()) &&
+      (!req.user || owner.id !== req.user.id));
+
+  shuffle(pool);
+  const collections = pool.slice(0, limit)
+    .map(({ owner, count }) => rosterEntry(owner, req.user?.id, count));
+
+  res.json({ success: true, data: { collections, remaining: Math.max(0, pool.length - collections.length) } });
+});
+
+// Collections the signed-in user has starred, newest first.
+router.get('/collections/starred/mine', requireAuth, (req, res) => {
+  const collections = memoryDb.getStarsByUser(req.user.id)
+    .slice()
+    .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+    .map(star => {
+      const owner = memoryDb.getUserById(star.owner_id);
+      return owner ? rosterEntry(owner, req.user.id) : null;
+    })
+    .filter(Boolean);
+  res.json({ success: true, data: { collections } });
+});
+
+// Star / unstar another user's collection.
+router.post('/collections/:username/star', requireAuth, (req, res) => {
+  const owner = memoryDb.getUserByUsername(req.params.username);
+  if (!owner) return res.status(404).json({ success: false, error: 'No such collection' });
+  if (owner.id === req.user.id) {
+    return res.status(400).json({ success: false, error: "You can't star your own collection" });
+  }
+  memoryDb.createStar(req.user.id, owner.id);
+  res.status(201).json({ success: true, data: { stars: memoryDb.countStarsForOwner(owner.id), starredByMe: true } });
+});
+
+router.delete('/collections/:username/star', requireAuth, (req, res) => {
+  const owner = memoryDb.getUserByUsername(req.params.username);
+  if (!owner) return res.status(404).json({ success: false, error: 'No such collection' });
+  memoryDb.deleteStar(req.user.id, owner.id);
+  res.json({ success: true, data: { stars: memoryDb.countStarsForOwner(owner.id), starredByMe: false } });
+});
+
+// Public: one user's whole collection — the cards, plus the roster header
+// (count, star total, whether the viewer has starred it). Powers peeking into a
+// discovered collection.
+router.get('/collections/:username', optionalAuth, (req, res) => {
+  const owner = memoryDb.getUserByUsername(req.params.username);
+  if (!owner) return res.status(404).json({ success: false, error: 'No such collection' });
+  const items = memoryDb.getSavesByUser(owner.id)
+    .map(save => {
+      const card = memoryDb.getCardById(save.card_id);
+      return card ? {
+        save: { ...save, cost: save.cost ?? saveCostFor(save.card_id) },
+        card,
+        stats: cardStats(card)
+      } : null;
+    })
+    .filter(Boolean);
+  res.json({
+    success: true,
+    data: {
+      username: owner.username,
+      count: items.length,
+      stars: memoryDb.countStarsForOwner(owner.id),
+      starredByMe: req.user ? !!memoryDb.getStar(req.user.id, owner.id) : false,
+      items
+    }
+  });
 });
 
 // Cards you have published, with their statistics.
