@@ -24,23 +24,22 @@ const StartStage = ({
 }) => (
   <Wrap className="start-stage">
     <Block>
-      <BlockTitle>Roll your card</BlockTitle>
+      <BlockTitle>Randomly generated Rarity Value:</BlockTitle>
       <Roll>
-        <span className="label"><Dim>Rolled rarity</Dim></span>
+        <span className="label"><Dim>Rarity Value:</Dim></span>
         <span className="score">{(rarity ?? 0).toFixed(3)}</span>
         {tierName && <span className="tier"><Dim>{tierName}</Dim></span>}
       </Roll>
       <Dim>
-        Regenerate rerolls the background and the rarity — the signature image and
-        holo stay, so it always reads as an R5c card. Each reroll costs a little
-        more; minting resets it.
+        Hit “Regenerate” to get a new randomly generated Rarity Value. Regeneration
+        costs you /t26.
       </Dim>
       <RollRow>
         <PillButton $secondary type="button" className="regenerate" onClick={onRegenerate}>
           Regenerate <span className="cost">−{fmtT26(regenCost)} /t26</span>
         </PillButton>
       </RollRow>
-      {rolls > 0 && <Dim className="rolls">{rolls} reroll{rolls === 1 ? '' : 's'} this card</Dim>}
+      {rolls > 0 && <Dim className="rolls">{rolls} regeneration{rolls === 1 ? '' : 's'}</Dim>}
     </Block>
 
     <Block>
