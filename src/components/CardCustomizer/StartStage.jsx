@@ -1,14 +1,12 @@
 import styled from 'styled-components';
 import { LuCircleArrowRight } from 'react-icons/lu';
-import { Select, PillButton, Dim } from '../UI';
+import { PillButton, Dim } from '../UI';
 import { fmtT26 } from '../../utils/economyRandom';
 
 // Stage 1 of the customizer: the roll. Every card starts as a rolled base —
 // a random background + the fixed signature image + default holo + a rolled
 // rarity. Regenerate rerolls the background and the rarity (the signature and
-// holo stay). Start commits to the card (costs /t26) and moves into design; you
-// can also start from a saved set — that swaps the design in without touching
-// the rolled rarity.
+// holo stay). Start commits to the card (costs /t26) and moves into design.
 const StartStage = ({
   rarity,
   tierName,
@@ -16,10 +14,6 @@ const StartStage = ({
   regenCost,
   createCost,
   onRegenerate,
-  presets,
-  selectedPresetId,
-  onLoadPreset,
-  onDeletePreset,
   onNext
 }) => (
   <Wrap className="start-stage">
@@ -40,40 +34,6 @@ const StartStage = ({
         </PillButton>
       </RollRow>
       {rolls > 0 && <Dim className="rolls">{rolls} regeneration{rolls === 1 ? '' : 's'}</Dim>}
-    </Block>
-
-    <Block>
-      <BlockTitle>Start from a saved set</BlockTitle>
-      <Dim>
-        Load one of your base sets to build on — this swaps the design in, but
-        never changes your rolled rarity.
-      </Dim>
-      <StartFromRow>
-        <Select
-          className="preset-select"
-          value={selectedPresetId}
-          onChange={(e) => onLoadPreset(e.target.value)}
-        >
-          <option value="">Load a set…</option>
-          {presets.map((p) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </Select>
-        {selectedPresetId && (
-          <PillButton
-            $secondary
-            type="button"
-            className="preset-delete"
-            onClick={onDeletePreset}
-            title="Delete this set"
-          >✕</PillButton>
-        )}
-      </StartFromRow>
-      {presets.length === 0 && (
-        <Dim style={{ fontStyle: 'italic' }}>
-          No sets yet — they appear here once you save a design at the publish step.
-        </Dim>
-      )}
     </Block>
 
     <NextRow>
@@ -133,16 +93,6 @@ const RollRow = styled.div`
     white-space: nowrap;
   }
   .cost { font-size: 11px; font-weight: 600; opacity: 0.8; }
-`;
-
-const StartFromRow = styled.div`
-  display: flex;
-  gap: 8px;
-  margin-top: 4px;
-  align-items: center;
-
-  .preset-select { flex: 1; }
-  button { white-space: nowrap; }
 `;
 
 const NextRow = styled.div`

@@ -16,7 +16,7 @@ import CodingAgentGuide from '../components/CardCustomizer/CodingAgentGuide';
 import { generateBaseBackground, generateCardAttributes } from '../utils/cardGenerator';
 import { applyPreset } from '../utils/presets';
 import { useAuth, tierForScore } from '../context/AuthContext';
-import { Dim } from '../components/UI';
+import { Dim, Select, PillButton } from '../components/UI';
 import sigImage from '../assets/img/r5c_signature.png';
 
 // The creation flow runs in three stages: roll a base card (Start) → design →
@@ -423,10 +423,6 @@ const CardCustomizer = () => {
                 regenCost={regenPrice(rolls, customCard?.id)}
                 createCost={createPrice(rolls, customCard?.id)}
                 onRegenerate={handleRegenerate}
-                presets={presets}
-                selectedPresetId={selectedPresetId}
-                onLoadPreset={handleLoadPreset}
-                onDeletePreset={async () => { await deletePreset(selectedPresetId); setSelectedPresetId(''); }}
                 onNext={() => setStage('design')}
               />
               {feedback && <Dim className="customizer-feedback">{feedback}</Dim>}
@@ -435,6 +431,45 @@ const CardCustomizer = () => {
 
           {stage === 'design' && (
             <>
+              {/* Load a saved base set — tucked into an expandable so it sits
+                  quietly above the design tabs without crowding them. Loading a
+                  set swaps the design but never the rolled rarity. */}
+              <LoadSet className="load-set">
+                <summary>Load a base set</summary>
+                <div className="body">
+                  <Dim>
+                    Load one of your base sets to build on — this swaps the design
+                    in, but never changes your rolled rarity.
+                  </Dim>
+                  <div className="row">
+                    <Select
+                      className="preset-select"
+                      value={selectedPresetId}
+                      onChange={(e) => handleLoadPreset(e.target.value)}
+                    >
+                      <option value="">Load a set…</option>
+                      {presets.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </Select>
+                    {selectedPresetId && (
+                      <PillButton
+                        $secondary
+                        type="button"
+                        className="preset-delete"
+                        onClick={async () => { await deletePreset(selectedPresetId); setSelectedPresetId(''); }}
+                        title="Delete this set"
+                      >✕</PillButton>
+                    )}
+                  </div>
+                  {presets.length === 0 && (
+                    <Dim style={{ fontStyle: 'italic' }}>
+                      No sets yet — they appear here once you save a design at the publish step.
+                    </Dim>
+                  )}
+                </div>
+              </LoadSet>
+
               {/* Tabs: pick which part of the card to customize. */}
               <TabBar className="customizer-tabs">
                 {TABS.map((tab) => (
@@ -719,6 +754,51 @@ const StageBody = styled.div`
   @media (max-width: 768px) {
     overflow-y: visible;
     padding-right: 0;
+  }
+`;
+
+// Collapsed-by-default loader for saved base sets — sits between the stepper
+// and the design tabs. Native <details>, so no extra open/close state.
+const LoadSet = styled.details`
+  flex-shrink: 0;
+  margin-bottom: 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: var(--field-bg);
+
+  > summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: var(--gold-bright);
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  > summary::-webkit-details-marker { display: none; }
+  > summary::before {
+    content: '▸';
+    font-size: 10px;
+    transition: transform 0.15s ease;
+  }
+  &[open] > summary::before { transform: rotate(90deg); }
+
+  .body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 0 12px 12px;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    .preset-select { flex: 1; }
+    button { white-space: nowrap; }
   }
 `;
 
