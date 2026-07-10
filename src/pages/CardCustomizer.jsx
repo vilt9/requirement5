@@ -43,13 +43,24 @@ const rollBaseCard = () => ({
   holoEffects: DEFAULT_HOLO
 });
 
-// Costs climb linearly with the reroll count (the gambling tax): each reroll a
-// little more, and minting the finished card a little more the more you fished.
-// The count only resets on a successful mint — Reset preserves it, so you can't
-// dodge the price by resetting.
+// Costs climb linearly with the reroll count (the gambling tax), plus a random
+// fraction seeded off the card so the /t26 reads with the fractional flavour of
+// the rest of the economy (2.37, not a flat 2) — stable per roll, fresh each
+// reroll. The linear part only resets on a successful mint; Reset preserves it,
+// so you can't dodge the price by resetting.
 const round2 = (n) => Math.round(n * 100) / 100;
-const regenPrice = (rolls) => round2(1 + rolls);   // 1, 2, 3, …
-const createPrice = (rolls) => round2(2 + rolls);  // 2, 3, 4, …
+
+// Tiny deterministic hash → [0, 1). Same seed always yields the same fraction,
+// so the shown price never jitters between renders.
+const frac01 = (seed) => {
+  let h = 2166136261;
+  const s = String(seed);
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return ((h >>> 0) % 100000) / 100000;
+};
+
+const regenPrice = (rolls, seed) => round2(1 + rolls + frac01(`${seed}:regen`));   // 1.xx, 2.xx, …
+const createPrice = (rolls, seed) => round2(2 + rolls + frac01(`${seed}:create`)); // 2.xx, 3.xx, …
 
 // Two ways to make a card: click through the stages here, or drive the r5c CLI
 // from a terminal. Manual is the default; the agent mode swaps the stepper for
@@ -409,8 +420,8 @@ const CardCustomizer = () => {
                 rarity={customCard?.rarity}
                 tierName={tierForScore(config, customCard?.rarity)?.name}
                 rolls={rolls}
-                regenCost={regenPrice(rolls)}
-                createCost={createPrice(rolls)}
+                regenCost={regenPrice(rolls, customCard?.id)}
+                createCost={createPrice(rolls, customCard?.id)}
                 onRegenerate={handleRegenerate}
                 presets={presets}
                 selectedPresetId={selectedPresetId}
