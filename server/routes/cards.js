@@ -2,7 +2,7 @@ import express from 'express';
 import Card from '../models/Card.js';
 import { memoryDb } from '../config/database.js';
 import crypto from 'node:crypto';
-import { getTier, saveCostFor, saveValueFor, dividendFor, rollPublishStake, normalizeProvenance, round6, tierForScore } from '../services/economy.js';
+import { getTier, saveCostFor, saveValueFor, dividendFor, rollPublishStake, normalizeProvenance, round2, round6, tierForScore, TIERS } from '../services/economy.js';
 import { absorb, issue, InsufficientFundsError } from '../services/ledger.js';
 import { cardStats } from '../services/drawEngine.js';
 import { requireAuth, optionalAuth } from '../middleware/auth.js';
@@ -239,23 +239,35 @@ router.delete('/collection/:cardId', requireAuth, (req, res) => {
 });
 
 // ---------- Discover collections ----------
-// A card's tier, most-striking first — for the little rarity dots on a
-// collection's roster card.
-const topTiers = (userId, max = 6) =>
-  memoryDb.getSavesByUser(userId)
-    .map(s => memoryDb.getCardById(s.card_id))
-    .filter(Boolean)
-    .sort((a, b) => (b.rarity_score || 0) - (a.rarity_score || 0))
-    .slice(0, max)
-    .map(c => c.tier || 'common');
+// Tier rarity rank (higher = rarer) — TIERS is ordered rarest-first.
+const TIER_RANK = new Map(TIERS.map((t, i) => [t.key, TIERS.length - i]));
+
+// A collection's makeup: total spent building it (sum of what was paid per
+// save) and the rarity breakdown as per-tier shares, rarest tier first.
+const collectionStats = (userId) => {
+  const saves = memoryDb.getSavesByUser(userId);
+  let value = 0;
+  const byTier = new Map();
+  for (const s of saves) {
+    const card = memoryDb.getCardById(s.card_id);
+    if (!card) continue;
+    value += (s.cost ?? saveCostFor(s.card_id));
+    const key = card.tier || 'common';
+    byTier.set(key, (byTier.get(key) || 0) + 1);
+  }
+  const total = [...byTier.values()].reduce((a, b) => a + b, 0) || 1;
+  const rarity = [...byTier.entries()]
+    .map(([key, count]) => ({ key, count, pct: Math.round((count / total) * 1000) / 10 }))
+    .sort((a, b) => (TIER_RANK.get(b.key) || 0) - (TIER_RANK.get(a.key) || 0));
+  return { count: saves.length, value: round2(value), rarity };
+};
 
 // The public roster shape for one collection owner.
-const rosterEntry = (owner, viewerId, countOverride) => ({
+const rosterEntry = (owner, viewerId) => ({
   username: owner.username,
-  count: countOverride ?? memoryDb.getSavesByUser(owner.id).length,
   stars: memoryDb.countStarsForOwner(owner.id),
   starredByMe: viewerId ? !!memoryDb.getStar(viewerId, owner.id) : false,
-  tiers: topTiers(owner.id)
+  ...collectionStats(owner.id)
 });
 
 // Fisher-Yates, in place.
@@ -284,7 +296,7 @@ router.get('/collections/discover', optionalAuth, (req, res) => {
 
   shuffle(pool);
   const collections = pool.slice(0, limit)
-    .map(({ owner, count }) => rosterEntry(owner, req.user?.id, count));
+    .map(({ owner }) => rosterEntry(owner, req.user?.id));
 
   res.json({ success: true, data: { collections, remaining: Math.max(0, pool.length - collections.length) } });
 });
@@ -336,11 +348,14 @@ router.get('/collections/:username', optionalAuth, (req, res) => {
       } : null;
     })
     .filter(Boolean);
+  const stats = collectionStats(owner.id);
   res.json({
     success: true,
     data: {
       username: owner.username,
       count: items.length,
+      value: stats.value,
+      rarity: stats.rarity,
       stars: memoryDb.countStarsForOwner(owner.id),
       starredByMe: req.user ? !!memoryDb.getStar(req.user.id, owner.id) : false,
       items

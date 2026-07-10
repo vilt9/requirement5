@@ -97,9 +97,7 @@ const Pool = () => {
             <CardRow key={card.id}>
               <CardLine>
                 <span className="name">{card.name}</span>
-                <span className="tier" style={{ color: tier?.color || 'var(--amber-dim)' }}>
-                  {tier?.name || 'untiered'}
-                </span>
+                <span className="tier">{tier?.name || 'untiered'}</span>
                 <span className="creator"><Dim>by {card.creator_id}</Dim></span>
                 <span className="counts">
                   {card.times_saved || 0} saved / {card.times_drawn || 0} drawn

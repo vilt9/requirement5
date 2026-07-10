@@ -113,10 +113,12 @@ const BandLine = styled.div`
   .odds { width: 12ch; text-align: right; flex-shrink: 0; }
 `;
 
-export const BandRow = ({ name, color, width, odds, right }) => (
+// Bars carry weight by width alone — the per-tier colours were dropped because
+// the colour→rarity code confused people; one neutral gold reads as "a bar".
+export const BandRow = ({ name, width, odds, right }) => (
   <BandLine>
-    <span className="name" style={{ color }}>{name}</span>
-    <span className="band"><i style={{ width, background: color }} /></span>
+    <span className="name">{name}</span>
+    <span className="band"><i style={{ width, background: 'var(--gold)' }} /></span>
     <span className="odds">{right ?? odds}</span>
   </BandLine>
 );
@@ -135,7 +137,6 @@ export const RarityBands = ({ config, counts }) => {
         <BandRow
           key={tier.key}
           name={tier.name}
-          color={tier.color}
           width={BAND_WIDTHS[tier.key] || '100%'}
           right={
             counts

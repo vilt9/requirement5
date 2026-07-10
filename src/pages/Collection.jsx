@@ -149,7 +149,7 @@ const Collection = () => {
                 )}
                 <Panel>
                   <div>{card.name}</div>
-                  {tier && <div style={{ color: tier.color }}>{tier.name}</div>}
+                  {tier && <div>{tier.name}</div>}
                   {stats && (
                     <div><Dim>{stats.timesSaved} saved / {stats.timesDrawn} drawn in the pool</Dim></div>
                   )}
@@ -213,7 +213,7 @@ const Collection = () => {
                 )}
                 <Panel>
                   <div>{card.name} <Dim>· {card.creator_id === 'cloud' ? 'synthetic' : `by ${card.creator_id}`}</Dim></div>
-                  {tier && <div style={{ color: tier.color }}>{tier.name}</div>}
+                  {tier && <div>{tier.name}</div>}
                   {stats && (
                     <div><Dim>{stats.timesSaved} saved / {stats.timesDrawn} drawn in the pool</Dim></div>
                   )}

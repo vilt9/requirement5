@@ -5,6 +5,7 @@ import { LuStar, LuUsers, LuShuffle } from 'react-icons/lu';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../utils/api';
 import { Panel, Divider, Dim, PillButton } from '../UI';
+import RarityStrip from './RarityStrip';
 
 // "Discover collections": a shuffled roster of other people's collections
 // (anyone holding more than five cards), each starrable and peekable. Public —
@@ -22,8 +23,8 @@ const DiscoverCollections = () => {
   const [loaded, setLoaded] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  const tierColor = useCallback(
-    (key) => config?.tiers?.find(t => t.key === key)?.color || 'var(--amber-dim)',
+  const tierName = useCallback(
+    (key) => config?.tiers?.find(t => t.key === key)?.name || key,
     [config]
   );
 
@@ -117,10 +118,12 @@ const DiscoverCollections = () => {
               <LuStar /> {entry.stars}
             </StarButton>
           </div>
-          <Dots>
-            {entry.tiers.map((t, i) => <i key={i} style={{ background: tierColor(t) }} />)}
-          </Dots>
-          <Dim className="count">{entry.count} cards</Dim>
+          <RarityStrip
+            rarity={entry.rarity}
+            value={entry.value}
+            count={entry.count}
+            tierName={tierName}
+          />
         </RosterCard>
       ))}
     </Roster>
@@ -207,19 +210,6 @@ const RosterCard = styled.div`
     &:hover { text-decoration: underline; }
   }
   .count { font-size: 11px; }
-`;
-
-// The little rarity spectrum — one dot per top card, most striking first.
-const Dots = styled.div`
-  display: flex;
-  gap: 4px;
-  min-height: 8px;
-  i {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
 `;
 
 const StarButton = styled.button`

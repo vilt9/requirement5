@@ -8,8 +8,9 @@ import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
 import { poolCardToCardData } from '../utils/poolCard';
 import { fmtT26 } from '../utils/economyRandom';
-import { Page, Panel, Divider, Dim, PillButton, TagList } from '../components/UI';
+import { Page, Panel, Divider, Dim, TagList } from '../components/UI';
 import { ensureTags } from '../utils/tags';
+import RarityStrip from '../components/Collection/RarityStrip';
 
 // Someone else's collection, read-only — the page you land on from a "Discover
 // collections" roster. Same shelf-of-cards as your own, minus the editing: you
@@ -56,6 +57,7 @@ const UserCollection = () => {
   };
 
   const tierOf = (key) => config?.tiers?.find(t => t.key === key);
+  const tierName = (key) => tierOf(key)?.name || key;
 
   if (loaded && notFound) {
     return (
@@ -85,6 +87,12 @@ const UserCollection = () => {
           )}
           {isOwn && <Dim className="own">this is your collection · <Link to="/collection">manage it</Link></Dim>}
         </Header>
+        {data && data.items.length > 0 && (
+          <>
+            <Divider />
+            <RarityStrip rarity={data.rarity} value={data.value} count={data.count} tierName={tierName} />
+          </>
+        )}
       </Panel>
 
       {loaded && data && data.items.length === 0 && (
@@ -109,7 +117,7 @@ const UserCollection = () => {
                 )}
                 <Panel>
                   <div>{card.name} <Dim>· {card.creator_id === 'cloud' ? 'synthetic' : `by ${card.creator_id}`}</Dim></div>
-                  {tier && <div style={{ color: tier.color }}>{tier.name}</div>}
+                  {tier && <div>{tier.name}</div>}
                   <div><Dim>Saved for {fmtT26(cost)} /t26 · {new Date(save.created_at).toISOString().slice(0, 10)}</Dim></div>
                   {ensureTags(card.tags).length > 0 && (
                     <div style={{ marginTop: 4 }}><TagList tags={ensureTags(card.tags)} /></div>
