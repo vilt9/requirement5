@@ -113,9 +113,11 @@ const Bar = styled.nav`
 `;
 
 const Inner = styled.div`
-  max-width: 880px;
-  margin: 0 auto;
-  padding: 0 15px;
+  /* Full-bleed on desktop: logo hard left, balance hard right — no centred
+     880px lane. Page content below still centres; only the bar spans edge to
+     edge. */
+  width: 100%;
+  padding: 0 22px;
   height: 38px;
   display: flex;
   align-items: center;
