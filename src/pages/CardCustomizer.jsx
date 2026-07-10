@@ -258,7 +258,7 @@ const CardCustomizer = () => {
         flashSpend(res.charged);
       } catch (error) {
         flash(error?.status === 402
-          ? 'Not enough /t26 to regenerate.'
+          ? (error.message || 'Debt limit reached — pay down /t26 first.')
           : 'Could not charge the reroll — try again.');
         return;
       }
@@ -284,7 +284,7 @@ const CardCustomizer = () => {
         setPaidCreate(true);
       } catch (error) {
         flash(error?.status === 402
-          ? 'Not enough /t26 to create this card.'
+          ? (error.message || 'Debt limit reached — pay down /t26 first.')
           : 'Could not charge the create fee — try again.');
         return;
       }

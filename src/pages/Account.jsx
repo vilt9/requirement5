@@ -13,7 +13,9 @@ const TXN_LABELS = {
   save: 'Card saved',
   dividend: 'Creator dividend',
   publish_stake: 'Publish stake',
-  reroll: 'Card regeneration'
+  reroll: 'Card regeneration',
+  create_stake: 'Card create fee',
+  interest: 'Debt interest'
 };
 
 const AuthForm = ({ title, submitLabel, onSubmit }) => {
@@ -104,9 +106,19 @@ const Account = () => {
     <Page>
       <Panel>
         Account: {user.username}<br />
-        Balance: <b>{fmtT26(user.balance)} /t26</b><br />
+        Balance: <b style={user.balance < 0 ? { color: '#ff8a8a' } : undefined}>{fmtT26(user.balance)} /t26</b><br />
         Yield remaining today: {yieldRemaining != null ? fmtT26(yieldRemaining) : '—'} /t26 <Dim>(cap {config?.dailyYieldCap} /t26 per day)</Dim><br />
         Erosion: suppressed on this platform
+        {user.balance < 0 && (
+          <>
+            <Divider />
+            <DebtNote>
+              In debt. Interest accrues at {((config?.debtInterestDaily ?? 0.0147) * 100).toFixed(2)}% per day,
+              compounding, until you’re back in the black. Spending stops at the{' '}
+              {fmtT26(config?.debtFloor ?? -1000)} /t26 floor — generate to earn your way out.
+            </DebtNote>
+          </>
+        )}
         <Divider />
         Your cards: <Link to="/collection">creations &amp; collection</Link>
         {' · '}<Link to="/create">design a new one</Link>
@@ -136,6 +148,11 @@ const Account = () => {
     </Page>
   );
 };
+
+const DebtNote = styled.div`
+  color: #ff8a8a;
+  line-height: 1.6;
+`;
 
 const LedgerLine = styled.div`
   display: flex;

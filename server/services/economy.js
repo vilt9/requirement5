@@ -30,7 +30,11 @@ export const TIERS = [...RARE_TIERS, COMMON];
 export const ECONOMY = {
   STARTING_GRANT: 50,
   DIVIDEND_RATE: 0.2,
-  DAILY_YIELD_CAP: 100
+  DAILY_YIELD_CAP: 100,
+  // Overdraft: you can spend into the red down to this floor; at it, spending
+  // stops. A negative balance accrues interest, compounded daily.
+  DEBT_FLOOR: -1000,
+  DEBT_INTEREST_DAILY: 0.0147 // 1.47% / day
 };
 
 // ---- Per-card pricing -------------------------------------------------------
@@ -152,5 +156,7 @@ export const economyConfig = () => ({
   },
   startingGrant: ECONOMY.STARTING_GRANT,
   dailyYieldCap: ECONOMY.DAILY_YIELD_CAP,
+  debtFloor: ECONOMY.DEBT_FLOOR,
+  debtInterestDaily: ECONOMY.DEBT_INTEREST_DAILY,
   erosion: 'suppressed'
 });

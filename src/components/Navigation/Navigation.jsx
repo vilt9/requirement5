@@ -71,7 +71,7 @@ const Navigation = () => {
         <Balance to="/account" className="nav-balance" aria-label="Your account">
           <span className="body">
             {user
-              ? <><span className="who">{user.username} · </span><b>{fmtT26(user.balance, 3)} /t26</b></>
+              ? <><span className="who">{user.username} · </span><b className={user.balance < 0 ? 'debt' : ''}>{fmtT26(user.balance, 3)} /t26</b></>
               : stash > 0
                 ? <><b>{fmtT26(stash, 3)} /t26</b> <span className="who">· log in to claim</span><span className="short">· claim</span></>
                 : <span className="dim"><span className="who">Not logged in</span><span className="short">Log in</span></span>}
@@ -196,6 +196,7 @@ const Balance = styled(Link)`
   white-space: nowrap;
   &:hover { text-decoration: none; color: var(--white); }
   b { color: var(--gold-bright); }
+  b.debt { color: #ff8a8a; }
   .dim { color: var(--amber-dim); }
   .short { display: none; }
 

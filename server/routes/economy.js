@@ -1,7 +1,7 @@
 import express from 'express';
 import { memoryDb } from '../config/database.js';
 import { economyConfig, TIERS, regenCostFor, createCostFor } from '../services/economy.js';
-import { yieldRemainingToday, absorb, InsufficientFundsError } from '../services/ledger.js';
+import { yieldRemainingToday, absorb, accrueInterest, InsufficientFundsError } from '../services/ledger.js';
 import { requireAuth } from '../middleware/auth.js';
 import { storageInfo } from '../storage/index.js';
 
@@ -13,11 +13,14 @@ router.get('/config', (req, res) => {
 });
 
 router.get('/balance', requireAuth, (req, res) => {
+  // Bring any debt interest current before reporting the balance.
+  const user = accrueInterest(req.user.id) || req.user;
   res.json({
     success: true,
     data: {
-      balance: req.user.balance,
-      yieldRemainingToday: yieldRemainingToday(req.user)
+      balance: user.balance,
+      yieldRemainingToday: yieldRemainingToday(user),
+      inDebt: user.balance < 0
     }
   });
 });
@@ -35,7 +38,7 @@ router.post('/reroll', requireAuth, (req, res) => {
     res.json({ success: true, data: { charged, balance: memoryDb.getUserById(req.user.id).balance } });
   } catch (error) {
     if (error instanceof InsufficientFundsError) {
-      return res.status(402).json({ success: false, error: 'Not enough /t26 to regenerate' });
+      return res.status(402).json({ success: false, error: 'Debt limit reached — pay down /t26 before regenerating' });
     }
     console.error('Reroll charge error:', error);
     res.status(500).json({ success: false, error: 'Internal server error' });
@@ -54,7 +57,7 @@ router.post('/create', requireAuth, (req, res) => {
     res.json({ success: true, data: { charged, balance: memoryDb.getUserById(req.user.id).balance } });
   } catch (error) {
     if (error instanceof InsufficientFundsError) {
-      return res.status(402).json({ success: false, error: 'Not enough /t26 to create this card' });
+      return res.status(402).json({ success: false, error: 'Debt limit reached — pay down /t26 before creating' });
     }
     console.error('Create charge error:', error);
     res.status(500).json({ success: false, error: 'Internal server error' });
