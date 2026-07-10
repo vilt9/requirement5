@@ -6,6 +6,7 @@ import Navigation from './components/Navigation/Navigation';
 import GenerateGate from './pages/GenerateGate';
 import Pool from './pages/Pool';
 import Collection from './pages/Collection';
+import UserCollection from './pages/UserCollection';
 import CardCustomizer from './pages/CardCustomizer';
 import Account from './pages/Account';
 import ClaimAccount from './pages/ClaimAccount';
@@ -146,6 +147,8 @@ function App() {
                 <Route path="/" element={<GenerateGate />} />
                 <Route path="/pool" element={<Pool />} />
                 <Route path="/collection" element={<Collection />} />
+                {/* Someone else's collection, read-only (from Discover) */}
+                <Route path="/u/:username" element={<UserCollection />} />
                 <Route path="/customize" element={<CardCustomizer />} />
                 <Route path="/account" element={<Account />} />
                 <Route path="/claim/:token" element={<ClaimAccount />} />

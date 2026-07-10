@@ -1,29 +1,54 @@
 import { Link, useLocation } from 'react-router-dom';
 import styled from 'styled-components';
 import { FiGithub } from 'react-icons/fi';
+import { LuUserRound } from 'react-icons/lu';
 import { useAuth } from '../../context/AuthContext';
 import { fmtT26 } from '../../utils/economyRandom';
 
 const REPO_URL = 'https://github.com/vilt9/requirement5';
 
-// Discovery happens through Generate (draws surface published cards), so the
-// Pool listing left the nav — the /pool route still answers deep links.
+// Account lives on the right (username / log-in), so it's out of the centre
+// list. Discovery happens through Discover (draws surface published cards), so
+// the Pool listing stays off the nav — the /pool route still answers deep links.
 const LINKS = [
-  { to: '/', label: 'Generate' },
-  { to: '/collection', label: 'Collection' },
+  { to: '/', label: 'Discover' },
+  { to: '/collection', label: 'Collections' },
   { to: '/customize', label: 'Create' },
-  { to: '/about', label: 'About' },
-  { to: '/account', label: 'Account' }
+  { to: '/about', label: 'About' }
 ];
+
+// The logo reads "R5c" at rest and grows to the full "Requirement5cards" on
+// hover, the in-between letters cascading in one at a time. "R5c" is a
+// subsequence of the full word (R·…·5·c), so the same letters stay put while
+// the rest unfold between them.
+const LOGO_FULL = 'Requirement5cards';
+const LOGO_BASE = new Set([0, 11, 12]); // R, 5, c — always visible
 
 const Navigation = () => {
   const location = useLocation();
   const { user, stash, earnFlash } = useAuth();
 
+  // Each letter is its own span; the non-base ones start collapsed and reveal
+  // with a stagger so the word unrolls left to right on hover.
+  let revealIndex = 0;
+
   return (
     <Bar>
       <Inner>
-        <Brand to="/">R5c <span>// Requirement5 cards</span></Brand>
+        <Brand to="/" aria-label="Requirement5 cards">
+          {LOGO_FULL.split('').map((ch, i) => {
+            const base = LOGO_BASE.has(i);
+            return (
+              <span
+                key={i}
+                className={base ? 'base' : 'rest'}
+                style={base ? undefined : { transitionDelay: `${(revealIndex++) * 24}ms` }}
+              >
+                {ch}
+              </span>
+            );
+          })}
+        </Brand>
         <Links>
           {LINKS.map(link => (
             <NavLink
@@ -44,12 +69,15 @@ const Navigation = () => {
         >
           <FiGithub />
         </GitHubLink>
-        <Balance to="/account" className="nav-balance">
-          {user
-            ? <><span className="who">{user.username} · </span><b>{fmtT26(user.balance, 3)} /t26</b></>
-            : stash > 0
-              ? <><b>{fmtT26(stash, 3)} /t26</b> <span className="who">· log in to claim</span><span className="short">· claim</span></>
-              : <span className="dim"><span className="who">Not logged in</span><span className="short">Log in</span></span>}
+        <Balance to="/account" className="nav-balance" aria-label="Your account">
+          <LuUserRound className="usericon" aria-hidden />
+          <span className="body">
+            {user
+              ? <><span className="who">{user.username} · </span><b>{fmtT26(user.balance, 3)} /t26</b></>
+              : stash > 0
+                ? <><b>{fmtT26(stash, 3)} /t26</b> <span className="who">· log in to claim</span><span className="short">· claim</span></>
+                : <span className="dim"><span className="who">Not logged in</span><span className="short">Log in</span></span>}
+          </span>
           {/* The earn, made visible — quietly: a small tick under the total
               that fades in and out. Re-keyed per generate. */}
           {earnFlash && (
@@ -97,13 +125,29 @@ const Brand = styled(Link)`
   color: var(--white);
   font-family: var(--font-sans);
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: baseline;
   &:hover { text-decoration: none; color: var(--gold-bright); }
-  span { color: var(--amber-dim); font-weight: 400; font-family: var(--font-mono); }
 
-  @media (max-width: 640px) {
-    span { display: none; }
+  span { display: inline-block; }
+  /* The letters that fill out "Requirement…cards": collapsed at rest, unrolled
+     on hover. max-width animates the reveal; each carries its own delay for the
+     one-at-a-time cascade. */
+  span.rest {
+    max-width: 0;
+    opacity: 0;
+    overflow: hidden;
+    transform: translateY(-1px);
+    transition: max-width 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+  }
+  &:hover span.rest {
+    /* Generous cap so wide glyphs (m, w) never clip — the box still settles at
+       each letter's real width; the extra headroom just finishes off-screen. */
+    max-width: 2ch;
+    opacity: 1;
+    transform: translateY(0);
   }
 `;
 
@@ -145,12 +189,18 @@ const GitHubLink = styled.a`
 
 const Balance = styled(Link)`
   position: relative; /* the earn tick hangs off the total */
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   color: var(--amber-dim);
   white-space: nowrap;
   &:hover { text-decoration: none; color: var(--white); }
   b { color: var(--gold-bright); }
   .dim { color: var(--amber-dim); }
   .short { display: none; }
+  /* The account glyph — always present, so on phones (where the text trims to
+     a bare balance) there's still a clear tap target for the account. */
+  .usericon { font-size: 15px; flex-shrink: 0; }
 
   /* Phones: keep the balance, drop the username / long label. */
   @media (max-width: 640px) {

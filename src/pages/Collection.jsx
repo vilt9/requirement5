@@ -10,6 +10,7 @@ import { poolCardToCardData } from '../utils/poolCard';
 import { saveCostFor, fmtT26 } from '../utils/economyRandom';
 import { Page, Panel, PillButton, Divider, Dim, TagList } from '../components/UI';
 import { ensureTags } from '../utils/tags';
+import DiscoverCollections from '../components/Collection/DiscoverCollections';
 
 // One page of cards at a time: every card rides the shared motion loop, so a
 // bounded page keeps the animation light while the whole shelf stays browsable.
@@ -110,6 +111,10 @@ const Collection = () => {
           dragging this scrubs the whole shelf; ❚❚ pauses motion everywhere. */}
       {anyCards && <PageMotionBar className="collection-motion-bar" />}
 
+      {/* Discover other collectors — a shuffled, starrable roster — sits above
+          your own shelf. */}
+      <DiscoverCollections />
+
       {!user && (
         <Panel>
           Your account collection lives on the server.{' '}
@@ -162,7 +167,7 @@ const Collection = () => {
         <Panel>
           Collection: {items.length} card{items.length === 1 ? '' : 's'}
           {loaded && items.length === 0 && (
-            <> — nothing yet. <Link to="/">Generate</Link> and save cards to build it.</>
+            <> — nothing yet. <Link to="/">Discover</Link> and save cards to build it.</>
           )}
           {items.length > 0 && (
             <FilterBar>
