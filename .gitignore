@@ -38,3 +38,8 @@ server/uploads/
 
 # Local-only Claude notes (names real infrastructure)
 CLAUDE.local.md
+.e2e-data/
+test-results/
+playwright-report/
+blob-report/
+.playwright/
