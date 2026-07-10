@@ -25,7 +25,9 @@ const LOGO_BASE = new Set([0, 11, 12]); // R, 5, c — always visible
 
 const Navigation = () => {
   const location = useLocation();
-  const { user, stash, earnFlash } = useAuth();
+  const { user, config, stash, earnFlash } = useAuth();
+  const debtFloor = config?.debtFloor ?? -1000;
+  const ratePct = ((config?.debtInterestDaily ?? 0.0147) * 100).toFixed(2);
 
   // Each letter is its own span; the non-base ones start collapsed and reveal
   // with a stagger so the word unrolls left to right on hover.
@@ -71,7 +73,12 @@ const Navigation = () => {
         <Balance to="/account" className="nav-balance" aria-label="Your account">
           <span className="body">
             {user
-              ? <><span className="who">{user.username} · </span><b className={user.balance < 0 ? 'debt' : ''}>{fmtT26(user.balance, 3)} /t26</b></>
+              ? <>
+                  <span className="who">{user.username} · </span>
+                  <b className={user.balance < 0 ? 'debt' : ''}>{fmtT26(user.balance, 3)} /t26</b>
+                  <span className="floor"> / {debtFloor}</span>
+                  {user.balance < 0 && <span className="rate"> · {ratePct}%/day</span>}
+                </>
               : stash > 0
                 ? <><b>{fmtT26(stash, 3)} /t26</b> <span className="who">· log in to claim</span><span className="short">· claim</span></>
                 : <span className="dim"><span className="who">Not logged in</span><span className="short">Log in</span></span>}
@@ -199,10 +206,14 @@ const Balance = styled(Link)`
   b.debt { color: #ff8a8a; }
   .dim { color: var(--amber-dim); }
   .short { display: none; }
+  /* The debt floor sits quietly after the total; the interest rate shows in
+     red, only while in the red. Both are desktop-only detail. */
+  .floor { color: var(--amber-dim); }
+  .rate { color: #ff8a8a; }
 
-  /* Phones: keep the balance, drop the username / long label. */
+  /* Phones: keep the balance, drop the username / floor / rate detail. */
   @media (max-width: 640px) {
-    .who { display: none; }
+    .who, .floor, .rate { display: none; }
     .short { display: inline; }
   }
 `;
