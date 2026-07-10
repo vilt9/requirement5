@@ -7,11 +7,23 @@ import AboutR5c from '../components/AboutR5c';
 const About = () => (
   <Page>
     <Panel>
+      {/* The mark is black-on-white artwork; inverted it drops onto the black
+          page as a light emblem. */}
+      <Logo src="/r5c_logo.png" alt="Requirement5" />
       <Heading>About Requirement5</Heading>
       <AboutR5c />
     </Panel>
   </Page>
 );
+
+const Logo = styled.img`
+  display: block;
+  width: 160px;
+  height: auto;
+  margin: 4px auto 8px;
+  filter: invert(1);
+  opacity: 0.92;
+`;
 
 const Heading = styled.h1`
   max-width: 460px;
