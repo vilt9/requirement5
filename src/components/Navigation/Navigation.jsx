@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import styled from 'styled-components';
 import { FiGithub } from 'react-icons/fi';
@@ -35,10 +36,34 @@ const Navigation = () => {
   // with a stagger so the word unrolls left to right on hover.
   let revealIndex = 0;
 
+  // The logo's unrolled state is driven from here, not from CSS :hover — a touch
+  // tap triggers a sticky hover that never clears, so on phones the word would
+  // stay expanded forever. Opening arms an auto-collapse timer for touch/pen
+  // (which have no reliable "leave"); a real mouse collapses on pointerleave.
+  const [logoOpen, setLogoOpen] = useState(false);
+  const logoTimer = useRef(null);
+  const openLogo = (e) => {
+    clearTimeout(logoTimer.current);
+    setLogoOpen(true);
+    if (!e || e.pointerType !== 'mouse') {
+      logoTimer.current = setTimeout(() => setLogoOpen(false), 2600);
+    }
+  };
+  const closeLogo = () => { clearTimeout(logoTimer.current); setLogoOpen(false); };
+  useEffect(() => () => clearTimeout(logoTimer.current), []);
+
   return (
     <Bar>
       <Inner>
-        <Brand to="/" aria-label="Requirement5 cards">
+        <Brand
+          to="/"
+          aria-label="Requirement5 cards"
+          className={logoOpen ? 'open' : ''}
+          onPointerEnter={openLogo}
+          onPointerLeave={(e) => { if (e.pointerType === 'mouse') closeLogo(); }}
+          onFocus={() => openLogo()}
+          onBlur={closeLogo}
+        >
           {LOGO_FULL.split('').map((ch, i) => {
             const base = LOGO_BASE.has(i);
             return (
@@ -136,10 +161,15 @@ const Inner = styled.div`
   align-items: center;
   gap: 16px;
 
+  /* Phones: two tiers. Row 1 is logo + balance; the nav links wrap to a full-
+     width row 2 (see Links) instead of being squashed into one line. */
   @media (max-width: 640px) {
+    flex-wrap: wrap;
+    height: auto;
     gap: 10px;
-    padding: 0 10px;
-    font-size: 12px;
+    row-gap: 0;
+    padding: 7px 12px;
+    font-size: 13px;
   }
 `;
 
@@ -164,13 +194,15 @@ const Brand = styled(Link)`
     transform: translateY(-1px);
     transition: max-width 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
   }
-  &:hover span.rest {
-    /* Generous cap so wide glyphs (m, w) never clip — the box still settles at
-       each letter's real width; the extra headroom just finishes off-screen. */
+  /* Reveal is driven by the .open class (set from React), not :hover — see the
+     component for why. Generous cap so wide glyphs (m, w) never clip. */
+  &.open span.rest {
     max-width: 2ch;
     opacity: 1;
     transform: translateY(0);
   }
+
+  @media (max-width: 640px) { order: 1; }
 `;
 
 const Links = styled.div`
@@ -185,8 +217,18 @@ const Links = styled.div`
   scrollbar-width: none;
   &::-webkit-scrollbar { display: none; }
 
+  /* Row 2 on phones: full-width tier below logo/balance, links spread edge to
+     edge with room to breathe (no more single-line squash). */
   @media (max-width: 640px) {
+    order: 3;
+    flex: 0 0 100%;
+    width: 100%;
     gap: 10px;
+    justify-content: space-between;
+    overflow-x: visible;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid var(--panel-border);
   }
 `;
 
@@ -195,6 +237,8 @@ const NavLink = styled(Link)`
   white-space: nowrap;
   &:hover { color: var(--white); text-decoration: none; }
   &.active { color: var(--gold-bright); font-weight: 700; }
+
+  @media (max-width: 640px) { padding: 2px 0; }
 `;
 
 const IconLinks = styled.div`
@@ -232,8 +276,10 @@ const Balance = styled(Link)`
   .floor { color: var(--amber-dim); }
   .rate { color: #ff8a8a; }
 
-  /* Phones: keep the balance, drop the username / floor / rate detail. */
+  /* Phones: sit at the right end of row 1; drop the username / floor / rate. */
   @media (max-width: 640px) {
+    order: 2;
+    margin-left: auto;
     .who, .floor, .rate { display: none; }
     .short { display: inline; }
   }
