@@ -6,7 +6,7 @@ import Card from '../components/Card/Card';
 import { useAuth } from '../context/AuthContext';
 import { api, ApiError, apiBase } from '../utils/api';
 import { poolCardToCardData, asOdds } from '../utils/poolCard';
-import { scoreCard, generateCardAttributes } from '../utils/cardGenerator';
+import { generateCardAttributes } from '../utils/cardGenerator';
 import { saveCostFor, fmtT26 } from '../utils/economyRandom';
 import { scrubTo } from '../utils/cardMotion';
 import { prefetchedCards } from '../utils/drawQueue';
@@ -166,12 +166,15 @@ const ShareCard = () => {
   }, [id]);
 
   // The authentic rarity of every published card — drives this card's percentile,
-  // pool share and draw weight, all from the same self-consistent distribution.
+  // pool share and draw weight. We use the STORED rarity_score (the server roll),
+  // the same number this card is measured by, so the comparison is like-for-like.
+  // (Re-deriving a score from each card's look collapses to ~0 for most cards, so
+  // the percentile is only meaningful against the authentic scores.)
   useEffect(() => {
     let active = true;
     api('/api/cards/community/all')
       .then(cards => {
-        if (active) setRarities(cards.map(c => scoreCard(c.state_data?.customCard)).filter(Number.isFinite));
+        if (active) setRarities(cards.map(c => c.rarity_score).filter(n => typeof n === 'number'));
       })
       .catch(() => {});
     return () => { active = false; };
