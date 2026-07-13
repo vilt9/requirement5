@@ -113,9 +113,15 @@ const Navigation = () => {
             {user
               ? <>
                   <span className="who">{user.username} · </span>
-                  <b className={user.balance < 0 ? 'debt' : ''}>{fmtT26(user.balance, 3)} /t26</b>
-                  <span className="floor"> / {debtFloor}</span>
-                  {user.balance < 0 && <span className="rate"> · {ratePct}%/day</span>}
+                  {user.balance < 0
+                    ? <>
+                        {/* In debt: show how far you are from the floor, e.g. −53.32/−1000 /t26 */}
+                        <b className="debt">
+                          {fmtT26(user.balance, 3)}<span className="floor">/{debtFloor}</span> /t26
+                        </b>
+                        <span className="rate"> · {ratePct}%/day</span>
+                      </>
+                    : <b>{fmtT26(user.balance, 3)} /t26</b>}
                 </>
               : stash > 0
                 ? <><b>{fmtT26(stash, 3)} /t26</b> <span className="who">· log in to claim</span><span className="short">· claim</span></>
