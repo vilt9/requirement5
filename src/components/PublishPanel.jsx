@@ -7,7 +7,7 @@ import { Panel, PillButton, TextInput, Divider, Dim, ErrorText, TagList } from '
 // Publish the card being customized into the pool. The rarity (and so the tier
 // and odds) is NOT chosen here — it's the rolled value from the Start stage.
 const PublishPanel = ({ customCard, onPublished }) => {
-  const { user, config, setBalance } = useAuth();
+  const { user, config, setBalance, flashSpend } = useAuth();
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(null);
@@ -36,6 +36,7 @@ const PublishPanel = ({ customCard, onPublished }) => {
         }
       });
       setBalance(result.balance);
+      flashSpend(result.createStake); // 0 when already charged at Start (no-op)
       setPublished(result.card);
       setMessage(`Published to the pool — rarity ${Number(result.rarityScore).toFixed(3)} (${result.card.tier}).` +
         (result.createStake ? ` −${result.createStake} /t26 create fee.` : ''));

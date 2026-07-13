@@ -28,7 +28,7 @@ const ShareCard = () => {
   const { id, username } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, config, setBalance, refreshBalance, nextCard } = useAuth();
+  const { user, config, setBalance, refreshBalance, nextCard, flashSpend } = useAuth();
 
   // Reached via the Generate button this session? Lives in router state, never
   // the URL. `earned` is the /t26 the generate paid — flashed on arrival.
@@ -229,6 +229,7 @@ const ShareCard = () => {
         setBalance(result.balance);
         setCard({ ...result.card, synthetic: false });
         setSaveResult(result);
+        flashSpend(result.cost); // deduction ticks by the nav balance, like reroll
       } else {
         const result = await api(`/api/cards/${id}/save`, {
           method: 'POST',
@@ -236,6 +237,7 @@ const ShareCard = () => {
         });
         setBalance(result.balance);
         setSaveResult(result);
+        flashSpend(result.cost);
       }
       refreshBalance();
     } catch (err) {
@@ -243,7 +245,7 @@ const ShareCard = () => {
       else setSaveError(err?.message || 'Could not save this card.');
     }
     setBusy(false);
-  }, [user, id, card, discovered, navigate, location.pathname, setBalance, refreshBalance]);
+  }, [user, id, card, discovered, navigate, location.pathname, setBalance, refreshBalance, flashSpend]);
 
   // Finish a save that was interrupted by signup/login: the intent was parked
   // in sessionStorage before the redirect; the Account page sends them back.
