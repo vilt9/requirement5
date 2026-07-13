@@ -9,6 +9,9 @@ const AuthContext = createContext();
 // synchronous and survives reloads). Logging in or signing up claims it: the
 // count rides along on the auth request and the server credits it, capped.
 const STASH_KEY = 'r5c_stash';
+// How many cards to keep pre-drawn ahead of the user. The whole deficit is
+// fetched in one batched /api/draw request, so a deeper queue is nearly free.
+const QUEUE_TARGET = 5;
 const readStash = () => {
   const n = parseFloat(localStorage.getItem(STASH_KEY));
   return Number.isFinite(n) && n > 0 ? n : 0;
@@ -160,25 +163,30 @@ export function AuthProvider({ children }) {
     if (refillingRef.current) return;
     refillingRef.current = true;
     try {
-      while (userRef.current && queueRef.current.length < 2) {
-        // Mint the synthetic uuid up front and send it as the yield seed; if
-        // the draw lands on a pool card instead, the server seeds from that
-        // card's id. Either way result.yield is what was actually credited.
-        const seed = crypto.randomUUID();
-        const result = await api('/api/draw', { method: 'POST', body: { seed } });
-        setBalance(result.balance);
-        const earned = result.yield?.credited ?? 0;
-        // Rare pool finds always surface; common pool finds only half the
-        // time, so generating stays generative even with a populated pool.
-        const showPool = result.source === 'pool' && result.card &&
-          (result.tier?.key !== 'common' || Math.random() < 0.5);
-        if (showPool) {
-          prefetchedCards.set(result.card.id, result.card);
-          queueRef.current.push({ id: result.card.id, discovered: true, earned });
-        } else {
-          prefetchedCards.set(seed, 'synthetic');
-          queueRef.current.push({ id: seed, discovered: false, earned });
-        }
+      while (userRef.current && queueRef.current.length < QUEUE_TARGET) {
+        // Mint the synthetic uuids up front and send them as yield seeds; if a
+        // draw lands on a pool card instead, the server seeds from that card's
+        // id. Either way result.yield is what was actually credited. The whole
+        // deficit is fetched in ONE batched request — fewer round-trips, deeper
+        // queue, so chaining Generate stays instant.
+        const need = QUEUE_TARGET - queueRef.current.length;
+        const seeds = Array.from({ length: need }, () => crypto.randomUUID());
+        const { draws = [], balance } = await api('/api/draw', { method: 'POST', body: { seeds } });
+        if (typeof balance === 'number') setBalance(balance);
+        if (!draws.length) break; // nothing came back — avoid a busy loop
+        draws.forEach((result, i) => {
+          const seed = seeds[i];
+          const earned = result.yield?.credited ?? 0;
+          // The server owns the pool-vs-synthetic decision (rarity-weighted
+          // lottery + synthetic slice); the client just shows what it dealt.
+          if (result.source === 'pool' && result.card) {
+            prefetchedCards.set(result.card.id, result.card);
+            queueRef.current.push({ id: result.card.id, discovered: true, earned });
+          } else {
+            prefetchedCards.set(seed, 'synthetic');
+            queueRef.current.push({ id: seed, discovered: false, earned });
+          }
+        });
       }
     } catch (error) {
       console.error('Draw prefetch failed:', error);

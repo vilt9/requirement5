@@ -164,11 +164,13 @@ describe('publish', () => {
 });
 
 describe('draw engine', () => {
-  test('synthetic draw when the pool is empty in the rolled tier', async () => {
+  test('synthetic draw when the pool is empty', async () => {
     const { user } = await signup('drawer');
-    const result = draw(user.id, () => 0.5, 'abcd1234-seed-uuid'); // rolls common; pool empty
+    const result = draw(user.id, () => 0.5, 'abcd1234-seed-uuid'); // pool empty ⇒ synthetic
     expect(result.source).toBe('synthetic');
-    expect(result.tier.key).toBe('common');
+    // A synthetic draw carries no server tier now — the client mints the card
+    // (with its own rarity) from the seed; only pool cards report a tier.
+    expect(result.tier).toBeNull();
     expect(result.card).toBeNull();
     expect(result.yield.credited).toBe(drawYieldFor('abcd1234-seed-uuid'));
     expect(result.balance).toBeCloseTo(ECONOMY.STARTING_GRANT + result.yield.credited, 6);

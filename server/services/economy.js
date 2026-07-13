@@ -157,6 +157,35 @@ export const rollTier = (rand = Math.random) => {
   return COMMON;
 };
 
+// ---- Draw weighting ---------------------------------------------------------
+// A published card's chance of being DRAWN falls off with its rarity value:
+// weight = e^(-k·rarity), so a rarer card surfaces less. The pool draw picks in
+// proportion to these weights, normalised over whatever is currently published —
+// so a newly published card just joins the lottery and every share re-balances on
+// the next draw (no cron, no stored distribution). A fixed share of every draw
+// still mints a brand-new synthetic card, so generating stays generative however
+// big the pool grows.
+export const DRAW_RARITY_FALLOFF = 8;    // steepness: 0.3→0.9 is ~120× rarer
+export const SYNTHETIC_DRAW_SHARE = 0.5; // fraction of draws that mint fresh
+
+export const drawWeightFor = (rarityScore) =>
+  Math.exp(-DRAW_RARITY_FALLOFF * clamp01(rarityScore));
+
+// Pick an index in proportion to weights, given a uniform u in [0,1). Returns -1
+// when the weights are empty or sum to zero. Pure and deterministic — the draw
+// engine and its tests both drive it.
+export const pickWeightedIndex = (weights, u) => {
+  let total = 0;
+  for (const w of weights) if (w > 0) total += w;
+  if (!(total > 0)) return -1;
+  let r = u * total;
+  for (let i = 0; i < weights.length; i++) {
+    if (weights[i] > 0) r -= weights[i];
+    if (r < 0) return i;
+  }
+  return weights.length - 1;
+};
+
 export const creatorDividendFor = (cardId, rarity = 0.35) =>
   round2(saveCostFor(cardId, rarity) * ECONOMY.DIVIDEND_RATE);
 
