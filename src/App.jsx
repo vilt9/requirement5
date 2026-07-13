@@ -13,6 +13,8 @@ import ClaimAccount from './pages/ClaimAccount';
 import ShareCard from './pages/ShareCard';
 import CaptureCard from './pages/CaptureCard';
 import About from './pages/About';
+import Analytics from './pages/Analytics';
+import Footer from './components/Footer';
 import './App.css';
 
 // The design language (refreshed, after midjourney.com/medical): JetBrains Mono
@@ -155,6 +157,7 @@ function App() {
                 <Route path="/account" element={<Account />} />
                 <Route path="/claim/:token" element={<ClaimAccount />} />
                 <Route path="/about" element={<About />} />
+                <Route path="/analytics" element={<Analytics />} />
                 <Route path="/card/:id" element={<ShareCard />} />
                 {/* A collector's copy of a card: same page, plus whose
                     collection it's in and what they paid. */}
@@ -165,6 +168,7 @@ function App() {
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </main>
+            <Footer />
           </div>
         </Router>
       </CardProvider>

@@ -301,6 +301,14 @@ const memoryDb = {
   getTransactionsByUser: (userId) =>
     db.transactions.filter(t => t.user_id === userId).slice().reverse(),
 
+  // Whole-collection reads — used by the public analytics roll-up, which needs
+  // to sweep every row rather than a single user's slice. Copies so callers
+  // can't mutate the working set.
+  getAllUsers: () => [...db.users],
+  getAllTransactions: () => [...db.transactions],
+  getAllSaves: () => [...db.saves],
+  getAllStars: () => [...db.stars],
+
   // ---------- saves (a user's collection of pool cards) ----------
   createSave: (save) => {
     const newSave = {

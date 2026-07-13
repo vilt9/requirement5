@@ -7,6 +7,7 @@ import cardRoutes from './routes/cards.js';
 import authRoutes from './routes/auth.js';
 import economyRoutes from './routes/economy.js';
 import drawRoutes from './routes/draw.js';
+import analyticsRoutes from './routes/analytics.js';
 import { UPLOADS_DIR } from './storage/index.js';
 
 const app = express();
@@ -35,6 +36,7 @@ app.use('/api/cards', cardRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/economy', economyRoutes);
 app.use('/api/draw', drawRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
