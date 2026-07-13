@@ -310,7 +310,9 @@ describe('save-synthetic', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.data.card.id).toBe(claimedId);
-    const cost = saveCostFor(claimedId);
+    // Price tracks the card's rarity now (as a wide distribution), so the cost
+    // is seeded from BOTH the id and the natural rarity (0.75 here).
+    const cost = saveCostFor(claimedId, 0.75);
     expect(res.body.data.cost).toBe(cost);
     expect(res.body.data.card.is_public).toBe(false);
     expect(res.body.data.card.creator_id).toBe('cloud');

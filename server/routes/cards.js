@@ -101,15 +101,15 @@ router.post('/:id/save', requireAuth, async (req, res) => {
 
     // How the saver reached this card. 'discovered' (pressed Generate) is worth
     // more than 'direct' (opened a shared link). Defaults to 'discovered' so the
-    // existing generate→save flow is unchanged. The price is the card's own —
-    // seeded from its id, independent of rarity.
+    // existing generate→save flow is unchanged. Price tracks the card's stored
+    // rarity (as a wide distribution), seeded from its id.
     const provenance = normalizeProvenance(req.body?.provenance);
-    const cost = saveCostFor(card.id);
+    const cost = saveCostFor(card.id, card.rarity_score);
     // No creator account (cloud-claimed draws) → no dividend; the cloud
     // absorbs the whole cost.
     const hasCreator = !!memoryDb.getUserById(card.creator_id);
-    const dividend = hasCreator ? dividendFor(card.id, provenance) : 0;
-    const value = saveValueFor(card.id, provenance);
+    const dividend = hasCreator ? dividendFor(card.id, provenance, card.rarity_score) : 0;
+    const value = saveValueFor(card.id, provenance, card.rarity_score);
 
     absorb(req.user.id, 'save', cost, { card_id: card.id });
     // Dividend leaves the absorbed pot and goes to the creator.
@@ -168,7 +168,12 @@ router.post('/save-synthetic', requireAuth, async (req, res) => {
       ? id : undefined;
     const finalId = requestedId || crypto.randomUUID();
 
-    const cost = saveCostFor(finalId);
+    // The card keeps its NATURAL rarity (the seed it was generated from). Price
+    // is settled from it BEFORE charging, so it matches the number the page
+    // showed. Same clamp/fallback the client uses, so the two never disagree.
+    const rawScore = Number(stateData?.customCard?.rarity);
+    const score = Number.isFinite(rawScore) ? Math.max(0, Math.min(1, rawScore)) : 0.35;
+    const cost = saveCostFor(finalId, score);
     absorb(req.user.id, 'save', cost);
 
     const { value: offloadedState } = await offloadImages(stateData, req.user.username);
@@ -180,10 +185,6 @@ router.post('/save-synthetic', requireAuth, async (req, res) => {
       isPublic: false,
       tags: tags || stateData?.customCard?.tags || []
     });
-    // The card keeps its NATURAL rarity — price and rarity are decoupled, so a
-    // rare-looking card can be cheap to claim (the diamond in the rough).
-    const rawScore = Number(stateData?.customCard?.rarity);
-    const score = Number.isFinite(rawScore) ? Math.max(0, Math.min(1, rawScore)) : 0.35;
     const card = memoryDb.updateCard(result.data.id, {
       tier: tierForScore(score).key,
       rarity_score: score,
@@ -213,7 +214,7 @@ router.get('/collection/mine', requireAuth, (req, res) => {
     .map(save => {
       const card = memoryDb.getCardById(save.card_id);
       return card ? {
-        save: { ...save, cost: save.cost ?? saveCostFor(save.card_id) },
+        save: { ...save, cost: save.cost ?? saveCostFor(save.card_id, card.rarity_score) },
         card,
         stats: cardStats(card)
       } : null;
@@ -235,7 +236,7 @@ router.get('/:id/save-of/:username', (req, res) => {
     success: true,
     data: {
       username: owner.username,
-      cost: save.cost ?? saveCostFor(save.card_id),
+      cost: save.cost ?? saveCostFor(save.card_id, memoryDb.getCardById(save.card_id)?.rarity_score),
       provenance: save.provenance || null,
       saved_at: save.created_at
     }
@@ -263,7 +264,7 @@ const collectionStats = (userId) => {
   for (const s of saves) {
     const card = memoryDb.getCardById(s.card_id);
     if (!card) continue;
-    value += (s.cost ?? saveCostFor(s.card_id));
+    value += (s.cost ?? saveCostFor(s.card_id, card.rarity_score));
     scores.push(Number(card.rarity_score) || 0);
   }
   scores.sort((a, b) => b - a);
@@ -354,7 +355,7 @@ router.get('/collections/:username', optionalAuth, (req, res) => {
     .map(save => {
       const card = memoryDb.getCardById(save.card_id);
       return card ? {
-        save: { ...save, cost: save.cost ?? saveCostFor(save.card_id) },
+        save: { ...save, cost: save.cost ?? saveCostFor(save.card_id, card.rarity_score) },
         card,
         stats: cardStats(card)
       } : null;

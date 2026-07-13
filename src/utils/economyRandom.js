@@ -1,8 +1,10 @@
 // Per-card pricing, seeded from the card's id. EXACT mirror of the maths in
 // server/services/economy.js — keep the two in sync: the price the page shows
-// must be exactly the price the server charges. Prices are decoupled from
-// rarity on purpose (a rare-looking card can be cheap — the diamond in the
-// rough); each card rolls its own price on a wide log-scale bell.
+// must be exactly the price the server charges. Price TRACKS rarity as a wide
+// distribution: rarity slides the centre of a log-scale band up, an id-seeded
+// Gaussian jitter spreads each card around it. Rarer cards cost more on average,
+// but the spreads overlap heavily — a lucky Common can outprice an unlucky Fine,
+// and occasionally a Singular lands at common-money (the "gem in the rough").
 
 export const PRICE_BANDS = {
   saveCost: [1.5, 48],     // /t26 to save a card into your collection
@@ -33,9 +35,42 @@ const bell01 = (seed) => {
 };
 
 const logBand = (n, [min, max]) => min * Math.pow(max / min, n);
+const clamp01 = (n) => Math.max(0, Math.min(1, Number(n) || 0));
 
-export const saveCostFor = (cardId) =>
-  Math.round(logBand(bell01(`${cardId}:save`), PRICE_BANDS.saveCost) * 100) / 100;
+// Standard-normal noise seeded from the card's id (Box–Muller over the same
+// mulberry32 stream). Deterministic, so client and server agree bit-for-bit.
+const gauss = (seed) => {
+  const r = mulberry32(fnv1a(seed));
+  const u = Math.max(r(), 1e-9);
+  const v = r();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+};
+
+// Rarity → centre of the price band (position in [0,1] on the log scale). Anchors
+// calibrated so each tier's MEAN save price hits target (Common ≈ 6.5 … Singular
+// ≈ 30) under the Gaussian spread. EXACT mirror of server/services/economy.js.
+const PRICE_SPREAD = 0.30;
+const PRICE_MID_RARITIES = [0.35, 0.75, 0.825, 0.875, 0.94, 0.99];
+const PRICE_ANCHORS = [0.23019, 0.39971, 0.49042, 0.61776, 0.68766, 0.8744];
+const priceCentre = (rarity) => {
+  const r = clamp01(rarity);
+  const xs = PRICE_MID_RARITIES, ys = PRICE_ANCHORS;
+  if (r <= xs[0]) return ys[0];
+  if (r >= xs[xs.length - 1]) return ys[ys.length - 1];
+  for (let i = 0; i < xs.length - 1; i++) {
+    if (r <= xs[i + 1]) {
+      const t = (r - xs[i]) / (xs[i + 1] - xs[i]);
+      return ys[i] + t * (ys[i + 1] - ys[i]);
+    }
+  }
+  return ys[ys.length - 1];
+};
+
+export const saveCostFor = (cardId, rarity = 0.35) =>
+  Math.round(logBand(
+    clamp01(priceCentre(rarity) + PRICE_SPREAD * gauss(`${cardId}:save`)),
+    PRICE_BANDS.saveCost
+  ) * 100) / 100;
 
 export const drawYieldFor = (seed) =>
   Math.round(logBand(bell01(`${seed}:yield`), PRICE_BANDS.drawYield) * 1e6) / 1e6;

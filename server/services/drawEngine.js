@@ -19,8 +19,8 @@ export const cardStats = (card) => {
     poolShare: totalPublished > 0 ? poolPeers / totalPublished : null,
     timesDrawn: card.times_drawn || 0,
     timesSaved: card.times_saved || 0,
-    saveCost: saveCostFor(card.id),
-    creatorDividend: creatorDividendFor(card.id),
+    saveCost: saveCostFor(card.id, card.rarity_score),
+    creatorDividend: creatorDividendFor(card.id, card.rarity_score),
     creatorId: card.creator_id
   };
 };

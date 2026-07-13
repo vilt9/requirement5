@@ -68,7 +68,7 @@ const Collection = () => {
   };
 
   const tierOf = (key) => config?.tiers?.find(t => t.key === key);
-  const costOf = ({ save, card }) => save.cost ?? saveCostFor(card.id);
+  const costOf = ({ save, card }) => save.cost ?? saveCostFor(card.id, card.rarity_score);
 
   const allTags = useMemo(() => {
     const set = new Set();
@@ -200,7 +200,7 @@ const Collection = () => {
           {pageItems.map(({ save, card, stats }) => {
             const cardData = poolCardToCardData(card);
             const tier = tierOf(card.tier);
-            const cost = save.cost ?? saveCostFor(card.id);
+            const cost = save.cost ?? saveCostFor(card.id, card.rarity_score);
             const ownUrl = `/${user.username}/card/${card.id}`;
             return (
               <Item key={save.id}>
@@ -262,7 +262,7 @@ const Collection = () => {
               <Item key={card.id}>
                 <CardScale><Card cardData={card} loop /></CardScale>
                 <Panel>
-                  <div>Rarity: {Number(card.rarity).toFixed(3)}</div>
+                  <div>Rarity Value: {Number(card.rarity).toFixed(3)}</div>
                   <Divider />
                   <PillButton $secondary onClick={() => deleteCard(card.id)}>Delete</PillButton>
                 </Panel>

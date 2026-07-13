@@ -197,10 +197,6 @@ const ShareCard = () => {
   // Tiers commonest → rarest (the ladder shown in the details).
   const orderedTiers = (config?.tiers || []).slice().sort((a, b) => a.scoreRange[0] - b.scoreRange[0]);
 
-  // The card's own price — seeded from its id, independent of rarity. The
-  // server computes the identical number, so this is exactly what's charged.
-  const cardPrice = saveCostFor(id);
-
   const save = useCallback(async (discoveredOverride) => {
     const synthetic = !!card?.synthetic;
     const isDiscovered = discoveredOverride ?? discovered;
@@ -307,10 +303,6 @@ const ShareCard = () => {
   const tags = ensureTags(card.tags);
   const synthetic = !!card.synthetic;
 
-  const saved = saveResult && saveResult !== 'exists';
-  const mainLabel = saveResult === 'exists' ? 'In collection ✓' : saved ? 'Saved ✓' : 'Save';
-  const subLabel = saveResult ? null : `−${fmtT26(cardPrice)} /t26`;
-
   // The underlying generation parameters — what the customizer controls.
   const cc = card.state_data?.customCard || {};
   const bg = cc.backgroundColor || {};
@@ -339,10 +331,20 @@ const ShareCard = () => {
   const tierOf = (score) => (config?.tiers || []).find(t => score >= t.scoreRange[0] && score <= t.scoreRange[1])
     || config?.tiers?.find(t => t.key === 'common') || null;
   // Rarity is the server roll (stored on the card), not something recomputed
-  // from the look — you can't design your way to a better score. Fall back to
-  // the params only for cards with no stored score (unsaved/synthetic draws).
-  const rarity = typeof card.rarity_score === 'number' ? card.rarity_score : scoreCard(cc);
+  // from the look — you can't design your way to a better score. For an unsaved
+  // synthetic draw it's the card's OWN generated rarity (the same value the
+  // server will charge against), so the price shown is exactly what's charged.
+  const rarity = typeof card.rarity_score === 'number'
+    ? card.rarity_score
+    : (Number.isFinite(Number(cc.rarity)) ? Math.max(0, Math.min(1, Number(cc.rarity))) : 0.35);
   const tier = tierOf(rarity);
+  // Price tracks that rarity as a wide distribution, seeded from the id. The
+  // server computes the identical number.
+  const cardPrice = saveCostFor(id, rarity);
+
+  const saved = saveResult && saveResult !== 'exists';
+  const mainLabel = saveResult === 'exists' ? 'In collection ✓' : saved ? 'Saved ✓' : 'Save';
+  const subLabel = saveResult ? null : `−${fmtT26(cardPrice)} /t26`;
   const totalPublished = rarities ? rarities.length : null;
   const tierPeers = rarities && tier ? rarities.filter(r => tierOf(r)?.key === tier.key).length : null;
   const drawWeight = tier && tierPeers > 0 ? tier.probability / tierPeers : null;
@@ -387,20 +389,29 @@ const ShareCard = () => {
         )}
 
         {/* Generate + Save live in a fixed dock at the bottom of the screen —
-            always visible, so the next card is one tap away from anywhere. */}
+            always visible, so the next card is one tap away from anywhere. The
+            rarity of the card you just pulled rides at the top of the dock, so
+            how rare it is reads instantly without scrolling to the details. */}
         <FixedDock className="card-actions">
-          <SaveButton onClick={generate} disabled={busy}>
-            <span className="main">{busy ? 'Working…' : 'Generate'} <LuCircleArrowRight aria-hidden /></span>
-            <span className="sub">{earned != null ? `+${fmtT26(earned)} /t26` : '+ /t26'}</span>
-          </SaveButton>
-          <SaveButton
-            $secondary
-            onClick={() => save()}
-            disabled={busy || provisional || saveResult === 'exists' || !!saveResult}
-          >
-            <span className="main">{mainLabel}</span>
-            {subLabel && <span className="sub">{subLabel}</span>}
-          </SaveButton>
+          <RarityReadout style={{ '--tier': tier?.color || 'var(--amber-text)' }}>
+            <span className="label">Rarity</span>
+            <span className="val">{num(rarity, 3)}</span>
+            {tier && <span className="tier">{tier.name}</span>}
+          </RarityReadout>
+          <div className="buttons">
+            <SaveButton onClick={generate} disabled={busy}>
+              <span className="main">{busy ? 'Working…' : 'Generate'} <LuCircleArrowRight aria-hidden /></span>
+              <span className="sub">{earned != null ? `+${fmtT26(earned)} /t26` : '+ /t26'}</span>
+            </SaveButton>
+            <SaveButton
+              $secondary
+              onClick={() => save()}
+              disabled={busy || provisional || saveResult === 'exists' || !!saveResult}
+            >
+              <span className="main">{mainLabel}</span>
+              {subLabel && <span className="sub">{subLabel}</span>}
+            </SaveButton>
+          </div>
         </FixedDock>
 
         {/* Secondary actions stay in the page flow. Unclaimed cards render
@@ -432,8 +443,8 @@ const ShareCard = () => {
         </AboutBox>
 
         <Details>
-          {/* Rarity & standing — rarity is computed from the card's own params */}
-          <Detail label="Rarity">{num(rarity, 3)}</Detail>
+          {/* Rarity & standing — the server roll; drives the tier and the price. */}
+          <Detail label="Rarity Value">{num(rarity, 3)}</Detail>
           <Detail label="Percentile">{topPct != null ? `top ${topPct}%` : null}</Detail>
           {tier && orderedTiers.length > 0 && (
             <DetailRow>
@@ -578,8 +589,14 @@ const Actions = styled.div`
 // always a thumb away, with a translucent panel and a gentle glow.
 const FixedDock = styled.div`
   display: flex;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
   align-items: stretch;
+  .buttons {
+    display: flex;
+    gap: 10px;
+    align-items: stretch;
+  }
   button {
     font-family: var(--font-mono);
     font-weight: 600;
@@ -622,6 +639,35 @@ const FixedDock = styled.div`
     @media (prefers-reduced-motion: reduce) {
       button::after { animation: none; opacity: 0; }
     }
+  }
+`;
+
+// The pulled card's rarity, sat at the top of the dock so it's the first thing
+// read after a Generate. The value and tier name take the tier's own colour, so
+// a Singular glows pink and a Common stays muted — an instant "how rare is this".
+const RarityReadout = styled.div`
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 1px 4px;
+  .label {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--amber-dim);
+  }
+  .val {
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1;
+    color: var(--tier);
+    font-variant-numeric: tabular-nums;
+  }
+  .tier { font-size: 12px; font-weight: 400; color: var(--tier); }
+
+  @media (max-width: 640px) {
+    justify-content: center;
+    padding: 0 2px 2px;
   }
 `;
 
