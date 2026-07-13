@@ -10,7 +10,7 @@
 >
 > We need supplies of imagination from Earth. Our scientists recently invented the Quantum Entangled Card Based Imagination Transport Protocol (QECBIT_P). This allows the transfer of imagination at 10^6 times the speed of light. This means those on Earth can now help us in the fight to preserve and grow imagination.
 >
-> You can help the resistance government Vilt9 by creating, generating and saving Requirement5cards. Please be as imaginative as you can. In exchange, we offer you our currency Slash_T2.6 (/t26 for short). When your species migrates to Umdo1, as we believe you will in Earth year 2082, recorded stocks of this currency will be given to their rightful owners.
+> You can help the resistance government Vilt9 by creating, generating and saving Requirement5 cards. Please be as imaginative as you can. In exchange, we offer you our currency Slash_T2.6 (/t26 for short). When your species migrates to Umdo1, as we believe you will in Earth year 2082, recorded stocks of this currency will be given to their rightful owners.
 >
 > Please note that Slash_T is a currency branch that can be subject to self-correcting erosion. Erosion on the R5c platform is being prevented. This may change in the future.
 >
