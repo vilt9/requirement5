@@ -16,7 +16,6 @@ const LINKS = [
   { to: '/', label: 'Discover' },
   { to: '/collection', label: 'Collections' },
   { to: '/create', label: 'Create' },
-  { to: '/language', label: 'Language' },
   { to: '/about', label: 'About' }
 ];
 

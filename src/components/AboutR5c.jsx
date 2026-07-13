@@ -1,5 +1,4 @@
 import styled from 'styled-components';
-import { Link } from 'react-router-dom';
 import { useScrollBloom } from '../utils/useScrollBloom';
 
 const REPO_URL = 'https://github.com/vilt9/requirement5';
@@ -61,11 +60,6 @@ const AboutR5c = () => {
       </Dates>
 
       <Rule />
-      <p>
-        <Term $active={scrolling}>QECBIT_P</Term> carries imagination in the five-carrier
-        script of <Term $active={scrolling}>Nation Elgo</Term>. Learn to read it, and to
-        write it, at <Link to="/language">Vitrec5</Link>.
-      </p>
       <p>
         We have representatives on Earth aiding in our fight. Speak to them on{' '}
         <a href={DISCORD_URL} target="_blank" rel="noopener noreferrer">Discord</a>.
