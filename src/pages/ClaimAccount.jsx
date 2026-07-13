@@ -57,7 +57,7 @@ const ClaimAccount = () => {
   return (
     <Page>
       <Panel>
-        We turned your Midjourney art into Requirement5 cards, and set aside the
+        We turned your Midjourney art into Requirement5cards, and set aside the
         account <b>{info.username}</b> for you.
         <Divider />
         {info.cards.length > 0 ? (

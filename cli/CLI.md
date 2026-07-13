@@ -1,4 +1,4 @@
-# r5c — the Requirement5 cards CLI
+# r5c — the Requirement5cards CLI
 
 Create, publish, and render R5c trading cards from the terminal. Built for
 humans and agents: every command has `--json` output, auth is a stored token or

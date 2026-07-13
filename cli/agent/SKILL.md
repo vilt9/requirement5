@@ -3,7 +3,7 @@ name: r5c
 description: Create, publish, preview, and update Requirement5 holographic trading cards from the terminal with the r5c CLI. Use when the user wants to make/publish/render an R5c card or mentions requirement5.com or "/t26".
 ---
 
-# r5c — Requirement5 cards from the terminal
+# r5c — Requirement5cards from the terminal
 
 `r5c` is a CLI for requirement5.com. A card is a single JSON **spec** file: you
 write it, publish it, and inspect the rendered result — no browser needed. The

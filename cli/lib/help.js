@@ -3,7 +3,7 @@
 // leaving the terminal.
 import { TIERS, BLEND_MODES, PATTERN_TYPES, HOLO_EFFECTS } from './spec.js';
 
-export const HELP = `r5c — Requirement5 cards from the command line
+export const HELP = `r5c — Requirement5cards from the command line
 
 USAGE
   r5c <command> [args] [--flags]

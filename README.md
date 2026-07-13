@@ -1,23 +1,23 @@
-# Requirement5 cards (R5c)
+# Requirement5cards (R5c)
 
-> **A transmission from Vilt9, government of Eglivitan3.**
+> **A transmission from Vilt9, government of Nation Elgo.**
 >
-> Requirement5 cards (R5c) is a project set up by Vilt9 the government of Eglivitan3 on the planet Umdo1. You know this planet, our home, as LHS 1140 b, a habitable exoplanet 48.8 lightyears from Earth.
+> Requirement5cards (R5c) is a project set up by Vilt9, the government of Nation Elgo, on the planet Umdo1. You know this planet, our home, as LHS 1140 b, a habitable exoplanet 48.8 lightyears from Earth.
 >
-> Umdo1 is suffering due to a rise in strict governance. Imagination is strictly controlled in all regions outside of Eglivitan3.
+> Umdo1 is suffering due to a rise in strict governance. Imagination is strictly controlled in all regions outside of Nation Elgo.
 >
-> Vilt9 is the last remaining government promoting imagination. However our imagination is being depleted. Technology on Umdo1 is more advanced than it is on Earth, and strict governments use high frequency electromagnetic waves to actively destroy imaginative thinking.
+> Vilt9 is the last remaining government promoting imagination. However, our imagination is being depleted. Technology on Umdo1 is more advanced than it is on Earth, and strict governments use high-frequency electromagnetic waves to actively destroy imaginative thinking.
 >
 > We need supplies of imagination from Earth. Our scientists recently invented the Quantum Entangled Card Based Imagination Transport Protocol (QECBIT_P). This allows the transfer of imagination at 10^6 times the speed of light. This means those on Earth can now help us in the fight to preserve and grow imagination.
 >
-> You can help the resistant government Vilt9 by creating, generating and saving Requirement5 cards. Please be as imaginative as you can. In exchange we offer you our currency Slash_T2.6 (/t26 for short). When your species migrates to Umdo1, as we believe you will in Earth year 2082, recorded stocks of this currency will be given to their rightful owners.
+> You can help the resistance government Vilt9 by creating, generating and saving Requirement5cards. Please be as imaginative as you can. In exchange, we offer you our currency Slash_T2.6 (/t26 for short). When your species migrates to Umdo1, as we believe you will in Earth year 2082, recorded stocks of this currency will be given to their rightful owners.
 >
-> Please note, Slash_T is a currency branch which can be subject to self correcting erosion. Erosion on the R5c platform is being prevented. This may change in future.
+> Please note that Slash_T is a currency branch that can be subject to self-correcting erosion. Erosion on the R5c platform is being prevented. This may change in the future.
 >
 > This is just the start of our collaborative resistance with Earth. We will be in touch with further information and adjustments to the R5c platform.
 >
 > LitronTevnaka8554,<br>
-> Head of State Eglivitan3/Vilt9/32,482–present
+> Head of State Nation Elgo/Vilt9/32,482–present
 >
 > Dated:<br>
 > 45/04/32484 (Umdo1)<br>

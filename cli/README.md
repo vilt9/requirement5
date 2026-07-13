@@ -1,6 +1,6 @@
 # r5c
 
-Command-line client for [Requirement5 cards](https://requirement5.com) —
+Command-line client for [Requirement5cards](https://requirement5.com) —
 create, publish, and render holographic trading cards from the terminal.
 
 ```bash

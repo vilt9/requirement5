@@ -16,6 +16,7 @@ const LINKS = [
   { to: '/', label: 'Discover' },
   { to: '/collection', label: 'Collections' },
   { to: '/create', label: 'Create' },
+  { to: '/language', label: 'Language' },
   { to: '/about', label: 'About' }
 ];
 
@@ -57,7 +58,7 @@ const Navigation = () => {
       <Inner>
         <Brand
           to="/"
-          aria-label="Requirement5 cards"
+          aria-label="Requirement5cards"
           className={logoOpen ? 'open' : ''}
           onPointerEnter={openLogo}
           onPointerLeave={(e) => { if (e.pointerType === 'mouse') closeLogo(); }}
