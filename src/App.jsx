@@ -160,6 +160,9 @@ function App() {
                     collection it's in and what they paid. */}
                 <Route path="/:username/card/:id" element={<ShareCard />} />
                 <Route path="/capture/:id" element={<CaptureCard />} />
+                {/* Unknown paths (incl. retired routes like /language) fall
+                    back to Discover rather than a blank frame. */}
+                <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </main>
           </div>
