@@ -55,3 +55,14 @@ CREATE TABLE IF NOT EXISTS singletons (
   key   text PRIMARY KEY,
   data  jsonb NOT NULL
 );
+
+-- Lightweight usage events (generate clicks). Append-only, like transactions.
+-- user_id is null for logged-out visitors — that's how the analytics roll-up
+-- splits logged-in from logged-out usage.
+CREATE TABLE IF NOT EXISTS events (
+  id       text PRIMARY KEY,
+  data     jsonb NOT NULL,
+  type     text GENERATED ALWAYS AS (data ->> 'type') STORED,
+  user_id  text GENERATED ALWAYS AS (data ->> 'user_id') STORED
+);
+CREATE INDEX IF NOT EXISTS events_type_idx ON events (type);

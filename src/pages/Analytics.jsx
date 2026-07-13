@@ -78,17 +78,13 @@ const Analytics = () => {
   if (error) return <Page><Panel><ErrorText>{error}</ErrorText></Panel></Page>;
   if (!data) return <Page><Panel><Dim>Loading…</Dim></Panel></Page>;
 
-  const { weeks, totals, retention, economy, segments } = data;
+  const { weeks, totals, usage, retention, economy, segments } = data;
 
   return (
     <Page>
       <Panel>
         <H1>Analytics</H1>
-        <Blurb>
-          Public cohort view of Requirement5. Every player is grouped by the week
-          they joined; each row tracks that group over the weeks that follow.
-          Aggregate counts only — no names, no per-user data.
-        </Blurb>
+        <Blurb>Grouped by signup week. Aggregate only, no names.</Blurb>
         <Stats>
           <Stat><b>{totals.users}</b><span>players</span></Stat>
           <Stat><b>{totals.creators}</b><span>creators</span></Stat>
@@ -98,10 +94,11 @@ const Analytics = () => {
         </Stats>
       </Panel>
 
-      <Section
-        title="1 · Retention"
-        blurb="Of each week's new players, how many came back and did anything (drew, saved, published, starred) in a later week. Darker = a bigger share still active."
-      >
+      <Section title="Usage · weekly" blurb="Actions per week.">
+        <UsageTable usage={usage} weeks={weeks} />
+      </Section>
+
+      <Section title="1 · Retention" blurb="Share of each signup week still active.">
         <Triangle
           cohorts={retention.cohorts}
           weeks={weeks}
@@ -118,10 +115,7 @@ const Analytics = () => {
         />
       </Section>
 
-      <Section
-        title="2 · Activity intensity"
-        blurb="Not just who came back, but how hard they played: average actions per active player that week. Darker = more actions each."
-      >
+      <Section title="2 · Activity intensity" blurb="Actions per active player.">
         <Triangle
           cohorts={retention.cohorts}
           weeks={weeks}
@@ -140,17 +134,11 @@ const Analytics = () => {
         />
       </Section>
 
-      <Section
-        title="3 · Economy health"
-        blurb="Each cohort's money over time — median balance, and the share of the group underwater. Red tint = more of the cohort in debt."
-      >
+      <Section title="3 · Economy health" blurb="Median balance · red = share in debt.">
         <EconTriangle cohorts={economy.cohorts} weeks={weeks} />
       </Section>
 
-      <Section
-        title="4 · Creators vs collectors"
-        blurb="Retention split by behaviour. Creators have published a card; collectors have only saved others'. Do makers or curators stick around longer?"
-      >
+      <Section title="4 · Creators vs collectors" blurb="Retention by behaviour.">
         <SubHead>Creators <Dim>· {totals.creators}</Dim></SubHead>
         <Triangle
           cohorts={segments.creator.cohorts}
@@ -224,6 +212,53 @@ const EconTriangle = ({ cohorts, weeks }) => {
   );
 };
 
+// Weekly usage: generate clicks (logged-in / out), saves, cards created. Rows
+// are metrics, columns are weeks; each cell heat-shades against its own row's
+// peak so a row reads as a trend regardless of the others' scale.
+const UsageTable = ({ usage, weeks }) => {
+  const rows = [
+    { key: 'gin', label: 'Generate · logged-in', series: usage.generate.in, total: usage.totals.generateIn },
+    { key: 'gout', label: 'Generate · logged-out', series: usage.generate.out, total: usage.totals.generateOut },
+    { key: 'saves', label: 'Card saves', series: usage.saves, total: usage.totals.saves },
+    { key: 'created', label: 'Cards created', series: usage.created, total: usage.totals.created }
+  ];
+  // Only weeks where something happened, so the table doesn't sprawl.
+  const cols = weeks.filter(w => rows.some(r => (r.series[w] || 0) > 0));
+  if (!cols.length) return <Dim>No usage yet.</Dim>;
+  return (
+    <Scroll>
+      <Grid>
+        <thead>
+          <tr>
+            <th className="corner">metric</th>
+            {cols.map(w => <th key={w}>{shortWeek(w)}</th>)}
+            <th className="total">Σ</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(r => {
+            const peak = Math.max(1, ...cols.map(w => r.series[w] || 0));
+            return (
+              <tr key={r.key}>
+                <th className="row">{r.label}</th>
+                {cols.map(w => {
+                  const v = r.series[w] || 0;
+                  return (
+                    <td key={w} className={v ? '' : 'muted'} style={{ background: v ? heat(v / peak) : 'transparent' }}>
+                      {v || '·'}
+                    </td>
+                  );
+                })}
+                <td className="total">{r.total}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </Grid>
+    </Scroll>
+  );
+};
+
 const H1 = styled.h1`
   font-size: 22px; font-weight: 700; letter-spacing: -0.02em;
   color: var(--white); margin: 0 0 6px;
@@ -255,7 +290,8 @@ const Grid = styled.table`
   th.row { text-align: left; color: var(--amber-text); white-space: nowrap; }
   td { color: #140d03; font-weight: 700; font-variant-numeric: tabular-nums; }
   td.empty { background: transparent; border-color: transparent; }
-  td.muted { color: var(--amber-dim); font-weight: 400; }
+  td.muted { color: var(--amber-dim); font-weight: 400; background: transparent; }
+  .total { color: var(--gold-bright); font-weight: 700; background: transparent; border-left: 1px solid var(--panel-border); }
 `;
 
 export default Analytics;

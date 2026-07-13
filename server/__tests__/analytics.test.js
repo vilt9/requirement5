@@ -146,6 +146,51 @@ describe('feature 4 — creator vs collector segments', () => {
   });
 });
 
+describe('feature 5 — usage breakdown', () => {
+  const genEvent = (userId, createdAt) =>
+    at(memoryDb.createEvent({ type: 'generate', user_id: userId }), createdAt);
+
+  test('splits generate clicks into logged-in and logged-out by week', () => {
+    const u = makeUser('u', W1);
+    genEvent(u.id, W1);        // logged in
+    genEvent(u.id, W2);
+    genEvent(null, W1);        // logged out
+    genEvent(null, W1);
+
+    const { usage } = computeAnalytics();
+    expect(usage.generate.in[K1]).toBe(1);
+    expect(usage.generate.in[K2]).toBe(1);
+    expect(usage.generate.out[K1]).toBe(2);
+    expect(usage.totals.generateIn).toBe(2);
+    expect(usage.totals.generateOut).toBe(2);
+  });
+
+  test('counts saves and card-creates per week from their tables', () => {
+    const u = makeUser('u', W1);
+    at(memoryDb.createCard({ creator_id: u.id }), W1);
+    at(memoryDb.createCard({ creator_id: u.id }), W2);
+    at(memoryDb.createSave({ user_id: u.id, card_id: 'c1' }), W2);
+
+    const { usage } = computeAnalytics();
+    expect(usage.created[K1]).toBe(1);
+    expect(usage.created[K2]).toBe(1);
+    expect(usage.saves[K2]).toBe(1);
+    expect(usage.totals.created).toBe(2);
+    expect(usage.totals.saves).toBe(1);
+  });
+
+  test('every week key is present and zero-filled across all series', () => {
+    const u = makeUser('u', W1);
+    genEvent(u.id, W3); // pushes the axis out to W3
+    const { usage, weeks } = computeAnalytics();
+    for (const w of weeks) {
+      expect(usage.generate.in[w]).toBeGreaterThanOrEqual(0);
+      expect(usage.saves[w]).toBe(0);
+      expect(usage.created[w]).toBe(0);
+    }
+  });
+});
+
 describe('banner totals', () => {
   test('sums circulating balance, cards, and per-week new/active users', () => {
     const a = makeUser('a', W1, { balance: 30 });

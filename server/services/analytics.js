@@ -190,6 +190,46 @@ function buildEconomy(users, txns, weeks) {
   return result;
 }
 
+// Feature 5: usage breakdown — three deliberate actions counted per week.
+// Generate clicks split logged-in vs logged-out (user_id null); saves and
+// card-creates come from their own tables. Every week key is present in all
+// four series (0-filled) so the UI can render aligned columns.
+function buildUsage(events, saves, cards, weeks) {
+  const gen = { in: {}, out: {} };
+  const savesByWeek = {};
+  const created = {};
+  for (const w of weeks) { gen.in[w] = 0; gen.out[w] = 0; savesByWeek[w] = 0; created[w] = 0; }
+
+  for (const e of events) {
+    if (e.type !== 'generate' || !e.created_at) continue;
+    const w = isoWeek(new Date(e.created_at));
+    if (!(w in gen.in)) continue;
+    (e.user_id ? gen.in : gen.out)[w] += 1;
+  }
+  for (const s of saves) {
+    if (!s.created_at) continue;
+    const w = isoWeek(new Date(s.created_at));
+    if (w in savesByWeek) savesByWeek[w] += 1;
+  }
+  for (const c of cards) {
+    if (!c.created_at) continue;
+    const w = isoWeek(new Date(c.created_at));
+    if (w in created) created[w] += 1;
+  }
+  const total = (obj) => Object.values(obj).reduce((a, b) => a + b, 0);
+  return {
+    generate: { in: gen.in, out: gen.out },
+    saves: savesByWeek,
+    created,
+    totals: {
+      generateIn: total(gen.in),
+      generateOut: total(gen.out),
+      saves: total(savesByWeek),
+      created: total(created)
+    }
+  };
+}
+
 export function computeAnalytics() {
   const allUsers = memoryDb.getAllUsers();
   const users = allUsers.filter(isRealUser);
@@ -197,6 +237,7 @@ export function computeAnalytics() {
   const saves = memoryDb.getAllSaves();
   const stars = memoryDb.getAllStars();
   const cards = memoryDb.getAllCards();
+  const usageEvents = memoryDb.getAllEvents();
   const userIds = new Set(users.map(u => u.id));
 
   // --- timeline scaffold: the contiguous week axis every triangle aligns to ---
@@ -206,6 +247,7 @@ export function computeAnalytics() {
   for (const c of cards) { const d = parseDate(c.created_at); if (d) dates.push(d); }
   for (const s of saves) { const d = parseDate(s.created_at); if (d) dates.push(d); }
   for (const s of stars) { const d = parseDate(s.created_at); if (d) dates.push(d); }
+  for (const e of usageEvents) { const d = parseDate(e.created_at); if (d) dates.push(d); }
   const minDate = dates.length ? new Date(Math.min(...dates.map(d => d.getTime()))) : null;
   const maxDate = dates.length ? new Date(Math.max(...dates.map(d => d.getTime()))) : null;
   const weeks = enumerateWeeks(minDate, maxDate);
@@ -257,6 +299,7 @@ export function computeAnalytics() {
       cloudAbsorbed: cloud.total_absorbed
     },
     weekly: { newUsers, activeUsers, cards: cardsPerWeek },
+    usage: buildUsage(usageEvents, saves, cards, weeks),
     retention: { cohorts: buildCohorts(users, byUser) },
     economy: { cohorts: buildEconomy(users, txns, weeks) },
     segments: {

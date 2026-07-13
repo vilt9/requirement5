@@ -30,6 +30,8 @@ const db = {
   saves: [],
   // A user starring another user's collection (user_id starrer, owner_id owner).
   stars: [],
+  // Usage events (generate clicks). Append-only; user_id null when logged out.
+  events: [],
   // In-progress rarity rolls (one active per user). Ephemeral — deliberately
   // NOT persisted: a restart just means designers re-roll. The server owns the
   // rolled rarity so neither the web nor the CLI can self-declare it.
@@ -43,7 +45,7 @@ const db = {
 // Track which rows changed since the last flush so we only upsert the deltas
 // (transactions are append-only and unbounded — a full-snapshot flush would grow
 // linearly). Counters + cloud are tiny and rewritten every flush.
-const dirty = { cards: new Set(), users: new Set(), transactions: new Set(), saves: new Set(), stars: new Set() };
+const dirty = { cards: new Set(), users: new Set(), transactions: new Set(), saves: new Set(), stars: new Set(), events: new Set() };
 const removed = { cards: new Set(), users: new Set(), saves: new Set(), stars: new Set() };
 let truncateRequested = false;
 
@@ -120,7 +122,7 @@ const load = () => {
   if (IS_TEST || !fs.existsSync(DB_FILE)) return;
   try {
     const loaded = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-    for (const key of ['cards', 'users', 'transactions', 'saves', 'stars']) {
+    for (const key of ['cards', 'users', 'transactions', 'saves', 'stars', 'events']) {
       if (Array.isArray(loaded[key])) db[key] = loaded[key];
     }
     if (loaded.cloud) db.cloud = { ...db.cloud, ...loaded.cloud };
@@ -309,6 +311,21 @@ const memoryDb = {
   getAllSaves: () => [...db.saves],
   getAllStars: () => [...db.stars],
 
+  // ---------- events (usage: generate clicks) ----------
+  createEvent: (event) => {
+    const newEvent = {
+      user_id: null,
+      ...event,
+      id: crypto.randomUUID(),
+      created_at: now()
+    };
+    db.events.push(newEvent);
+    markDirty('events', newEvent.id);
+    persistSoon();
+    return newEvent;
+  },
+  getAllEvents: () => [...db.events],
+
   // ---------- saves (a user's collection of pool cards) ----------
   createSave: (save) => {
     const newSave = {
@@ -429,6 +446,7 @@ const memoryDb = {
     db.transactions.length = 0;
     db.saves.length = 0;
     db.stars.length = 0;
+    db.events.length = 0;
     db.rolls.length = 0;
     db.cloud = { total_issued: 0, total_absorbed: 0 };
     if (USE_PG) {

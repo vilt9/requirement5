@@ -209,6 +209,10 @@ export function AuthProvider({ children }) {
   // Pop the next card to show. Never waits: an empty queue mints a fresh
   // uuid on the spot (its card generates from the seed, no network needed).
   const nextCard = useCallback(() => {
+    // Log the generate click for usage analytics — fire-and-forget, tagged
+    // logged-in/out server-side by whether a token rides along. Never blocks
+    // or fails the draw.
+    api('/api/analytics/event', { method: 'POST', body: { type: 'generate' } }).catch(() => {});
     if (!user) {
       const entry = mintFresh();
       bumpStash(entry.earned); // the stash grows by the card's own seeded yield
