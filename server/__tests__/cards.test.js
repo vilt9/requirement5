@@ -10,7 +10,7 @@ let token, userId;
 const signup = async (username) => {
   const res = await request(app)
     .post('/api/auth/signup')
-    .send({ username, password: 'password123' });
+    .send({ username, email: `${username}@earth.test`, password: 'password123' });
   expect(res.status).toBe(201);
   return res.body.data; // { user, token }
 };

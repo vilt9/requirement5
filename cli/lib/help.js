@@ -9,8 +9,8 @@ USAGE
   r5c <command> [args] [--flags]
 
 ACCOUNT
-  signup --username <name> [--password <pw>]   Create an account (grants 50 /t26) and log in
-  login  --username <name> [--password <pw>]   Log in (token saved to ~/.r5c/config.json)
+  signup --username <name> --email <addr> [--password <pw>]   Create an account (grants 50 /t26) and log in
+  login  --username <name|email> [--password <pw>]            Log in (token saved to ~/.r5c/config.json)
   logout                                       Forget the saved token
   whoami                                       Show current user and balance
   balance                                      Show /t26 balance
@@ -240,11 +240,12 @@ Prints an example card spec as JSON, ready to save and edit:
 
 "minimal" (default) is the smallest useful spec; "full" demonstrates every
 visual knob including all four holo effect systems. Reference: r5c help spec`,
-  signup: `r5c signup --username <name> [--password <pw>]
+  signup: `r5c signup --username <name> --email <addr> [--password <pw>]
 
 Creates an account and stores the session token in ~/.r5c/config.json.
-Username: 3-24 chars (letters, numbers, underscore). Password: min 8 chars —
-prompted interactively if omitted (or piped via stdin).
+Username: 3-24 chars (letters, numbers, underscore). Email: required (kept
+private, server-side only). Password: min 8 chars — prompted interactively if
+omitted (or piped via stdin). Log in later with either the username or email.
 New accounts are granted 50 /t26; rerolling and publishing spend from it (you
 may go into the red down to -1000, which accrues 1.47%/day interest).`,
   login: `r5c login --username <name> [--password <pw>]

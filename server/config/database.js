@@ -268,6 +268,9 @@ const memoryDb = {
   getUserByUsername: (username) =>
     db.users.find(u => u.username.toLowerCase() === String(username).toLowerCase()),
 
+  getUserByEmail: (email) =>
+    email ? db.users.find(u => u.email && u.email.toLowerCase() === String(email).toLowerCase()) : undefined,
+
   getUserByClaimToken: (token) =>
     token ? db.users.find(u => u.claim_token && u.claim_token === token) : undefined,
 

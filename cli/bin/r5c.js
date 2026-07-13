@@ -101,16 +101,18 @@ async function promptHidden(label) {
 
 async function cmdSignup({ flags }) {
   const username = flags.username || fail('signup needs --username (3-24 chars: letters, numbers, underscore)');
+  const email = flags.email || fail('signup needs --email');
   const password = flags.password || await promptHidden('Password (min 8 chars): ');
-  const { data } = await api.post('/api/auth/signup', { username, password });
+  const { data } = await api.post('/api/auth/signup', { username, email, password });
   setSession({ token: data.token, username: data.user.username });
   out(flags.json ? data : `Signed up and logged in as ${data.user.username}. Starting balance: ${data.user.balance} /t26.`);
 }
 
 async function cmdLogin({ flags }) {
-  const username = flags.username || fail('login needs --username');
+  // Accept a username or an email as the identifier (--username kept for habit).
+  const identifier = flags.username || flags.email || fail('login needs --username (or --email)');
   const password = flags.password || await promptHidden('Password: ');
-  const { data } = await api.post('/api/auth/login', { username, password });
+  const { data } = await api.post('/api/auth/login', { identifier, password });
   setSession({ token: data.token, username: data.user.username });
   out(flags.json ? data : `Logged in as ${data.user.username} (${apiUrl()}). Balance: ${data.user.balance} /t26.`);
 }

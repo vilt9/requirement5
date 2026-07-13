@@ -29,7 +29,7 @@ const signup = async () => {
   const res = await fetch(`${API_URL}/api/auth/signup`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password: 'password123' })
+    body: JSON.stringify({ username, email: `${username}@earth.test`, password: 'password123' })
   });
   const body = await res.json();
   if (!body.success) throw new Error(`signup failed: ${body.error}`);

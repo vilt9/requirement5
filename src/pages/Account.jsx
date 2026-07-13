@@ -18,8 +18,12 @@ const TXN_LABELS = {
   interest: 'Debt interest'
 };
 
-const AuthForm = ({ title, submitLabel, onSubmit }) => {
+const AuthForm = ({ title, submitLabel, mode, onSubmit }) => {
+  const isSignup = mode === 'signup';
+  // On login this field holds a username OR an email (the identifier); on signup
+  // it's strictly the username, with email captured separately below.
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -29,7 +33,8 @@ const AuthForm = ({ title, submitLabel, onSubmit }) => {
     setBusy(true);
     setError(null);
     try {
-      await onSubmit(username, password);
+      if (isSignup) await onSubmit(username, email, password);
+      else await onSubmit(username, password);
     } catch (err) {
       setError(err.message);
     }
@@ -42,17 +47,27 @@ const AuthForm = ({ title, submitLabel, onSubmit }) => {
       <Divider />
       <Stack>
         <TextInput
-          placeholder="Username"
+          placeholder={isSignup ? 'Username' : 'Username or Earth email'}
           value={username}
           onChange={e => setUsername(e.target.value)}
           autoComplete="username"
         />
+        {isSignup && (
+          <TextInput
+            type="email"
+            placeholder="Earth email address"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            autoComplete="email"
+            required
+          />
+        )}
         <TextInput
           type="password"
           placeholder="Password (8+ characters)"
           value={password}
           onChange={e => setPassword(e.target.value)}
-          autoComplete={submitLabel === 'Sign up' ? 'new-password' : 'current-password'}
+          autoComplete={isSignup ? 'new-password' : 'current-password'}
         />
         {error && <ErrorText>{error}</ErrorText>}
         <div><PillButton type="submit" disabled={busy}>{submitLabel}</PillButton></div>
@@ -95,8 +110,8 @@ const Account = () => {
           New accounts receive a grant of {config?.startingGrant ?? 50} /t26 from the cloud.
         </Panel>
         <Row>
-          <AuthForm title="Log in" submitLabel="Log in" onSubmit={login} />
-          <AuthForm title="Create account" submitLabel="Sign up" onSubmit={signup} />
+          <AuthForm title="Log in" submitLabel="Log in" mode="login" onSubmit={login} />
+          <AuthForm title="Create account" submitLabel="Sign up" mode="signup" onSubmit={signup} />
         </Row>
       </Page>
     );

@@ -11,7 +11,7 @@ beforeEach(() => {
 const signup = async (username) => {
   const res = await request(app)
     .post('/api/auth/signup')
-    .send({ username, password: 'password123' });
+    .send({ username, email: `${username}@earth.test`, password: 'password123' });
   expect(res.status).toBe(201);
   return res.body.data; // { user, token }
 };
@@ -24,23 +24,70 @@ describe('auth flow', () => {
     expect(user.username).toBe('vex_haldane');
     expect(user.balance).toBe(ECONOMY.STARTING_GRANT);
     expect(user.password_hash).toBeUndefined();
+    // Email is captured but private: it must never come back to the client.
+    expect(user.email).toBeUndefined();
 
     const login = await request(app)
       .post('/api/auth/login')
-      .send({ username: 'vex_haldane', password: 'password123' });
+      .send({ identifier: 'vex_haldane', password: 'password123' });
     expect(login.status).toBe(200);
 
     const me = await request(app).get('/api/auth/me').set(auth(token));
     expect(me.status).toBe(200);
     expect(me.body.data.username).toBe('vex_haldane');
+    expect(me.body.data.email).toBeUndefined();
 
     const bad = await request(app)
       .post('/api/auth/login')
-      .send({ username: 'vex_haldane', password: 'wrong-password' });
+      .send({ identifier: 'vex_haldane', password: 'wrong-password' });
     expect(bad.status).toBe(401);
 
     const noToken = await request(app).get('/api/auth/me');
     expect(noToken.status).toBe(401);
+  });
+
+  // The whole point of capturing email: you can sign in with it OR the username.
+  test('logs in with either username or email; email never leaks', async () => {
+    // signup() sends email `${username}@earth.test`.
+    await signup('mira_okonkwo');
+
+    const byUsername = await request(app)
+      .post('/api/auth/login')
+      .send({ identifier: 'mira_okonkwo', password: 'password123' });
+    expect(byUsername.status).toBe(200);
+    expect(byUsername.body.data.user.username).toBe('mira_okonkwo');
+    expect(byUsername.body.data.user.email).toBeUndefined();
+
+    const byEmail = await request(app)
+      .post('/api/auth/login')
+      .send({ identifier: 'mira_okonkwo@earth.test', password: 'password123' });
+    expect(byEmail.status).toBe(200);
+    expect(byEmail.body.data.user.username).toBe('mira_okonkwo');
+    expect(byEmail.body.data.user.email).toBeUndefined();
+
+    // Email match is case-insensitive (stored lowercased).
+    const byEmailCaps = await request(app)
+      .post('/api/auth/login')
+      .send({ identifier: 'Mira_Okonkwo@Earth.Test', password: 'password123' });
+    expect(byEmailCaps.status).toBe(200);
+
+    // A wrong/unknown identifier is rejected.
+    const unknown = await request(app)
+      .post('/api/auth/login')
+      .send({ identifier: 'nobody@earth.test', password: 'password123' });
+    expect(unknown.status).toBe(401);
+  });
+
+  test('signup requires a valid email', async () => {
+    const noEmail = await request(app)
+      .post('/api/auth/signup')
+      .send({ username: 'no_mail_user', password: 'password123' });
+    expect(noEmail.status).toBe(400);
+
+    const badEmail = await request(app)
+      .post('/api/auth/signup')
+      .send({ username: 'bad_mail_user', email: 'not-an-email', password: 'password123' });
+    expect(badEmail.status).toBe(400);
   });
 });
 

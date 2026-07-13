@@ -12,7 +12,7 @@ npm install -g r5c                                 # via npm
 cd cli && npm link                                 # from a repo checkout
 
 # One-minute card
-r5c signup --username ada_l --password 'correct-horse-9'
+r5c signup --username ada_l --email ada@example.com --password 'correct-horse-9'
 r5c template > card.json               # edit: point "image" at your artwork
 r5c publish card.json                  # prints https://requirement5.com/card/<id>
 ```
@@ -44,8 +44,8 @@ with `r5c balance` / `r5c transactions`.
 ## Commands
 
 ### Account
-- `r5c signup --username <name> [--password <pw>]` — create account + log in
-- `r5c login --username <name> [--password <pw>]` — log in (password prompted if omitted)
+- `r5c signup --username <name> --email <addr> [--password <pw>]` — create account + log in
+- `r5c login --username <name|email> [--password <pw>]` — log in with a username or email (password prompted if omitted)
 - `r5c logout` — forget the stored token
 - `r5c whoami` — current user, balance, API URL
 - `r5c balance` / `r5c transactions` — /t26 balance and ledger

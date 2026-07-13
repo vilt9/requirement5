@@ -8,6 +8,7 @@ test.describe('account', () => {
 
     const form = page.locator('form').filter({ hasText: 'Create account' });
     await form.getByPlaceholder('Username').fill(username);
+    await form.getByPlaceholder('Earth email address').fill(`${username}@earth.test`);
     await form.getByPlaceholder('Password (8+ characters)').fill('password123');
     await form.getByRole('button', { name: 'Sign up' }).click();
 

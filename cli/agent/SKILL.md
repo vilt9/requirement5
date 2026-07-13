@@ -15,7 +15,7 @@ you only specify what you care about.
 - Check it's installed: `r5c --version`. If missing: `npm install -g r5c`
   (or `curl -fsSL https://requirement5.com/install | sh` for a no-root install).
 - Auth: `r5c whoami` shows the current login. If the user isn't logged in, ask
-  them to run `r5c signup --username <name>` / `r5c login`, or to set
+  them to run `r5c signup --username <name> --email <addr>` / `r5c login`, or to set
   `R5C_TOKEN`. Never invent credentials or sign up on their behalf.
 
 ## Rarity is a gamble, not a choice

@@ -5,6 +5,10 @@ import { ECONOMY } from '../services/economy.js';
 import { issue } from '../services/ledger.js';
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,24}$/;
+// Deliberately loose: enough to reject obvious non-addresses, not to police RFC
+// edge cases. We don't verify the address (no mail is sent yet), just capture it.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
 
 // A Reddit/X handle → a valid, unclaimed R5c username: `mj_<handle>`, lowercased,
 // non-username chars dropped, clamped to the 24-char limit. Empty/garbage handles
@@ -17,15 +21,21 @@ export const usernameForHandle = (handle) => {
 
 export const publicUser = (user) => {
   if (!user) return null;
-  // claim_token is a bearer secret (the claim link) — never expose it.
-  const { password_hash, claim_token, ...rest } = user;
+  // Strip everything private: password_hash, the claim_token bearer secret, and
+  // email. Email is captured at signup but only ever lives in the DB — it is
+  // never sent back to the client, so it can't surface on the account UI.
+  const { password_hash, claim_token, email, ...rest } = user;
   return rest;
 };
 
 export default class User {
-  static async create({ username, password }) {
+  static async create({ username, email, password }) {
     if (!USERNAME_RE.test(username || '')) {
       return { success: false, error: 'Username must be 3-24 characters: letters, numbers, underscore' };
+    }
+    const cleanEmail = normalizeEmail(email);
+    if (!EMAIL_RE.test(cleanEmail)) {
+      return { success: false, error: 'A valid email address is required' };
     }
     if (!password || password.length < 8) {
       return { success: false, error: 'Password must be at least 8 characters' };
@@ -33,8 +43,12 @@ export default class User {
     if (memoryDb.getUserByUsername(username)) {
       return { success: false, error: 'Username is taken' };
     }
+    if (memoryDb.getUserByEmail(cleanEmail)) {
+      return { success: false, error: 'That email is already registered' };
+    }
     const user = memoryDb.createUser({
       username,
+      email: cleanEmail,
       password_hash: bcrypt.hashSync(password, 10)
     });
     issue(user.id, 'grant', ECONOMY.STARTING_GRANT);
@@ -90,10 +104,14 @@ export default class User {
     return { success: true, data: publicUser(updated) };
   }
 
-  static async authenticate({ username, password }) {
-    const user = memoryDb.getUserByUsername(username || '');
+  // Log in with either a username or an email address — whichever the visitor
+  // typed into the single identifier field. `username` is still accepted as a
+  // fallback so older callers (e.g. the CLI) keep working unchanged.
+  static async authenticate({ identifier, username, password }) {
+    const id = String(identifier ?? username ?? '').trim();
+    const user = memoryDb.getUserByUsername(id) || memoryDb.getUserByEmail(id);
     if (!user || !bcrypt.compareSync(password || '', user.password_hash)) {
-      return { success: false, error: 'Invalid username or password' };
+      return { success: false, error: 'Invalid login or password' };
     }
     return { success: true, data: publicUser(user) };
   }

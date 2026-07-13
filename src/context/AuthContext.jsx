@@ -90,10 +90,10 @@ export function AuthProvider({ children }) {
     restore();
   }, []);
 
-  const signup = async (username, password) => {
+  const signup = async (username, email, password) => {
     const data = await api('/api/auth/signup', {
       method: 'POST',
-      body: { username, password, stash: readStash() }
+      body: { username, email, password, stash: readStash() }
     });
     setToken(data.token);
     setUser(data.user);
@@ -101,10 +101,11 @@ export function AuthProvider({ children }) {
     return data.user;
   };
 
-  const login = async (username, password) => {
+  // `identifier` is a username or an email — the server resolves either.
+  const login = async (identifier, password) => {
     const data = await api('/api/auth/login', {
       method: 'POST',
-      body: { username, password, stash: readStash() }
+      body: { identifier, password, stash: readStash() }
     });
     setToken(data.token);
     setUser(data.user);

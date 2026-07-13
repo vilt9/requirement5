@@ -3,7 +3,7 @@ Help me make a holographic trading card on requirement5.com using the `r5c` CLI.
 1. Check whether r5c is installed (`r5c --version`); if not, install it with
    `npm install -g r5c`.
 2. Check whether I'm logged in (`r5c whoami`). If I'm not, stop and ask me to run
-   `r5c signup --username <name>` (or to set `R5C_TOKEN`) — do not create an
+   `r5c signup --username <name> --email <addr>` (or to set `R5C_TOKEN`) — do not create an
    account for me.
 3. Learn the card spec by running `r5c help spec` and `r5c template full`. Treat
    these as the source of truth for every field — don't guess field names. Note

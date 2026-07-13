@@ -9,7 +9,7 @@ curl -fsSL https://requirement5.com/install | sh
 npm install -g r5c
 
 # one-minute card
-r5c signup --username your_name
+r5c signup --username your_name --email you@example.com
 r5c template > card.json     # edit: point "image" at your artwork
 r5c publish card.json        # prints your card's live URL
 ```
