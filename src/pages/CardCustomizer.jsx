@@ -19,7 +19,6 @@ import { useAuth, tierForScore } from '../context/AuthContext';
 import { api } from '../utils/api';
 import { regenCostFor, createCostFor } from '../utils/economyRandom';
 import { Dim, Select, PillButton } from '../components/UI';
-import sigImage from '../assets/img/r5c_signature.png';
 
 // The creation flow runs in three stages: roll a base card (Start) → design →
 // tag and publish. The stepper is free navigation, not a locked wizard —
@@ -31,10 +30,14 @@ const STAGES = [
 ];
 const STAGE_KEYS = STAGES.map(s => s.key);
 
-// Every rolled card wears the same signature image + default holo overlay —
-// constant across rolls, so a card always reads as "an R5c card". Only the
-// background and the rolled rarity change when you regenerate.
+// Every rolled card wears the same default holo overlay (the R5 holo image) —
+// constant across rolls, so a card always reads as "an R5c card". A fresh card
+// starts with no main image; you add your own. Only the background and the
+// rolled rarity change when you regenerate.
 const DEFAULT_HOLO = { overlay: true, rareHolo: false, rareHoloGalaxy: false, wowaHolo: false, rareHoloVmax: false };
+
+// The default Veil image every rolled card wears until you upload your own.
+const DEFAULT_HOLO_IMAGE = '/r5c_card_back.png';
 
 // Build a base card's visuals. When a rarity is given (the server roll), the
 // look is generated to match it; otherwise a client rarity is drawn (logged
@@ -43,8 +46,8 @@ const rollBaseCard = (rarity) => ({
   ...generateCardAttributes(rarity != null ? { rarityRange: [rarity, rarity] } : {}),
   tags: [],
   imagePath: 'custom_image',
-  customImageUrl: sigImage,
-  customHoloImageUrl: null,
+  customImageUrl: null,
+  customHoloImageUrl: DEFAULT_HOLO_IMAGE,
   holoEffects: DEFAULT_HOLO,
   ...(rarity != null ? { rarity } : {})
 });
@@ -256,9 +259,9 @@ const CardCustomizer = () => {
 
   const handleMainImageChange = (e) => readFileAsDataUrl(e, applyMainImage);
 
-  // The reroll: a fresh background + effects AND a fresh rolled rarity. The
-  // signature image (or whatever you've loaded) and the holo carry over — the
-  // gamble is the backdrop and the rarity, not the picture.
+  // The reroll: a fresh background + effects AND a fresh rolled rarity. Your
+  // main image (whatever you've loaded) and the holo carry over — the gamble is
+  // the backdrop and the rarity, not the picture.
   //
   // Logged in, the reroll costs /t26: charge the server first (it computes the
   // price from the reroll count + seed), and a failed / unaffordable charge
@@ -270,9 +273,9 @@ const CardCustomizer = () => {
     setCustomCard(prev => ({
       ...fresh,
       tags: prev?.tags || [],
-      customImageUrl: prev?.customImageUrl || sigImage,
+      customImageUrl: prev?.customImageUrl || null,
       imagePath: 'custom_image',
-      customHoloImageUrl: prev?.customHoloImageUrl || null,
+      customHoloImageUrl: prev?.customHoloImageUrl || DEFAULT_HOLO_IMAGE,
       holoEffects: prev?.holoEffects || DEFAULT_HOLO,
       ...(rarity != null ? { rarity } : {})
     }));

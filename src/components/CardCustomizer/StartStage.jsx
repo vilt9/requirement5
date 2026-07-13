@@ -4,9 +4,9 @@ import { PillButton, Dim } from '../UI';
 import { fmtT26 } from '../../utils/economyRandom';
 
 // Stage 1 of the customizer: the roll. Every card starts as a rolled base —
-// a random background + the fixed signature image + default holo + a rolled
-// rarity. Regenerate rerolls the background and the rarity (the signature and
-// holo stay). Start commits to the card (costs /t26) and moves into design.
+// a random background + default holo + a rolled rarity, with no main image yet.
+// Regenerate rerolls the background and the rarity (the holo stays). Start
+// commits to the card (costs /t26) and moves into design.
 const StartStage = ({
   rarity,
   tierName,

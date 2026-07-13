@@ -534,8 +534,8 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
   
   // Load image URL
   // Handle both custom image URLs and regular image paths
-  const imageUrl = imagePath === 'custom_image' && customImageUrl
-    ? customImageUrl
+  const imageUrl = imagePath === 'custom_image'
+    ? customImageUrl || null // a custom card with no image yet renders empty
     : `/assets/card_images/${imagePath}`;
 
   // Per-system image-layer presentation. Presence (how solid the image sits
@@ -651,7 +651,7 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
             <S.CardBorderImage
               className="card-border-image"
               style={{
-                '--card-image': `url(${imageUrl})`,
+                '--card-image': imageUrl ? `url(${imageUrl})` : 'none',
                 '--border-image-opacity': borderEffects?.imageOpacity ?? '0.7',
                 '--initial-blur': 'blur(2px)',
                 '--hover-blur': 'blur(0.5px)',
