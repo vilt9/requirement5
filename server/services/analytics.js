@@ -71,51 +71,67 @@ function median(nums) {
   return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
 }
 
-// Collect the raw activity stream: one { userId, week } per deliberate action,
-// unioned across all sources with no double counting (see DRAW_TYPES note).
+// The deliberate-action kinds the intensity view breaks out. Draws and rerolls
+// come from the ledger; saves, stars and card-creates from their own tables.
+export const ACTIVITY_KINDS = ['draw', 'reroll', 'save', 'star', 'create'];
+
+// Collect the raw activity stream: one { userId, week, kind } per deliberate
+// action, unioned across all sources with no double counting (see DRAW_TYPES
+// note). `kind` is one of ACTIVITY_KINDS so intensity can be split by activity.
 function collectActivity(txns, saves, stars, cards) {
   const events = [];
-  const push = (userId, iso) => {
+  const push = (userId, iso, kind) => {
     if (!userId || userId === 'anonymous' || !iso) return;
-    events.push({ userId, week: isoWeek(new Date(iso)) });
+    events.push({ userId, week: isoWeek(new Date(iso)), kind });
   };
   for (const t of txns) {
-    if (DRAW_TYPES.has(t.type) || t.type === 'reroll') push(t.user_id, t.created_at);
+    if (DRAW_TYPES.has(t.type)) push(t.user_id, t.created_at, 'draw');
+    else if (t.type === 'reroll') push(t.user_id, t.created_at, 'reroll');
   }
-  for (const s of saves) push(s.user_id, s.created_at);
-  for (const s of stars) push(s.user_id, s.created_at);
-  for (const c of cards) push(c.creator_id, c.created_at);
+  for (const s of saves) push(s.user_id, s.created_at, 'save');
+  for (const s of stars) push(s.user_id, s.created_at, 'star');
+  for (const c of cards) push(c.creator_id, c.created_at, 'create');
   return events;
 }
 
 // Turn the flat event stream into per-user, per-week counts:
-//   byUser.get(userId).get(week) -> number of actions that user took that week
+//   byUser.get(userId).get(week) -> { total, kinds: { draw, save, … } }
+// `total` powers retention/segments; `kinds` powers the split intensity view.
 function activityByUser(events) {
   const byUser = new Map();
   for (const e of events) {
     let weeks = byUser.get(e.userId);
     if (!weeks) { weeks = new Map(); byUser.set(e.userId, weeks); }
-    weeks.set(e.week, (weeks.get(e.week) || 0) + 1);
+    let cell = weeks.get(e.week);
+    if (!cell) { cell = { total: 0, kinds: {} }; weeks.set(e.week, cell); }
+    cell.total += 1;
+    cell.kinds[e.kind] = (cell.kinds[e.kind] || 0) + 1;
   }
   return byUser;
 }
 
 // The retention/intensity triangle for a set of users. Each cohort reports its
 // size (people who signed up that week) plus, per later week, how many were
-// active (came back and did anything) and how many actions they took in total.
+// active (came back and did anything), how many actions they took in total, and
+// that total broken out by activity kind (kinds.draw[week], kinds.save[week], …)
+// so the UI can draw one intensity grid per activity that sums back to `events`.
 function buildCohorts(users, byUser) {
   const cohorts = new Map();
   for (const u of users) {
     const cohortWeek = isoWeek(new Date(u.created_at));
     let c = cohorts.get(cohortWeek);
-    if (!c) { c = { cohort_week: cohortWeek, size: 0, active: {}, events: {} }; cohorts.set(cohortWeek, c); }
+    if (!c) { c = { cohort_week: cohortWeek, size: 0, active: {}, events: {}, kinds: {} }; cohorts.set(cohortWeek, c); }
     c.size += 1;
     const weeks = byUser.get(u.id);
     if (!weeks) continue;
-    for (const [week, count] of weeks) {
+    for (const [week, cell] of weeks) {
       if (week < cohortWeek) continue; // a stray pre-signup action can't retain a cohort
       c.active[week] = (c.active[week] || 0) + 1;
-      c.events[week] = (c.events[week] || 0) + count;
+      c.events[week] = (c.events[week] || 0) + cell.total;
+      for (const k in cell.kinds) {
+        const byWeek = c.kinds[k] || (c.kinds[k] = {});
+        byWeek[week] = (byWeek[week] || 0) + cell.kinds[k];
+      }
     }
   }
   return [...cohorts.values()].sort((a, b) => (a.cohort_week < b.cohort_week ? -1 : 1));

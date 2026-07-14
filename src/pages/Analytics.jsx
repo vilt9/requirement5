@@ -59,6 +59,16 @@ const Triangle = ({ cohorts, weeks, cell, rowLabel }) => {
   );
 };
 
+// The activities the intensity view breaks out, in the order they render. `kind`
+// matches the backend's ACTIVITY_KINDS keys on each cohort's `kinds` map.
+const ACTIVITIES = [
+  { key: 'draw', label: 'Draws', noun: 'draws' },
+  { key: 'reroll', label: 'Rerolls', noun: 'rerolls' },
+  { key: 'save', label: 'Saves', noun: 'saves' },
+  { key: 'star', label: 'Stars', noun: 'stars' },
+  { key: 'create', label: 'Card creates', noun: 'creates' }
+];
+
 const Section = ({ title, blurb, children }) => (
   <Panel>
     <H2>{title}</H2>
@@ -115,23 +125,13 @@ const Analytics = () => {
         />
       </Section>
 
-      <Section title="2 · Activity intensity" blurb="Actions per active player.">
-        <Triangle
-          cohorts={retention.cohorts}
-          weeks={weeks}
-          rowLabel={c => `${c.size}`}
-          cell={(c, w) => {
-            const a = c.active[w] || 0;
-            const e = c.events[w] || 0;
-            const per = a ? e / a : 0;
-            return {
-              text: a ? per.toFixed(1) : '·',
-              t: per / 6, // ~6 actions/week reads as full heat
-              muted: a === 0,
-              title: `${shortWeek(w)}: ${e} actions across ${a} active`
-            };
-          }}
-        />
+      <Section title="2 · Activity intensity" blurb="Actions per active player, one grid per activity. The grids sum to the total.">
+        {ACTIVITIES.map((act, i) => (
+          <div key={act.key}>
+            <SubHead style={i ? { marginTop: 14 } : undefined}>{act.label}</SubHead>
+            <IntensityTriangle cohorts={retention.cohorts} weeks={weeks} kind={act.key} noun={act.noun} />
+          </div>
+        ))}
       </Section>
 
       <Section title="3 · Economy health" blurb="Median balance · red = share in debt.">
@@ -161,6 +161,39 @@ const Analytics = () => {
         />
       </Section>
     </Page>
+  );
+};
+
+// One activity's intensity triangle: for a single kind, the number is that
+// activity's actions per active player (kinds[kind][w] / active[w]). Heat scales
+// to this grid's own busiest cell, so a low-volume activity (creates) still
+// reads as a trend instead of washing out next to a high-volume one (draws).
+const IntensityTriangle = ({ cohorts, weeks, kind, noun }) => {
+  const cols = weeks.filter(w => cohorts.length && w >= cohorts[0].cohort_week);
+  let max = 0;
+  for (const c of cohorts) {
+    for (const w of cols) {
+      const a = c.active[w] || 0;
+      if (a) max = Math.max(max, (c.kinds?.[kind]?.[w] || 0) / a);
+    }
+  }
+  return (
+    <Triangle
+      cohorts={cohorts}
+      weeks={weeks}
+      rowLabel={c => `${c.size}`}
+      cell={(c, w) => {
+        const a = c.active[w] || 0;
+        const n = c.kinds?.[kind]?.[w] || 0;
+        const per = a ? n / a : 0;
+        return {
+          text: per ? per.toFixed(1) : '·',
+          t: max ? per / max : 0,
+          muted: per === 0,
+          title: `${shortWeek(w)}: ${n} ${noun} across ${a} active`
+        };
+      }}
+    />
   );
 };
 

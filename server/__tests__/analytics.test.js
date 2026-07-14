@@ -83,6 +83,7 @@ describe('feature 2 — activity intensity', () => {
     const c = computeAnalytics().retention.cohorts.find(c => c.cohort_week === K1);
     expect(c.active[K2]).toBe(1);
     expect(c.events[K2]).toBe(3);
+    expect(c.kinds.draw[K2]).toBe(3); // and all three land in the draw breakdown
   });
 
   test('saves, stars and card-creates all count as activity (no double count)', () => {
@@ -94,6 +95,10 @@ describe('feature 2 — activity intensity', () => {
     const c = computeAnalytics().retention.cohorts.find(c => c.cohort_week === K1);
     // create + save + star = 3 actions for alice in her birth week
     expect(c.events[K1]).toBe(3);
+    // …and each lands under its own activity, summing back to events
+    expect(c.kinds.create[K1]).toBe(1);
+    expect(c.kinds.save[K1]).toBe(1);
+    expect(c.kinds.star[K1]).toBe(1);
   });
 });
 
