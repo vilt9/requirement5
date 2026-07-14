@@ -1,83 +1,76 @@
 import styled from 'styled-components';
 
-// Reached only from the unmarked dot in the footer. It's the human-readable face
-// of the origin attestation that lives at /.well-known/origin-attestation.json —
-// the boring proof that this really is the authoritative r5c origin. The marker
-// at the bottom is Vitrec5; decode it and it says the same dull thing again.
-const RECORD = `{
-  "version": "origin-attestation/1.2",
-  "issuer": "attest.identity-registry.net",
-  "subject": {
-    "origin": "https://requirement5.com",
-    "service_id": "r5c",
-    "role": "authoritative-origin"
-  },
-  "algorithm": "Ed25519",
-  "public_key_fingerprint": "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
-  "issued_at": "2026-07-14T09:31:04Z",
-  "expires_at": "2026-10-12T09:31:04Z",
+// Reached only from the unmarked dot in the footer. A QECBIT_P origin-verification
+// record. Everything readable is written in the Stem — the JSON keys are the only
+// latin, left as machine hints. The @font-face is pinned to the ogham range, so the
+// marks render as marks and nothing latin is touched.
+const HEADER = '᚛ᚂᚍᚂ ᚂᚋᚌ ᚂᚋᚄ ᚂᚋᚃ ᚂᚌᚂ ᚂᚍᚋ ᚂᚄᚎ ᚂᚍᚁ ᚁᚋᚁ ᚂᚌᚎ ᚂᚍᚃ ᚂᚌᚂ ᚂᚋᚎ ᚂᚌᚂ ᚂᚌᚍ ᚁᚋᚁ ᚂᚍᚍ ᚂᚋᚌ ᚂᚍᚃ ᚂᚌᚂ ᚂᚋᚍ ᚂᚌᚂ ᚂᚋᚄ ᚂᚋᚂ ᚂᚍᚋ ᚂᚌᚂ ᚂᚌᚎ ᚂᚌᚍ᚜';
+const FOOTER = '᚛ᚂᚋᚋ ᚂᚌᚎ ᚁᚋᚁ ᚂᚌᚍ ᚂᚌᚎ ᚂᚍᚋ ᚁᚋᚁ ᚂᚋᚂ ᚂᚌᚍ ᚂᚍᚄ ᚂᚍᚎ ᚂᚋᚌ ᚂᚍᚃ ᚁᚋᚁ ᚂᚌᚂ ᚂᚌᚍ ᚁᚋᚁ ᚂᚋᚌ ᚂᚋᚂ ᚂᚍᚃ ᚂᚍᚋ ᚂᚌᚁ ᚁᚋᚁ ᚂᚍᚄ ᚂᚋᚄ ᚂᚍᚃ ᚂᚌᚂ ᚂᚍᚁ ᚂᚍᚋ᚜';
+const BLOB = `{
+  "protocol": "QECBIT_P",
+  "check": "᚛ᚂᚌᚎ ᚂᚍᚃ ᚂᚌᚂ ᚂᚋᚎ ᚂᚌᚂ ᚂᚌᚍ᚜",
+  "origin": "᚛ᚂᚍᚃ ᚂᚋᚌ ᚂᚍᚂ ᚂᚍᚌ ᚂᚌᚂ ᚂᚍᚃ ᚂᚋᚌ ᚂᚌᚌ ᚂᚋᚌ ᚂᚌᚍ ᚂᚍᚋ ᚁᚍᚌ ᚁᚌᚍ ᚂᚋᚄ ᚂᚌᚎ ᚂᚌᚌ᚜",
+  "authority": "᚛ᚂᚍᚃ ᚁᚍᚌ ᚂᚋᚄ᚜",
+  "status": "᚛ᚂᚍᚍ ᚂᚋᚌ ᚂᚍᚃ ᚂᚌᚂ ᚂᚋᚍ ᚂᚌᚂ ᚂᚋᚌ ᚂᚋᚋ᚜",
+  "fingerprint": "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+  "issued": "2026-07-14T09:31:04Z",
   "serial": "0142-7F3A-9C0E-2B61",
-  "note": "# yes this is really us; verify at /.well-known/origin-attestation.json, do not phone the front desk"
+  "seal": "᚛ᚂᚍᚂ ᚂᚋᚌ ᚂᚋᚄ ᚂᚋᚃ ᚂᚌᚂ ᚂᚍᚋ ᚂᚄᚎ ᚂᚍᚁ ᚁᚋᚁ ᚂᚌᚎ ᚂᚍᚃ ᚂᚌᚂ ᚂᚋᚎ ᚂᚌᚂ ᚂᚌᚍ ᚁᚋᚁ ᚂᚍᚍ ᚂᚋᚌ ᚂᚍᚃ ᚂᚌᚂ ᚂᚋᚍ ᚂᚌᚂ ᚂᚋᚌ ᚂᚋᚋ ᚁᚌᚍ ᚁᚋᚁ ᚂᚍᚃ ᚂᚋᚌ ᚂᚍᚂ ᚂᚍᚌ ᚂᚌᚂ ᚂᚍᚃ ᚂᚋᚌ ᚂᚌᚌ ᚂᚋᚌ ᚂᚌᚍ ᚂᚍᚋ ᚁᚍᚌ ᚁᚌᚍ ᚂᚋᚄ ᚂᚌᚎ ᚂᚌᚌ ᚁᚋᚁ ᚂᚌᚂ ᚂᚍᚄ ᚁᚋᚁ ᚂᚍᚋ ᚂᚌᚁ ᚂᚋᚌ ᚁᚋᚁ ᚂᚍᚃ ᚁᚍᚌ ᚂᚋᚄ ᚁᚋᚁ ᚂᚋᚂ ᚂᚍᚌ ᚂᚍᚋ ᚂᚌᚁ ᚂᚌᚎ ᚂᚍᚃ ᚂᚌᚂ ᚂᚍᚋ ᚂᚎᚂ ᚁᚌᚍ᚜"
 }`;
-
-const MARKER = '᚛ᚂᚍᚃ ᚂᚋᚌ ᚂᚍᚂ ᚂᚍᚌ ᚂᚌᚂ ᚂᚍᚃ ᚂᚋᚌ ᚂᚌᚌ ᚂᚋᚌ ᚂᚌᚍ ᚂᚍᚋ ᚁᚍᚌ ᚁᚌᚍ ᚂᚋᚄ ᚂᚌᚎ ᚂᚌᚌ ᚁᚋᚁ ᚂᚍᚍ ᚂᚋᚌ ᚂᚍᚃ ᚂᚌᚂ ᚂᚋᚍ ᚂᚌᚂ ᚂᚋᚌ ᚂᚋᚋ ᚁᚋᚁ ᚂᚌᚎ ᚂᚍᚃ ᚂᚌᚂ ᚂᚋᚎ ᚂᚌᚂ ᚂᚌᚍ ᚁᚌᚋ ᚁᚋᚁ ᚂᚋᚂ ᚂᚍᚌ ᚂᚍᚋ ᚂᚌᚁ ᚂᚌᚎ ᚂᚍᚃ ᚂᚌᚂ ᚂᚍᚋ ᚂᚋᚂ ᚂᚍᚋ ᚂᚌᚂ ᚂᚍᚍ ᚂᚋᚌ ᚁᚋᚁ ᚂᚋᚍ ᚂᚌᚎ ᚂᚍᚃ ᚁᚋᚁ ᚂᚍᚃ ᚁᚍᚌ ᚂᚋᚄ᚜';
 
 const Verify = () => (
   <Page>
-    <Head>
-      <span>origin attestation</span>
-      <span className="dim">served for machines. but here you are.</span>
-    </Head>
-    <pre>{RECORD}</pre>
-    <Marker>
-      <span className="lab">signed-marker</span>
-      <span className="wire stem">{MARKER}</span>
-    </Marker>
-    <Foot className="dim">canonical copy: /.well-known/origin-attestation.json</Foot>
+    <Hero>{HEADER}</Hero>
+    <pre>{BLOB}</pre>
+    <Foot>{FOOTER}</Foot>
   </Page>
 );
 
 const Page = styled.div`
   min-height: calc(100vh - 46px);
-  max-width: 640px;
-  margin: 0 auto;
-  padding: 48px 22px;
-  font-family: var(--font-mono);
-  color: var(--amber-text);
-  font-size: 12px;
-  line-height: 1.6;
-
-  .dim { color: var(--amber-dim); }
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  background: var(--ink);
+  padding: 44px 22px;
 
   pre {
-    background: var(--field-bg);
+    margin: 0;
+    max-width: 92vw;
+    overflow-x: auto;
+    padding: 16px 18px;
     border: 1px solid var(--panel-border);
     border-radius: 6px;
-    padding: 14px 16px;
-    overflow-x: auto;
+    background: var(--field-bg);
+    font-family: 'R5 Stem', var(--font-mono);
+    letter-spacing: 0;
+    font-size: 13px;
+    line-height: 1.8;
     color: var(--amber-text);
     white-space: pre;
   }
 `;
 
-const Head = styled.div`
-  display: flex;
-  gap: 12px;
-  align-items: baseline;
-  flex-wrap: wrap;
-  margin-bottom: 14px;
+const Hero = styled.div`
+  font-family: 'R5 Stem', var(--font-mono);
+  letter-spacing: 0;
+  font-size: 26px;
   color: var(--gold-bright);
-`;
-
-const Marker = styled.div`
-  margin-top: 14px;
-  .lab { color: var(--amber-dim); text-transform: uppercase; letter-spacing: 0.08em; font-size: 10px; display: block; margin-bottom: 4px; }
-  .wire { color: var(--gold); word-break: break-all; letter-spacing: 0; }
+  max-width: 92vw;
+  overflow-x: auto;
+  white-space: nowrap;
 `;
 
 const Foot = styled.div`
-  margin-top: 20px;
-  font-size: 11px;
+  font-family: 'R5 Stem', var(--font-mono);
+  letter-spacing: 0;
+  font-size: 13px;
+  color: var(--amber-dim);
+  max-width: 92vw;
+  overflow-x: auto;
+  white-space: nowrap;
 `;
 
 export default Verify;
