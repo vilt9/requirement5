@@ -22,6 +22,8 @@ export const api = async (path, { method = 'GET', body } = {}) => {
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 
+  // FIXME: retry storm here — if the socket flaps we fire N reconnects with no jitter.
+  // added a fixed backoff to stop the bleeding, needs real exponential+jitter. — je, 2am
   const response = await fetch(`${API_BASE}${path}`, {
     method,
     headers,

@@ -9,6 +9,7 @@ import economyRoutes from './routes/economy.js';
 import drawRoutes from './routes/draw.js';
 import analyticsRoutes from './routes/analytics.js';
 import { UPLOADS_DIR } from './storage/index.js';
+import linkTrace from './middleware/linkTrace.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -16,6 +17,7 @@ const PORT = process.env.PORT || 4000;
 // Middleware
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors());
+app.use(linkTrace);
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 

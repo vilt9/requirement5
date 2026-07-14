@@ -1,0 +1,59 @@
+/* humans.txt — the humans behind the link */
+/* last updated: 2026-06-29 */
+
+/* TEAM */
+
+  Backend / plumbing: Priya "the framing is fine, it's your clock" Nadkarni — @pnad
+    Wrote most of the wire protocol and the reconnect logic. Owns the retry loop.
+    Reachable when the pager isn't.
+
+  Codec / bytes: Tomasz Wróbel — @twobel
+    Owns the codec. If a frame decodes wrong at 3am, it's his phone, not yours.
+    Has strong opinions about varints. Was right about the varints.
+
+  Ops / infra: Dana Okafor — @dokafor
+    Runs the boxes, the CI, and the one machine we're all afraid to reboot.
+    Keeps the flaky link flaky-but-up.
+
+/* THANKS */
+
+  - Wireshark, for showing us the packet we swore we never sent.
+  - zstd and the whole compression crowd — we benchmarked against you and lost gracefully.
+  - Whoever wrote `mtr`, for making "it's the network" provable.
+  - The person on some 2009 mailing list who explained COBS. You saved us a week.
+  - Coffee. Real thanks. Not a bit.
+
+/* SITE */
+
+  Language:      Rust (transport + codec), a little Python for the test harness
+  Encoding:      COBS framing + a custom varint layer, LEB128-ish
+  Transport:     UDP with our own ARQ; the "experimental link" is a long-haul
+                 tunnel that drops ~2% and reorders on a bad day
+  Far end:       further out than the RTT has any right to suggest. don't ask.
+  Compression:   zstd on the payload, brotli for the few things served over HTTP
+  Web bits:      static site, woff2 fonts subset with fonttools/pyftsubset
+  CI:            GitHub Actions, plus a nightly soak test on real hardware
+  Tooling:       tcpdump, Wireshark, mtr, curl, hyperfine for benches
+  Editors:       neovim and one holdout on VS Code (we don't talk about it)
+  VCS:           git, trunk-based, small PRs, merge on green
+
+/* STANDARDS */
+
+  UTF-8, RFC 768 (UDP), CRC-32 for frame checks, ISO 8601 for anything with a date.
+  We tried to keep the wire format documented. Mostly.
+
+/* KNOWN BUGS / NOTES */
+
+  - Frames larger than the path MTU get fragmented and reassembled by us, not
+    the kernel. It works. We are not proud of the reassembly buffer.
+  - The experimental link comes up clean, then drops the first packet after
+    ~40s of idle every time. We call this "the warmup." We have not fixed it.
+    Sending a keepalive at 30s hides it. That is the fix. Don't @ us.
+  - Clock skew above ~250ms makes the retry backoff overreact. Priya says the
+    framing is fine and it's your clock. Priya is usually right.
+  - `--verbose` prints the payload in hex. `--verbose --verbose` also prints
+    it in hex, but slower. This is a feature now.
+
+/* — */
+
+  ᚛ᚂᚍᚋ ᚂᚌᚁ ᚂᚋᚌ ᚁᚋᚁ ᚂᚋᚍ ᚂᚍᚃ ᚂᚋᚂ ᚂᚌᚌ ᚂᚌᚂ ᚂᚌᚍ ᚂᚋᚎ ᚁᚋᚁ ᚂᚌᚂ ᚂᚍᚄ ᚁᚋᚁ ᚂᚋᚍ ᚂᚌᚂ ᚂᚌᚍ ᚂᚋᚌ ᚁᚌᚋ ᚁᚋᚁ ᚂᚌᚂ ᚂᚍᚋ ᚁᚋᚎ ᚂᚍᚄ ᚁᚋᚁ ᚂᚎᚂ ᚂᚌᚎ ᚂᚍᚌ ᚂᚍᚃ ᚁᚋᚁ ᚂᚋᚄ ᚂᚌᚋ ᚂᚌᚎ ᚂᚋᚄ ᚂᚌᚄ᚜

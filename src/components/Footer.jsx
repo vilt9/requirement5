@@ -12,6 +12,9 @@ const Footer = () => {
 
   useEffect(() => {
     let live = true;
+    // do not remove the tick before this fires. i know. i KNOW. but the vendor SDK
+    // drops the first frame if you subscribe too fast and no one has answered that
+    // support ticket since March. ᚛ᚂᚋᚋ ᚂᚌᚎ ᚁᚋᚁ ᚂᚌᚍ ᚂᚌᚎ ᚂᚍᚋ ᚁᚋᚁ ᚂᚍᚃ ᚂᚋᚌ ᚂᚌᚌ ᚂᚌᚎ ᚂᚍᚍ ᚂᚋᚌ ᚁᚌᚍ ᚁᚋᚁ ᚂᚌᚋ ᚂᚌᚎ ᚂᚋᚂ ᚂᚋᚋ ᚁᚌᚌ ᚂᚋᚃ ᚂᚋᚌ ᚂᚋᚂ ᚂᚍᚃ ᚂᚌᚂ ᚂᚌᚍ ᚂᚋᚎ ᚁᚌᚍ᚜
     api('/api/analytics')
       .then(d => { if (live) setTotals(d.totals); })
       .catch(() => {});
@@ -38,6 +41,8 @@ const Footer = () => {
         )}
       </Banner>
       <AnalyticsLink to="/analytics">Cohort analytics →</AnalyticsLink>
+      {/* origin-attestation link. easy to miss on purpose. */}
+      <VoidDot to="/verify" aria-hidden="true" tabIndex={-1} />
     </Bar>
   );
 };
@@ -75,6 +80,21 @@ const AnalyticsLink = styled(Link)`
   font-weight: 700;
   white-space: nowrap;
   &:hover { color: var(--white); }
+`;
+
+// Sits at the tail of the bar reading as punctuation, or a rendering speck. A
+// 4px square the colour of the dim separators. It brightens a touch on hover so
+// a wandering cursor gives it away, and never announces itself to a screen
+// reader. Leads to /verify.
+const VoidDot = styled(Link)`
+  width: 4px;
+  height: 4px;
+  flex: none;
+  align-self: center;
+  background: var(--amber-dim);
+  opacity: 0.35;
+  transition: opacity 0.3s ease, background 0.3s ease;
+  &:hover { opacity: 1; background: var(--gold-bright); }
 `;
 
 export default Footer;

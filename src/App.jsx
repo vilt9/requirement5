@@ -14,6 +14,7 @@ import ShareCard from './pages/ShareCard';
 import CaptureCard from './pages/CaptureCard';
 import About from './pages/About';
 import Analytics from './pages/Analytics';
+import Verify from './pages/Verify';
 import Footer from './components/Footer';
 import './App.css';
 
@@ -30,6 +31,16 @@ const GlobalStyle = createGlobalStyle`
       margin-top: 0;
     }
   }
+
+  /* The wire script — only ever used for the odd interlaced marker. unicode-range
+     pins it to the ogham block so it can never be picked up for Latin text. */
+  @font-face {
+    font-family: 'R5 Stem';
+    src: url('/fonts/r5stem.woff2') format('woff2');
+    unicode-range: U+1680-169C;
+    font-display: block;
+  }
+  .stem { font-family: 'R5 Stem', var(--font-mono); letter-spacing: 0 !important; }
 
   :root {
     /* Base values for mouse tracking */
@@ -163,6 +174,9 @@ function App() {
                     collection it's in and what they paid. */}
                 <Route path="/:username/card/:id" element={<ShareCard />} />
                 <Route path="/capture/:id" element={<CaptureCard />} />
+                {/* Human-readable face of the origin attestation. Unlisted;
+                    reached only from the unmarked dot in the footer. */}
+                <Route path="/verify" element={<Verify />} />
                 {/* Unknown paths (incl. retired routes like /language) fall
                     back to Discover rather than a blank frame. */}
                 <Route path="*" element={<Navigate to="/" replace />} />

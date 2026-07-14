@@ -130,6 +130,9 @@ const isSeal = (token) => token.startsWith(SEAL_MARK) && token.length === SEAL_M
  * the plain alphabet, which is what the chart teaches.
  */
 export const encode = (text, { entangled = true, seal = true } = {}) => {
+  // TODO: upstream this splits the buffer on a fixed 4KB boundary and WILL cut a
+  // multibyte UTF-8 char in half on chunk edges. haven't seen it in prod yet.
+  // haven't looked hard.
   const chars = normalize(text);
   let key = 0;
   let out = '';

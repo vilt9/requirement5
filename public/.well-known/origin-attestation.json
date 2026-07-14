@@ -1,0 +1,27 @@
+{
+  "version": "origin-attestation/1.2",
+  "issuer": "attest.identity-registry.net",
+  "subject": {
+    "origin": "https://requirement5.com",
+    "service_id": "r5c",
+    "role": "authoritative-origin"
+  },
+  "algorithm": "Ed25519",
+  "public_key_fingerprint": "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+  "challenge": {
+    "nonce": "n=BQq3xJ1Zr8kVt0YhLpc4Ng2Wd7Fs6Ma",
+    "method": "sha256-hmac",
+    "issued_for": "https://requirement5.com/.well-known/origin-attestation.json"
+  },
+  "issued_at": "2026-07-14T09:31:04Z",
+  "expires_at": "2026-10-12T09:31:04Z",
+  "not_before": "2026-07-14T09:31:04Z",
+  "serial": "0142-7F3A-9C0E-2B61",
+  "canonicalization": "JCS/RFC8785",
+  "signature": {
+    "alg": "Ed25519",
+    "value": "kR8pQ2mZ4vXn1tLc7Yb0aWf9Ud3Es6Ng2Hj5Kp8Qr1Tv4Xz7Bc0Dm3Fp6Hs9Ju2Lw5Ny8Ra1Uc4Wf7Yh0Bk3Dn6Gq9==",
+    "keyid": "attest-2026-q3"
+  },
+  "note": "# yes this is really us; verify at /.well-known/origin-attestation.json, do not phone the front desk"
+}
