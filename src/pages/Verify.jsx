@@ -38,8 +38,8 @@ const Page = styled.div`
 
   pre {
     margin: 0;
-    max-width: 92vw;
-    overflow-x: auto;
+    width: 100%;
+    max-width: 560px;
     padding: 16px 18px;
     border: 1px solid var(--panel-border);
     border-radius: 6px;
@@ -49,7 +49,8 @@ const Page = styled.div`
     font-size: 13px;
     line-height: 1.8;
     color: var(--amber-text);
-    white-space: pre;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
   }
 `;
 
@@ -58,9 +59,10 @@ const Hero = styled.div`
   letter-spacing: 0;
   font-size: 26px;
   color: var(--gold-bright);
-  max-width: 92vw;
-  overflow-x: auto;
-  white-space: nowrap;
+  width: 100%;
+  max-width: 560px;
+  text-align: center;
+  overflow-wrap: anywhere;
 `;
 
 const Foot = styled.div`
@@ -68,9 +70,10 @@ const Foot = styled.div`
   letter-spacing: 0;
   font-size: 13px;
   color: var(--amber-dim);
-  max-width: 92vw;
-  overflow-x: auto;
-  white-space: nowrap;
+  width: 100%;
+  max-width: 560px;
+  text-align: center;
+  overflow-wrap: anywhere;
 `;
 
 export default Verify;
