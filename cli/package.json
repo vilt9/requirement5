@@ -1,5 +1,5 @@
 {
-  "name": "r5c",
+  "name": "@requirement5cards/r5c",
   "version": "0.1.0",
   "description": "Command-line client for Requirement5cards (R5c) — create, publish, and render trading cards from the terminal.",
   "type": "module",

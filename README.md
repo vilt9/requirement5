@@ -51,7 +51,7 @@ use it for anything except building a competing product or service (see
 - **CLI** — `r5c` (`cli/`), a zero-dependency command-line client: sign up,
   publish complete cards from a JSON spec (artwork inlined from local files),
   list/render/delete, check your /t26. Install:
-  `curl -fsSL https://requirement5.com/install | sh` (or `npm i -g r5c`).
+  `curl -fsSL https://requirement5.com/install | sh` (or `npm i -g @requirement5cards/r5c`).
   Docs: [cli/CLI.md](cli/CLI.md).
 
 ## Run locally

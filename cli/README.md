@@ -6,7 +6,7 @@ create, publish, and render holographic trading cards from the terminal.
 ```bash
 # install (either way)
 curl -fsSL https://requirement5.com/install | sh
-npm install -g r5c
+npm install -g @requirement5cards/r5c
 
 # one-minute card
 r5c signup --username your_name --email you@example.com

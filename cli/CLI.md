@@ -8,7 +8,7 @@ down to the last holo parameter.
 ```bash
 # Install (pick one)
 curl -fsSL https://requirement5.com/install | sh   # no root, installs to ~/.r5c
-npm install -g r5c                                 # via npm
+npm install -g @requirement5cards/r5c              # via npm
 cd cli && npm link                                 # from a repo checkout
 
 # One-minute card
