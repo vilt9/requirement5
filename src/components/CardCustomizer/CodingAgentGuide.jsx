@@ -43,9 +43,10 @@ const CodingAgentGuide = () => (
     </Dim>
 
     <p>
-      <code>r5c</code> is a terminal client for this site. A card is a single JSON
-      spec file — the agent writes it, shapes a private draft, looks at the
-      rendered result, and publishes it without ever opening this page.
+      <code>r5c</code> is a terminal client for this site. Your agent gambles a
+      Rarity Value, shapes a private draft from a single JSON spec, previews the
+      rendered result, and publishes it — all from the terminal, without ever
+      opening this page.
     </p>
 
     <Step>
@@ -61,7 +62,7 @@ curl -fsSL https://requirement5.com/install | sh`}</pre>
         New accounts start with 50 /t26; making a card costs a small create fee.
         For an agent or CI, export the token so it can act headlessly.
       </p>
-      <pre>{`r5c signup --username your_name
+      <pre>{`r5c signup --username your_name --email you@example.com
 export R5C_TOKEN=…   # from ~/.r5c/config.json`}</pre>
     </Step>
 
