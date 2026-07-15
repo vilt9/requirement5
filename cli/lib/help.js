@@ -16,17 +16,19 @@ ACCOUNT
   balance                                      Show /t26 balance
   transactions                                 Show your /t26 ledger
 
-RARITY (a card's rarity is a server gamble, not something you pick)
-  roll                                         Start / show your rarity roll for the next card (free)
-  reroll                                       Draw a fresh rarity — costs a climbing /t26 fee
-CARDS
-  publish <spec.json> [--open] [--json]        Publish a card at your rolled rarity (charges the create fee)
-  create  <spec.json> [--open] [--json]        Alias for publish
-  update <id> <spec.json> [--json]             Re-design a card you own from a spec (free; rarity unchanged)
-  preview <id> [--frames N] [--out <dir>]      Capture still PNGs of the live card (rest + orbit poses)
+CREATE A CARD  (r5c card create ... — mirrors the website's /create flow)
+  card create begin                            Start the creation; shows your Rarity Value + odds (free)
+  card create regenerate-rarity                Gamble a fresh Rarity Value — climbing /t26 fee
+  card create confirm-start [spec.json]        Pay the create fee, lock the rarity onto a PRIVATE draft
+  card create update <id> <spec.json>          Shape the private draft (free, repeatable)
+  card create preview <id> [--frames N] [--out <dir>]   Look at the draft: still PNGs (rest + orbit poses)
+  card create publish <id> [--open] [--json]   Release the finished draft into the pool (free)
+  card create status                           Where am I? Rarity Value, your drafts, balance
+
+OTHER CARD COMMANDS
   template [minimal|full]                      Print an example spec to start from
   get <id>                                     Fetch a card as JSON
-  list [--mine]                                List community cards (or your published cards)
+  list [--mine]                                List community cards (or your own, drafts included)
   collection                                   List cards you have saved
   delete <id>                                  Delete a card you created
   render <id> [--format gif|mp4] [--open]      Render a card to a shareable GIF/MP4 URL
@@ -52,15 +54,16 @@ MORE
 const SPEC_HELP = `THE CARD SPEC (r5c publish <spec.json>)
 
 A spec describes a card's LOOK. Its RARITY is not in the spec — it's a server
-roll (\`r5c roll\` / \`r5c reroll\`), stamped on publish. Nothing here is
-required; add "image" for a real card. Start from \`r5c template\`.
+gamble (\`r5c card create begin\` / \`regenerate-rarity\`), locked onto the card
+at confirm-start. Nothing here is required; add "image" for a real card. Start
+from \`r5c template\`.
 
 TOP LEVEL
   name        string    Card title
   tags        string[]  Search/discovery tags
-  (tier / rarityScore are ignored if present — rarity comes from your roll.
-   Tier bands, for reference: common 0–.7, holo .7–.8, galaxy .8–.85,
-   wowa .85–.9, ultra .9–.98, vmax .98–1)
+  (tier / rarityScore are ignored if present — rarity comes from your Rarity
+   Value gamble. Tier bands, for reference: common 0–.7, holo .7–.8,
+   galaxy .8–.85, wowa .85–.9, ultra .9–.98, vmax .98–1)
   image       path|URL  Main artwork. Local paths are inlined and the server
                         stores them (downscaled to 1200px, WebP) on its CDN.
   holoImage   path|URL  Optional overlay artwork for the holo layer
@@ -171,14 +174,16 @@ NOTES
   - Enabling a holo effect without its params block applies that effect's defaults.
   - Any local image path anywhere in spec.card (e.g. rareHoloParams.backgroundImage)
     is inlined automatically if the file exists (relative to the spec file).
-  - Rarity is a gamble: \`r5c roll\` gives a free rarity for the next card;
-    \`r5c reroll\` draws a fresh one for a climbing /t26 fee. Publishing charges
-    the (gentle) create fee and stamps the current roll onto the card.
+  - Rarity is a gamble: \`r5c card create begin\` gives a free Rarity Value for
+    the next card; \`regenerate-rarity\` draws a fresh one for a climbing /t26 fee.
+    \`confirm-start\` charges the (gentle) create fee and locks the rarity onto a
+    private draft.
   - New accounts start with 50 /t26. You may spend into the red down to -1000
     (debt accrues 1.47%/day). When others save your card you earn a dividend.
   - The published card lives at <api-url>/card/<id>.
-  - Loop: roll → (reroll to taste) → publish → \`r5c preview <id> --out shots/\`
-    → look → \`r5c update <id> spec.json\` (free; rarity stays) → preview again.
+  - Loop: card create begin → (regenerate-rarity to taste) → confirm-start card.json
+    → preview <id> --out shots/ → look → update <id> card.json (free; rarity stays)
+    → preview again → publish <id>.
 
 TASTE
   This is the knob reference. For HOW to choose them — turning an image into a
@@ -189,48 +194,45 @@ TASTE
 
 export const COMMAND_HELP = {
   spec: SPEC_HELP,
-  roll: `r5c roll
+  card: `r5c card create <step> — the guided creation flow (mirrors the website)
 
-Starts (or shows) your rarity roll for the NEXT card — a server-owned random
-0–1 score that decides the card's tier. Free, and idempotent: you get one roll
-per card, so calling it again returns the same roll (not a new free one).
-To gamble for a better number, \`r5c reroll\`. Publishing consumes the roll.`,
-  reroll: `r5c reroll
+  begin                      Start (or resume) the creation. Prints your Rarity
+                             Value: the number, its tier, the odds a card that
+                             rare appears at, both prices, and your balance. Free.
+  regenerate-rarity          Gamble a fresh Rarity Value for a climbing /t26 fee.
+  confirm-start [spec.json]  Accept the current Rarity Value: pays the create fee,
+                             locks the rarity, and makes a PRIVATE draft card. An
+                             optional spec seeds the draft's look.
+  update <id> <spec.json>    Shape the private draft (free, repeatable).
+  preview <id> [--out dir]   Look at the draft: still PNGs (rest + orbit poses).
+  publish <id> [--open]      Release the finished draft into the pool (free — the
+                             create fee was paid at confirm-start).
+  status                     Where am I? Rarity Value, your private drafts, balance.
 
-Draws a FRESH random rarity onto your active roll and charges the reroll fee
-(climbs each time — the gambling tax). Prints the new rarity, the next reroll
-price, and the create fee you'll pay at publish. Run \`r5c roll\` first if you
-have no active roll.`,
-  publish: `r5c publish <spec.json> [--open] [--json]   (alias: r5c create)
+Nobody sees the card until you publish. Rarity is a gamble, never a spec field.
+regenerate-rarity and confirm-start spend /t26 (you may go to -1000 in debt).`,
+  update: `r5c card create update <id> <spec.json> [--json]
 
-Publishes a card into the pool at your ROLLED rarity (\`r5c roll\` / \`reroll\`).
-If you have no active roll, one is created for you (a free first roll). Charges
-the create fee unless you already paid it. The spec provides only the LOOK —
-rarity/tier come from the roll. Local image paths are inlined and offloaded to
-the server's image store.
+Rebuilds a card YOU own from the spec file and replaces its LOOK — name, tags,
+images, every visual parameter. Free, and the rarity does NOT change (that was
+the gamble). Used to shape a private draft before publishing:
 
-Prints the card's public URL. --open opens it; --json prints the full response.
-See \`r5c help spec\` for the spec format.`,
-  update: `r5c update <id> <spec.json> [--json]
-
-Rebuilds a card YOU created from the spec file and replaces its LOOK — name,
-tags, images, every visual parameter. Free, and the rarity does NOT change
-(that was the roll). Iterate loop:
-
-  r5c roll                       # (or reroll to gamble)
-  r5c publish card.json          # first version (prints the id)
-  r5c preview <id> --out shots/  # look at it
+  r5c card create begin                        # see the Rarity Value
+  r5c card create confirm-start card.json      # private draft (prints the id)
+  r5c card create preview <id> --out shots/    # look at it
   # edit card.json...
-  r5c update <id> card.json      # same card, new look
-  r5c preview <id> --out shots/  # look again (fresh frames after updates)`,
-  preview: `r5c preview <id> [--frames N] [--out <dir>] [--json]
+  r5c card create update <id> card.json        # same draft, new look
+  r5c card create preview <id> --out shots/    # look again (fresh frames)
+  r5c card create publish <id>                 # release it`,
+  preview: `r5c card create preview <id> [--frames N] [--out <dir>] [--json]
 
-Captures still PNGs of the LIVE card — one at rest (holo dormant) and N-1
-poses along the tilt orbit with the holo awake — and prints their URLs.
-With --out the frames are downloaded as <dir>/<id>_frameN.png, ready for an
-agent (or a human) to look at. N defaults to 4, max 8.
+Captures still PNGs of the card — one at rest (holo dormant) and N-1 poses along
+the tilt orbit with the holo awake — and prints their URLs. Works on a private
+draft too (only you can see it). With --out the frames are downloaded as
+<dir>/<id>_frameN.png, ready for an agent (or a human) to look at. N defaults to
+4, max 8.
 
-Much cheaper than \`r5c render\` and made for design iteration: publish or
+Much cheaper than \`r5c render\` and made for design iteration: confirm-start or
 update, preview the frames, adjust the spec, update again. Frames re-capture
 automatically after an update (the cache is keyed to the card's version).`,
   template: `r5c template [minimal|full]
@@ -246,8 +248,9 @@ Creates an account and stores the session token in ~/.r5c/config.json.
 Username: 3-24 chars (letters, numbers, underscore). Email: required (kept
 private, server-side only). Password: min 8 chars — prompted interactively if
 omitted (or piped via stdin). Log in later with either the username or email.
-New accounts are granted 50 /t26; rerolling and publishing spend from it (you
-may go into the red down to -1000, which accrues 1.47%/day interest).`,
+New accounts are granted 50 /t26; regenerating the rarity and confirm-start
+spend from it (you may go into the red down to -1000, which accrues 1.47%/day
+interest).`,
   login: `r5c login --username <name> [--password <pw>]
 
 Logs in and stores the session token (valid 30 days) in ~/.r5c/config.json.

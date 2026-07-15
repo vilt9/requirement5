@@ -1,7 +1,7 @@
 import request from 'supertest';
 import app from '../index.js';
 import { memoryDb } from '../config/database.js';
-import { ECONOMY, getTier, PRICE_BANDS, saveCostFor, drawYieldFor, creatorDividendFor, round6 } from '../services/economy.js';
+import { ECONOMY, getTier, PRICE_BANDS, saveCostFor, drawYieldFor, creatorDividendFor, drawWeightFor, SYNTHETIC_DRAW_SHARE, round6 } from '../services/economy.js';
 import { draw } from '../services/drawEngine.js';
 
 beforeEach(() => {
@@ -17,6 +17,24 @@ const signup = async (username) => {
 };
 
 const auth = (token) => ({ Authorization: `Bearer ${token}` });
+
+// The guided creation flow (mirrors the web + CLI): begin → confirm-start →
+// publish. `rarity` (with the user's id) forces a deterministic Rarity Value so
+// tier/price assertions are stable; otherwise the server gamble is random.
+const beginCreation = (token) => request(app).post('/api/cards/create/begin').set(auth(token));
+const confirmStart = (token, body = {}) => request(app).post('/api/cards/create/confirm-start').set(auth(token)).send(body);
+const releaseDraft = (token, body = {}) => request(app).post('/api/cards/create/publish').set(auth(token)).send(body);
+
+const publishCard = async (token, { userId, rarity, name = 'Test card', tags = [], stateData = { customCard: { a: 1 } } } = {}) => {
+  await beginCreation(token);
+  if (rarity != null && userId) {
+    const roll = memoryDb.getActiveRollByUser(userId);
+    memoryDb.updateRoll(roll.id, { rarity_score: rarity });
+  }
+  const started = await confirmStart(token, { name, tags, stateData });
+  const released = await releaseDraft(token);
+  return { started, released, card: released.body.data?.card, createFee: started.body.data?.createFee };
+};
 
 describe('auth flow', () => {
   test('signup, login, me', async () => {
@@ -91,63 +109,71 @@ describe('auth flow', () => {
   });
 });
 
-describe('publish', () => {
-  test('publishing stakes /t26 and assigns the tier', async () => {
-    const { token } = await signup('creator');
-    const res = await request(app)
-      .post('/api/cards/publish')
-      .set(auth(token))
-      .send({ name: 'Test card', tier: 'galaxy', stateData: { customCard: { a: 1 } } });
+describe('create flow', () => {
+  test('confirm-start charges the create fee; publish assigns the rolled tier and is free', async () => {
+    const { token, user } = await signup('creator');
+    await beginCreation(token);
+    const roll = memoryDb.getActiveRollByUser(user.id);
+    memoryDb.updateRoll(roll.id, { rarity_score: 0.82 }); // force a galaxy roll
 
-    expect(res.status).toBe(201);
-    expect(res.body.data.card.tier).toBe('galaxy');
-    expect(res.body.data.card.rarity_score).toBeGreaterThanOrEqual(0.8);
-    expect(res.body.data.card.rarity_score).toBeLessThanOrEqual(0.85);
-    const stake = res.body.data.stake;
-    expect(stake).toBeGreaterThanOrEqual(PRICE_BANDS.publishStake[0]);
-    expect(stake).toBeLessThanOrEqual(PRICE_BANDS.publishStake[1]);
-    expect(res.body.data.balance).toBeCloseTo(ECONOMY.STARTING_GRANT - stake, 6);
+    const started = await confirmStart(token, { name: 'Test card', stateData: { customCard: { a: 1 } } });
+    expect(started.status).toBe(201);
+    const createFee = started.body.data.createFee;
+    expect(createFee).toBeGreaterThan(0);
+    expect(started.body.data.balance).toBeCloseTo(ECONOMY.STARTING_GRANT - createFee, 6);
+
+    const released = await releaseDraft(token);
+    expect(released.status).toBe(200);
+    expect(released.body.data.card.tier).toBe('galaxy');
+    expect(released.body.data.card.rarity_score).toBe(0.82);
+    // publishing is free — balance unchanged from after confirm-start
+    expect(released.body.data.balance).toBeCloseTo(ECONOMY.STARTING_GRANT - createFee, 6);
   });
 
-  test('rejects bad tiers and missing state', async () => {
+  test('confirm-start needs a creation, publish needs a draft', async () => {
     const { token } = await signup('creator');
-    const badTier = await request(app)
-      .post('/api/cards/publish')
-      .set(auth(token))
-      .send({ tier: 'mythic', stateData: {} });
-    expect(badTier.status).toBe(400);
+    const noCreation = await confirmStart(token, { stateData: { x: 1 } });
+    expect(noCreation.status).toBe(404);
 
-    const noState = await request(app)
-      .post('/api/cards/publish')
-      .set(auth(token))
-      .send({ tier: 'common' });
-    expect(noState.status).toBe(400);
+    await beginCreation(token);
+    const noDraft = await releaseDraft(token);
+    expect(noDraft.status).toBe(404);
   });
 
-  test('rejects publish when balance cannot cover the stake', async () => {
+  test('confirm-start is refused when balance cannot cover the create fee', async () => {
     const { token, user } = await signup('broke');
-    memoryDb.updateUser(user.id, { balance: 0.5 });
-    const res = await request(app)
-      .post('/api/cards/publish')
-      .set(auth(token))
-      .send({ tier: 'common', stateData: { x: 1 } });
+    memoryDb.updateUser(user.id, { balance: ECONOMY.DEBT_FLOOR }); // at the floor
+    await beginCreation(token);
+    const res = await confirmStart(token, { stateData: { x: 1 } });
     expect(res.status).toBe(402);
   });
 
+  test('a draft is private until published — not in the pool', async () => {
+    const { token } = await signup('drafter');
+    await beginCreation(token);
+    const started = await confirmStart(token, { name: 'Hidden', stateData: { x: 1 } });
+    const draftId = started.body.data.draft.id;
+    expect(started.body.data.draft.isPublic).toBe(false);
+    const poolBefore = await request(app).get('/api/cards/community/all');
+    expect(poolBefore.body.data.some(c => c.id === draftId)).toBe(false);
+
+    await releaseDraft(token);
+    const poolAfter = await request(app).get('/api/cards/community/all');
+    expect(poolAfter.body.data.some(c => c.id === draftId)).toBe(true);
+  });
+
   test('tags round-trip through publish, the pool, and a saver\'s collection', async () => {
-    const { token: creatorToken } = await signup('tagger');
-    const pub = await request(app)
-      .post('/api/cards/publish')
-      .set(auth(creatorToken))
-      .send({
-        name: 'Tagged card',
-        tier: 'common',
-        tags: ['neon', 'galaxy'],
-        stateData: { customCard: { rarity: 0.3 } }
-      });
-    expect(pub.status).toBe(201);
-    expect(pub.body.data.card.tags).toEqual(['neon', 'galaxy']);
-    const cardId = pub.body.data.card.id;
+    const { token: creatorToken, user } = await signup('tagger');
+    const { released } = await publishCard(creatorToken, {
+      userId: user.id,
+      rarity: 0.3,
+      name: 'Tagged card',
+      tags: ['neon', 'galaxy'],
+      stateData: { customCard: { rarity: 0.3 } }
+    });
+    expect(released.status).toBe(200);
+    expect(released.body.data.card.tags).toEqual(['neon', 'galaxy']);
+    const cardId = released.body.data.card.id;
 
     // Visible in the public pool with its tags
     const pool = await request(app).get('/api/cards/community/all');
@@ -176,20 +202,18 @@ describe('draw engine', () => {
     expect(result.balance).toBeCloseTo(ECONOMY.STARTING_GRANT + result.yield.credited, 6);
   });
 
-  test('pool draw serves a published card of the rolled tier and counts it', async () => {
-    const { token: creatorToken } = await signup('creator');
-    await request(app)
-      .post('/api/cards/publish')
-      .set(auth(creatorToken))
-      .send({ name: 'Pool card', tier: 'common', stateData: { x: 1 } });
+  test('pool draw serves a published card and counts it', async () => {
+    const { token: creatorToken, user: creator } = await signup('creator');
+    await publishCard(creatorToken, { userId: creator.id, rarity: 0.3, name: 'Pool card' });
 
     const { user } = await signup('drawer');
     const result = draw(user.id, () => 0.5);
     expect(result.source).toBe('pool');
     expect(result.card.name).toBe('Pool card');
     expect(result.card.times_drawn).toBe(1);
-    expect(result.stats.drawWeight).toBeCloseTo(getTier('common').probability, 10);
-    expect(result.stats.saveCost).toBe(saveCostFor(result.card.id));
+    // single card in the pool: it wins the non-synthetic slice outright
+    expect(result.stats.drawWeight).toBeCloseTo(1 - SYNTHETIC_DRAW_SHARE, 10);
+    expect(result.stats.saveCost).toBe(saveCostFor(result.card.id, result.card.rarity_score));
     // pool draws seed the yield from the served card's id
     expect(result.yield.full).toBe(drawYieldFor(result.card.id));
   });
@@ -201,14 +225,15 @@ describe('draw engine', () => {
 });
 
 describe('save economics', () => {
+  // Publish a card with a fixed rarity of 0.35 so saveCostFor(id) (its default
+  // rarity) matches what the server charges (saveCostFor(id, rarity)).
   const publishAndDraw = async () => {
     const creator = await signup('creator');
-    const publish = await request(app)
-      .post('/api/cards/publish')
-      .set(auth(creator.token))
-      .send({ name: 'Galaxy card', tier: 'galaxy', stateData: { x: 1 } });
+    const { card, createFee } = await publishCard(creator.token, {
+      userId: creator.user.id, rarity: 0.35, name: 'Galaxy card'
+    });
     const saver = await signup('saver');
-    return { creator, saver, card: publish.body.data.card, stake: publish.body.data.stake };
+    return { creator, saver, card, stake: createFee };
   };
 
   test('save debits cost, pays the creator dividend, cloud absorbs the rest', async () => {
@@ -246,9 +271,10 @@ describe('save economics', () => {
     expect(again.status).toBe(409);
   });
 
-  test('save fails politely with insufficient funds', async () => {
+  test('save fails politely at the debt floor', async () => {
     const { saver, card } = await publishAndDraw();
-    memoryDb.updateUser(saver.user.id, { balance: PRICE_BANDS.saveCost[0] - 0.01 });
+    // At the overdraft floor, any further spend is refused.
+    memoryDb.updateUser(saver.user.id, { balance: ECONOMY.DEBT_FLOOR });
     const res = await request(app).post(`/api/cards/${card.id}/save`).set(auth(saver.token));
     expect(res.status).toBe(402);
   });
@@ -364,15 +390,12 @@ describe('economy endpoints', () => {
 
   test('cloud books balance issuance against absorption', async () => {
     const { token, user } = await signup('solo');
-    await request(app)
-      .post('/api/cards/publish')
-      .set(auth(token))
-      .send({ tier: 'common', stateData: { x: 1 } });
+    const { createFee } = await publishCard(token, { userId: user.id, rarity: 0.3, stateData: { x: 1 } });
 
     const res = await request(app).get('/api/economy/cloud');
     expect(res.body.data.totalIssued).toBe(ECONOMY.STARTING_GRANT);
-    expect(res.body.data.totalAbsorbed).toBeGreaterThanOrEqual(PRICE_BANDS.publishStake[0]);
-    expect(res.body.data.totalAbsorbed).toBeLessThanOrEqual(PRICE_BANDS.publishStake[1]);
+    // the only /t26 absorbed is the create fee paid at confirm-start
+    expect(res.body.data.totalAbsorbed).toBeCloseTo(createFee, 6);
     expect(res.body.data.inCirculation).toBe(memoryDb.getUserById(user.id).balance);
     expect(res.body.data.tierCounts.common).toBe(1);
   });

@@ -2,8 +2,8 @@ import express from 'express';
 import Card from '../models/Card.js';
 import { memoryDb } from '../config/database.js';
 import crypto from 'node:crypto';
-import { getTier, saveCostFor, saveValueFor, dividendFor, createCostFor, normalizeProvenance, round2, round6, tierForScore } from '../services/economy.js';
-import { absorb, issue, InsufficientFundsError } from '../services/ledger.js';
+import { getTier, saveCostFor, saveValueFor, dividendFor, createCostFor, regenCostFor, rollRarity, normalizeProvenance, round2, round6, tierForScore, ECONOMY } from '../services/economy.js';
+import { absorb, issue, accrueInterest, InsufficientFundsError } from '../services/ledger.js';
 import { cardStats } from '../services/drawEngine.js';
 import { requireAuth, optionalAuth } from '../middleware/auth.js';
 import path from 'path';
@@ -12,74 +12,204 @@ import { renderCard, renderStills, MIME } from '../services/capture.js';
 
 const router = express.Router();
 
-// Publish a card into the pool. Costs the publish stake; embedded data-URL images
-// are offloaded to storage (S3 or local) and replaced with URLs.
-// Publish a card into the pool. The rarity is NOT chosen — it comes from the
-// creator's active server roll (see /api/economy/roll), so neither the web nor
-// the CLI can self-declare it. Publishing consumes that roll and charges the
-// create fee if it wasn't already committed (the web pays it at "Start"; the
-// CLI pays it here). The tier follows from the rolled score. Embedded data-URL
-// images are offloaded to storage and replaced with URLs.
-router.post('/publish', requireAuth, async (req, res) => {
+// ---------- Guided card creation (mirrors the website's /create flow + wording)
+// begin → regenerate-rarity → confirm-start → design → publish.
+// The Rarity Value is a server-owned gamble held as a short-lived "roll".
+// confirm-start pays the create fee and stamps that rarity onto a PRIVATE draft
+// card; the gamble stays live until publish, which applies the final design,
+// makes the card public, and consumes the gamble. Nothing here lets a caller
+// self-declare rarity — the same endpoints serve the web and the CLI.
+
+const oddsFor = (tier) => (tier.key === 'common' ? null : Math.round(1 / tier.probability));
+
+// The full, self-explaining view of a rarity gamble: the number, what it means
+// (tier + odds + where it sits), the two prices, your balance and the debt rules.
+const rarityView = (roll, user) => {
+  const tier = tierForScore(roll.rarity_score) || getTier('common');
+  return {
+    rarityValue: roll.rarity_score,
+    tier: { key: tier.key, name: tier.name, odds: oddsFor(tier), scoreRange: tier.scoreRange, multiplier: tier.multiplier },
+    regenerations: roll.rerolls,
+    prices: {
+      regenerate: regenCostFor(roll.rerolls, roll.id),
+      confirmStart: createCostFor(roll.rerolls, roll.id)
+    },
+    balance: user.balance,
+    debt: { floor: ECONOMY.DEBT_FLOOR, interestDaily: ECONOMY.DEBT_INTEREST_DAILY, inDebt: user.balance < 0 }
+  };
+};
+
+const draftView = (card) => ({
+  id: card.id,
+  name: card.name,
+  tier: card.tier,
+  rarityValue: card.rarity_score,
+  isPublic: !!card.is_public
+});
+
+// begin — start (or fetch) the Rarity Value gamble for your next card. Free and
+// idempotent: an existing gamble is returned rather than handing out a new one.
+router.post('/create/begin', requireAuth, (req, res) => {
+  accrueInterest(req.user.id);
+  let roll = memoryDb.getActiveRollByUser(req.user.id);
+  if (!roll) roll = memoryDb.createRoll({ user_id: req.user.id, rarity_score: rollRarity() });
+  res.json({ success: true, data: rarityView(roll, memoryDb.getUserById(req.user.id)) });
+});
+
+// regenerate-rarity — gamble a fresh Rarity Value for a climbing fee.
+router.post('/create/regenerate-rarity', requireAuth, (req, res) => {
   try {
-    const { name, stateData, tags } = req.body || {};
-    if (!stateData || typeof stateData !== 'object') {
-      return res.status(400).json({ success: false, error: 'stateData is required' });
-    }
-
     const roll = memoryDb.getActiveRollByUser(req.user.id);
-    if (!roll) {
-      return res.status(400).json({
-        success: false,
-        error: 'No active rarity roll — roll one first (POST /api/economy/roll)'
-      });
+    if (!roll) return res.status(404).json({ success: false, error: 'No creation in progress — run `card create begin` first' });
+    const charged = regenCostFor(roll.rerolls, roll.id);
+    absorb(req.user.id, 'reroll', charged);
+    const score = rollRarity();
+    const updated = memoryDb.updateRoll(roll.id, { rarity_score: score, rerolls: roll.rerolls + 1, committed: false });
+    // If a draft was already started, keep its design but re-stamp the new rarity
+    // (the create fee will apply again at the next confirm-start).
+    if (roll.draft_card_id && memoryDb.getCardById(roll.draft_card_id)) {
+      const tier = tierForScore(score) || getTier('common');
+      memoryDb.updateCard(roll.draft_card_id, { tier: tier.key, rarity_score: score });
     }
+    res.json({ success: true, data: { ...rarityView(updated, memoryDb.getUserById(req.user.id)), charged } });
+  } catch (error) {
+    if (error instanceof InsufficientFundsError) {
+      return res.status(402).json({ success: false, error: 'Debt limit reached — earn /t26 before regenerating' });
+    }
+    console.error('regenerate-rarity error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
 
-    // Rarity + tier come from the roll.
+// confirm-start — accept the current Rarity Value: pay the (gentle) create fee
+// and lock the rarity onto a PRIVATE draft card. Idempotent: once paid, calling
+// it again returns the same draft without re-charging (so stepping back and
+// forth in the web flow never double-bills). The gamble stays live until you
+// publish, so you can still step back and regenerate. An optional spec seeds the
+// draft's design (you can also shape it later with `card create update`).
+router.post('/create/confirm-start', requireAuth, async (req, res) => {
+  try {
+    const roll = memoryDb.getActiveRollByUser(req.user.id);
+    if (!roll) return res.status(404).json({ success: false, error: 'No creation in progress — run `card create begin` first' });
+
+    const { name, stateData, tags } = req.body || {};
     const score = roll.rarity_score;
     const tier = tierForScore(score) || getTier('common');
 
-    // Create fee: charged now unless already committed (web "Start").
-    const createStake = roll.committed ? 0 : createCostFor(roll.rerolls, roll.id);
-    if (createStake > 0) absorb(req.user.id, 'create_stake', createStake);
+    // Charge the create fee once, when first committing this gamble.
+    const createFee = roll.committed ? 0 : createCostFor(roll.rerolls, roll.id);
+    if (createFee > 0) absorb(req.user.id, 'create_stake', createFee);
 
-    const { value: offloadedState, stored } = await offloadImages(stateData, req.user.username);
+    const seed = stateData ? await offloadImages(stateData, req.user.username) : null;
+    let draft = roll.draft_card_id ? memoryDb.getCardById(roll.draft_card_id) : null;
 
-    const result = await Card.create({
-      name: name || 'Untitled card',
-      stateData: offloadedState,
-      creatorId: req.user.id,
-      isPublic: true,
-      tags: tags || []
-    });
-    if (!result.success) return res.status(400).json(result);
+    if (draft) {
+      // Re-confirming an existing draft: keep its design, refresh rarity, and
+      // apply the seed spec if one was passed this time.
+      const patch = { tier: tier.key, rarity_score: score };
+      if (seed) {
+        patch.state_data = seed.value;
+        patch.image_keys = [...(draft.image_keys || []), ...seed.stored.map(s => s.key)];
+      }
+      draft = memoryDb.updateCard(draft.id, patch);
+    } else {
+      const result = await Card.create({
+        name: name || 'Untitled card',
+        stateData: seed ? seed.value : {},
+        creatorId: req.user.id,
+        isPublic: false, // a private draft until you publish
+        tags: tags || []
+      });
+      if (!result.success) return res.status(400).json(result);
+      draft = memoryDb.updateCard(result.data.id, {
+        tier: tier.key,
+        rarity_score: score,
+        image_keys: seed ? seed.stored.map(s => s.key) : []
+      });
+    }
 
-    const card = memoryDb.updateCard(result.data.id, {
-      tier: tier.key,
-      rarity_score: score,
-      image_keys: stored.map(s => s.key)
-    });
-
-    // Roll consumed — the next card starts a fresh one.
-    memoryDb.deleteRoll(roll.id);
+    memoryDb.updateRoll(roll.id, { committed: true, draft_card_id: draft.id });
 
     res.status(201).json({
       success: true,
       data: {
-        card,
-        stats: cardStats(card),
-        rarityScore: score,
-        rerolls: roll.rerolls,
-        createStake,
+        draft: draftView(draft),
+        rarityValue: score,
+        tier: { key: tier.key, name: tier.name, odds: oddsFor(tier) },
+        createFee,
+        regenerations: roll.rerolls,
         balance: memoryDb.getUserById(req.user.id).balance,
-        imagesStored: stored.length
+        imagesStored: seed ? seed.stored.length : 0
       }
     });
   } catch (error) {
     if (error instanceof InsufficientFundsError) {
       return res.status(402).json({ success: false, error: error.message });
     }
-    console.error('Publish error:', error);
+    console.error('confirm-start error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// status — where am I? the active Rarity Value gamble (if any), your in-progress
+// private drafts, and your balance + debt rules.
+router.get('/create/status', requireAuth, (req, res) => {
+  const user = accrueInterest(req.user.id) || req.user;
+  const roll = memoryDb.getActiveRollByUser(req.user.id);
+  const drafts = memoryDb.getAllCards().filter(c => c.creator_id === req.user.id && !c.is_public);
+  res.json({
+    success: true,
+    data: {
+      rarity: roll ? rarityView(roll, user) : null,
+      drafts: drafts.map(draftView),
+      balance: user.balance,
+      debt: { floor: ECONOMY.DEBT_FLOOR, interestDaily: ECONOMY.DEBT_INTEREST_DAILY, inDebt: user.balance < 0 }
+    }
+  });
+});
+
+// publish — release the private draft into the pool. The create fee was already
+// paid at confirm-start, so this is free; it applies any final design and makes
+// the card public, then consumes the gamble. Accepts an optional final
+// { name, stateData, tags } (the web sends its finished design here); with no id
+// it publishes your single in-progress draft.
+router.post('/create/publish', requireAuth, async (req, res) => {
+  try {
+    const { id, name, stateData, tags } = req.body || {};
+    const roll = memoryDb.getActiveRollByUser(req.user.id);
+    const draft = id
+      ? memoryDb.getCardById(id)
+      : (roll && roll.draft_card_id ? memoryDb.getCardById(roll.draft_card_id) : null)
+        || memoryDb.getAllCards().find(c => c.creator_id === req.user.id && !c.is_public);
+    if (!draft) {
+      return res.status(404).json({ success: false, error: id ? 'Draft not found' : 'No draft to publish — run `card create confirm-start` first' });
+    }
+    if (draft.creator_id !== req.user.id) return res.status(403).json({ success: false, error: 'Not your draft' });
+    if (draft.is_public) return res.status(409).json({ success: false, error: 'Already published' });
+
+    const patch = { is_public: true, updated_at: new Date().toISOString() };
+    if (name !== undefined) patch.name = name;
+    if (tags !== undefined) patch.tags = tags;
+    if (stateData && typeof stateData === 'object') {
+      const { value, stored } = await offloadImages(stateData, req.user.username);
+      patch.state_data = value;
+      if (stored.length) patch.image_keys = [...(draft.image_keys || []), ...stored.map(s => s.key)];
+    }
+
+    const card = memoryDb.updateCard(draft.id, patch);
+    if (roll) memoryDb.deleteRoll(roll.id); // creation complete — next card starts fresh
+
+    res.json({
+      success: true,
+      data: {
+        card,
+        stats: cardStats(card),
+        rarityScore: card.rarity_score,
+        balance: memoryDb.getUserById(req.user.id).balance
+      }
+    });
+  } catch (error) {
+    console.error('create/publish error:', error);
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });

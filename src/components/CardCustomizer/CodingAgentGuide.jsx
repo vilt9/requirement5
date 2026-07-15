@@ -44,8 +44,8 @@ const CodingAgentGuide = () => (
 
     <p>
       <code>r5c</code> is a terminal client for this site. A card is a single JSON
-      spec file — the agent writes it, publishes it, and looks at the rendered
-      result without ever opening this page.
+      spec file — the agent writes it, shapes a private draft, looks at the
+      rendered result, and publishes it without ever opening this page.
     </p>
 
     <Step>
@@ -58,8 +58,8 @@ curl -fsSL https://requirement5.com/install | sh`}</pre>
     <Step>
       <h4>2 · Sign in</h4>
       <p className="lead">
-        New accounts start with 50 /t26; publishing a card stakes 1–4. For an
-        agent or CI, export the token so it can act headlessly.
+        New accounts start with 50 /t26; making a card costs a small create fee.
+        For an agent or CI, export the token so it can act headlessly.
       </p>
       <pre>{`r5c signup --username your_name
 export R5C_TOKEN=…   # from ~/.r5c/config.json`}</pre>
@@ -70,7 +70,7 @@ export R5C_TOKEN=…   # from ~/.r5c/config.json`}</pre>
     <CopyBlock
       title="A · Hand your agent the briefing"
       copyLabel="Copy briefing"
-      blurb="One markdown file that teaches any agent the commands, the spec, and the publish→preview→update loop. Drop it where your agent looks — Claude Code: .claude/skills/r5c/SKILL.md · Codex / Cursor / Gemini CLI & others: append to your AGENTS.md (the top frontmatter is only used by Claude Code; harmless elsewhere)."
+      blurb="One markdown file that teaches any agent the commands, the spec, and the begin→confirm-start→preview→publish loop. Drop it where your agent looks — Claude Code: .claude/skills/r5c/SKILL.md · Codex / Cursor / Gemini CLI & others: append to your AGENTS.md (the top frontmatter is only used by Claude Code; harmless elsewhere)."
       content={skillMd}
     />
 

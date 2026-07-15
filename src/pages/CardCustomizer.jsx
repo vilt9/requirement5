@@ -95,20 +95,32 @@ const CardCustomizer = () => {
   // forth to Design never double-charges. Cleared on a new roll. (Logged-out
   // only — logged in, the roll's `committed` flag is authoritative.)
   const [paidCreate, setPaidCreate] = useState(false);
-  // The server-owned rarity roll (logged in): { id, rarityScore, rerolls,
-  // committed, tier } + its { reroll, create } prices. Null when logged out.
+  // The server-owned rarity gamble (logged in), mapped from /api/cards/create/*:
+  // { rarityScore, rerolls, committed, tier } + its { reroll, create } prices.
+  // Null when logged out. `draftId` is the private draft once confirm-start runs.
   const [roll, setRoll] = useState(null);
   const [prices, setPrices] = useState(null);
+  const [draftId, setDraftId] = useState(null);
 
-  // Fetch (or create) the active server roll and sync the card's rarity to it.
+  // Map a begin/regenerate response into the { roll, prices } shape the UI uses.
+  const syncRarity = (data, committed = false) => {
+    setRoll({
+      rarityScore: data.rarityValue,
+      rerolls: data.regenerations,
+      committed,
+      tier: data.tier
+    });
+    setPrices({ reroll: data.prices.regenerate, create: data.prices.confirmStart });
+    setCustomCard(prev => (prev ? { ...prev, rarity: data.rarityValue } : prev));
+  };
+
+  // Start (or fetch) the active gamble and sync the card's rarity to it.
   const fetchRoll = useCallback(async () => {
     try {
-      const data = await api('/api/economy/roll', { method: 'POST' });
-      setRoll(data.roll);
-      setPrices(data.prices);
-      setCustomCard(prev => (prev ? { ...prev, rarity: data.roll.rarityScore } : prev));
+      const data = await api('/api/cards/create/begin', { method: 'POST' });
+      syncRarity(data);
     } catch (error) {
-      console.error('Could not fetch rarity roll:', error);
+      console.error('Could not start the rarity gamble:', error);
     }
   }, []);
   // The in-progress design is precious: publishing needs an account, and the
@@ -193,6 +205,7 @@ const CardCustomizer = () => {
       setAnonRolls(false);
       setPaidCreate(false);
       setRoll(null); // force a fresh server roll
+      setDraftId(null);
       setStage('start');
       setSelectedPresetId('');
       flash('Logged in — fresh roll. Rerolls made while logged out don’t carry over.');
@@ -203,7 +216,7 @@ const CardCustomizer = () => {
   // of truth for rarity). Logged out clears it (client-side rolls apply).
   useEffect(() => {
     if (loading || !draftChecked || !customCard) return;
-    if (!user) { setRoll(null); setPrices(null); return; }
+    if (!user) { setRoll(null); setPrices(null); setDraftId(null); return; }
     if (!roll) fetchRoll();
   }, [user, loading, draftChecked, customCard, roll, fetchRoll]);
 
@@ -284,18 +297,17 @@ const CardCustomizer = () => {
 
   const handleRegenerate = async () => {
     if (user) {
-      // Server owns the rarity: reroll draws a fresh one and charges the fee.
+      // Server owns the rarity: regenerate draws a fresh one and charges the fee.
       try {
-        const data = await api('/api/economy/roll/reroll', { method: 'POST' });
-        setRoll(data.roll);
-        setPrices(data.prices);
+        const data = await api('/api/cards/create/regenerate-rarity', { method: 'POST' });
+        syncRarity(data);
         setBalance(data.balance);
         flashSpend(data.charged);
-        doReroll(data.roll.rarityScore);
+        doReroll(data.rarityValue);
       } catch (error) {
         flash(error?.status === 402
           ? (error.message || 'Debt limit reached — pay down /t26 first.')
-          : 'Could not reroll — try again.');
+          : 'Could not regenerate — try again.');
       }
       return;
     }
@@ -311,14 +323,16 @@ const CardCustomizer = () => {
   // it's free (publishing needs an account, and logging in restarts the roll).
   const handleStart = async () => {
     if (user) {
-      // Commit the roll (pay the create fee) unless it's already committed.
+      // confirm-start (pay the create fee) unless already committed. It locks
+      // the rarity onto a private draft and returns its id — idempotent, so
+      // stepping back and forth never double-charges.
       if (!roll?.committed) {
         try {
-          const data = await api('/api/economy/roll/commit', { method: 'POST' });
-          setRoll(data.roll);
-          setPrices(data.prices);
+          const data = await api('/api/cards/create/confirm-start', { method: 'POST' });
+          setDraftId(data.draft.id);
+          setRoll(prev => (prev ? { ...prev, committed: true } : prev));
           setBalance(data.balance);
-          flashSpend(data.charged);
+          flashSpend(data.createFee);
         } catch (error) {
           flash(error?.status === 402
             ? (error.message || 'Debt limit reached — pay down /t26 first.')
@@ -330,12 +344,13 @@ const CardCustomizer = () => {
     setStage('design');
   };
 
-  // A published card consumes its roll — clear the draft and drop the stale
+  // A published card consumes its gamble — clear the draft and drop the stale
   // roll so the next card pulls a fresh one.
   const handlePublished = () => {
     localforage.removeItem('r5cCreateDraft').catch(() => {});
     setRoll(null);
     setPrices(null);
+    setDraftId(null);
   };
 
   // Reset (from the Design stage): drop back to the roll, keeping the current
@@ -671,6 +686,7 @@ const CardCustomizer = () => {
             <StageBody className="controls-footer">
               <PublishStage
                 customCard={customCard}
+                draftId={draftId}
                 onPublished={handlePublished}
                 onTagsChange={setTags}
                 presetName={presetName}

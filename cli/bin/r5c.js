@@ -137,26 +137,107 @@ async function cmdTransactions({ flags }) {
   out(data);
 }
 
-// A card's rarity is a server-owned gamble. `roll` starts (or shows) your one
-// free roll for the next card; `reroll` draws a fresh rarity for a climbing fee.
-// Publishing consumes the roll and charges the (gentle) create fee.
-async function cmdRoll({ flags }) {
-  const { data } = await api.post('/api/economy/roll', {}, { auth: true });
+// ---------- guided card creation: `r5c card create ...` ----------
+// Mirrors the website's /create flow and its exact wording: begin → regenerate
+// the Rarity Value → confirm-start (pay the create fee, lock it onto a private
+// draft) → design the draft (update/preview) → publish (release it into the
+// pool). The rarity is a server-owned gamble; you never declare it.
+
+// One line that says what a Rarity Value MEANS: the number, its tier, and the
+// odds a card that rare appears at ("1 in 220").
+function rarityLine(d) {
+  const t = d.tier || {};
+  const meaning = t.odds ? `appears at 1 in ${t.odds}` : 'the common run';
+  return `Rarity Value: ${d.rarityValue}  ·  ${t.name || '—'}  (${meaning})`;
+}
+
+async function cardBegin({ flags }) {
+  const { data } = await api.post('/api/cards/create/begin', {}, { auth: true });
   if (flags.json) return out(data);
-  const r = data.roll;
-  out(`Rarity roll: ${r.rarityScore}  (${r.tier?.name || '—'})${r.committed ? ' · committed' : ''}`);
-  out(`  rerolls so far: ${r.rerolls}`);
-  out(`  reroll: −${data.prices.reroll} /t26   ·   create (at publish): −${data.prices.create} /t26`);
+  out(rarityLine(data));
+  out(`  regenerations so far: ${data.regenerations}`);
+  out(`  regenerate: −${data.prices.regenerate} /t26   ·   confirm-start (create fee): −${data.prices.confirmStart} /t26`);
+  out(balanceReport(data.balance));
+  out('Next: `r5c card create regenerate-rarity` to gamble again, or `r5c card create confirm-start [spec.json]` to lock it in.');
+}
+
+async function cardRegen({ flags }) {
+  const { data } = await api.post('/api/cards/create/regenerate-rarity', {}, { auth: true });
+  if (flags.json) return out(data);
+  out(`${rarityLine(data)}   [−${data.charged} /t26]`);
+  out(`  next regenerate: −${data.prices.regenerate} /t26   ·   confirm-start: −${data.prices.confirmStart} /t26`);
   out(balanceReport(data.balance));
 }
 
-async function cmdReroll({ flags }) {
-  const { data } = await api.post('/api/economy/roll/reroll', {}, { auth: true });
+async function cardConfirm({ positional, flags }) {
+  const specPath = positional[0];
+  let payload = {};
+  if (specPath) {
+    let spec;
+    try {
+      spec = JSON.parse(fs.readFileSync(specPath, 'utf8'));
+    } catch (error) {
+      fail(`could not read spec ${specPath}: ${error.message}`);
+    }
+    payload = buildPublishPayload(spec, path.dirname(path.resolve(specPath)));
+  }
+  const { data } = await api.post('/api/cards/create/confirm-start', payload, { auth: true });
   if (flags.json) return out(data);
-  const r = data.roll;
-  out(`Rerolled → ${r.rarityScore}  (${r.tier?.name || '—'})   [−${data.charged} /t26]`);
-  out(`  next reroll: −${data.prices.reroll} /t26   ·   create: −${data.prices.create} /t26`);
+  out(`Confirmed — rarity locked at ${data.rarityValue} (${data.tier.name}). Private draft ${data.draft.id} created.`);
+  out(`  Create fee: −${data.createFee} /t26${data.imagesStored ? ` — images stored: ${data.imagesStored}` : ''}`);
   out(balanceReport(data.balance));
+  out(`Next: design it — \`r5c card create update ${data.draft.id} card.json\`, look with \`r5c card create preview ${data.draft.id}\`, then \`r5c card create publish ${data.draft.id}\`.`);
+}
+
+async function cardStatus({ flags }) {
+  const { data } = await api.get('/api/cards/create/status', { auth: true });
+  if (flags.json) return out(data);
+  if (data.rarity) {
+    out(rarityLine(data.rarity));
+    out(`  regenerate: −${data.rarity.prices.regenerate} /t26   ·   confirm-start: −${data.rarity.prices.confirmStart} /t26`);
+  } else {
+    out('No Rarity Value in progress — `r5c card create begin` to start one.');
+  }
+  if (data.drafts.length) {
+    out('Private drafts (not yet published):');
+    for (const d of data.drafts) out(`  ${d.id}  ${String(d.tier || '-').padEnd(9)} ${d.name}`);
+  }
+  out(balanceReport(data.balance));
+}
+
+async function cardCreatePublish({ positional, flags }) {
+  const id = positional[0];
+  const { data } = await api.post('/api/cards/create/publish', id ? { id } : {}, { auth: true });
+  const url = cardUrl(data.card.id);
+  if (flags.json) return out({ ...data, url });
+  out(`Published "${data.card.name}" — rarity ${data.card.rarity_score} (${data.card.tier})`);
+  out(`  ${url}`);
+  out(balanceReport(data.balance));
+  if (flags.open) openUrl(url);
+}
+
+// Dispatch `r5c card create <action> ...`.
+async function cmdCard({ positional, flags }) {
+  const [sub, action, ...rest] = positional;
+  if (sub !== 'create') {
+    fail(`unknown "r5c card ${sub || ''}" — the guided flow is \`r5c card create ...\``);
+  }
+  const inner = { positional: rest, flags };
+  const actions = {
+    begin: cardBegin,
+    'regenerate-rarity': cardRegen,
+    'confirm-start': cardConfirm,
+    status: cardStatus,
+    update: cmdUpdate,             // shape the private draft (PUT the card)
+    preview: cmdPreview,           // look at the private draft
+    publish: cardCreatePublish,    // release the draft into the pool
+    release: cardCreatePublish     // friendly alias for publish
+  };
+  const handler = actions[action];
+  if (!handler) {
+    fail(`unknown "r5c card create ${action || ''}" — try: begin | regenerate-rarity | confirm-start | update | preview | publish | status`);
+  }
+  return handler(inner);
 }
 
 async function cmdConfig({ positional, flags }) {
@@ -174,36 +255,9 @@ async function cmdConfig({ positional, flags }) {
   });
 }
 
-async function cmdPublish({ positional, flags }) {
-  const specPath = positional[0] || fail('publish needs a spec file: r5c publish card.json (see `r5c template`)');
-  let spec;
-  try {
-    spec = JSON.parse(fs.readFileSync(specPath, 'utf8'));
-  } catch (error) {
-    fail(`could not read spec ${specPath}: ${error.message}`);
-  }
-
-  const payload = buildPublishPayload(spec, path.dirname(path.resolve(specPath)));
-  // A card's rarity is a server roll. Ensure one exists (idempotent) — run
-  // `r5c reroll` first to gamble; otherwise this uses your current free roll.
-  await api.post('/api/economy/roll', {}, { auth: true });
-  const { data } = await api.post('/api/cards/publish', payload, { auth: true });
-
-  const url = cardUrl(data.card.id);
-  if (flags.json) {
-    out({ ...data, url });
-  } else {
-    out(`Published "${data.card.name}" — rarity ${data.card.rarity_score} (${data.card.tier})`);
-    out(`  ${url}`);
-    out(`  Create fee: ${data.createStake} /t26 — images stored: ${data.imagesStored}`);
-    out(balanceReport(data.balance));
-  }
-  if (flags.open) openUrl(url);
-}
-
 async function cmdUpdate({ positional, flags }) {
-  const id = positional[0] || fail('update needs a card id: r5c update <id> <spec.json>');
-  const specPath = positional[1] || fail('update needs a spec file: r5c update <id> card.json');
+  const id = positional[0] || fail('update needs a card id: r5c card create update <id> <spec.json>');
+  const specPath = positional[1] || fail('update needs a spec file: r5c card create update <id> card.json');
   let spec;
   try {
     spec = JSON.parse(fs.readFileSync(specPath, 'utf8'));
@@ -316,12 +370,7 @@ const COMMANDS = {
   balance: cmdBalance,
   transactions: cmdTransactions,
   config: cmdConfig,
-  roll: cmdRoll,
-  reroll: cmdReroll,
-  publish: cmdPublish,
-  create: cmdPublish, // alias — matches the web's "Create"
-  update: cmdUpdate,
-  preview: cmdPreview,
+  card: cmdCard, // the guided creation flow: `r5c card create ...`
   get: cmdGet,
   list: cmdList,
   collection: cmdCollection,

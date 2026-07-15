@@ -14,7 +14,9 @@ cd cli && npm link                                 # from a repo checkout
 # One-minute card
 r5c signup --username ada_l --email ada@example.com --password 'correct-horse-9'
 r5c template > card.json               # edit: point "image" at your artwork
-r5c publish card.json                  # prints https://requirement5.com/card/<id>
+r5c card create begin                  # see your Rarity Value (and its odds)
+r5c card create confirm-start card.json  # pay the create fee → a private draft
+r5c card create publish <id>           # release it → https://requirement5.com/card/<id>
 ```
 
 ## How it fits together
@@ -24,9 +26,14 @@ The CLI talks to the same JSON API as the web app (default
 `r5c config --api-url`). You write a small **spec file**; the CLI expands it
 into the complete card state the web customizer would produce — sensible
 defaults for every visual system, deep-merged with whatever you override —
-inlines your local artwork as data URLs, and publishes. The server downscales
-images to 1200px WebP and moves them to object storage, then the card is live
-at `/card/<id>`.
+inlines your local artwork as data URLs. The server downscales images to 1200px
+WebP and moves them to object storage.
+
+Making a card follows the same steps as the website's `/create` page: you
+**begin** a creation to get a Rarity Value, optionally **regenerate** it, then
+**confirm-start** to lock it onto a **private draft**. You shape and preview the
+draft privately, and **publish** when it's ready — only then does it go live at
+`/card/<id>`.
 
 ## Authentication
 
@@ -36,10 +43,12 @@ at `/card/<id>`.
 | `--password` flag | Non-interactive login | Scripts |
 | `R5C_TOKEN` env var | Bypasses the config file entirely | CI, agents, multi-account |
 
-New accounts are granted **50 /t26** (the platform currency). Publishing a card
-stakes **1–4 /t26** (rolled per publish), so a fresh account can publish many cards immediately.
-When other players save your card you earn a dividend, scaled by tier — check
-with `r5c balance` / `r5c transactions`.
+New accounts are granted **50 /t26** (the platform currency). The **create fee**
+(a few /t26, paid at `confirm-start`) is the cost of minting a card, so a fresh
+account can make many cards immediately. **Regenerating** the Rarity Value costs
+a climbing fee (the gambling tax). When other players save your card you earn a
+dividend, scaled by tier — check with `r5c balance` / `r5c transactions`. You may
+spend into the red down to **−1000 /t26** (debt accrues 1.47%/day, compounding).
 
 ## Commands
 
@@ -50,15 +59,32 @@ with `r5c balance` / `r5c transactions`.
 - `r5c whoami` — current user, balance, API URL
 - `r5c balance` / `r5c transactions` — /t26 balance and ledger
 
-### Cards
-- `r5c publish <spec.json> [--open] [--json]` — build and publish a card; prints its URL
-- `r5c update <id> <spec.json>` — re-design a card you own from a spec (no new stake)
-- `r5c preview <id> [--frames N] [--out <dir>]` — capture still PNGs of the live
-  card (one at rest, the others mid-orbit with the holo awake) — the agent-friendly
-  way to *look at* a card between updates
+### Create a card — `r5c card create ...`
+
+The guided flow, mirroring the website's `/create` page:
+
+- `r5c card create begin` — start the creation; prints your **Rarity Value**, its
+  tier, the odds a card that rare appears at ("1 in 220"), the two prices, and
+  your balance. Free and idempotent.
+- `r5c card create regenerate-rarity` — gamble a fresh Rarity Value for a climbing
+  /t26 fee. Prints the new value and the updated prices.
+- `r5c card create confirm-start [spec.json]` — accept the current Rarity Value:
+  pays the **create fee**, locks the rarity, and creates a **private draft** card
+  (prints its id). An optional spec seeds the draft's look.
+- `r5c card create update <id> <spec.json>` — shape the private draft (free, as
+  often as you like; rarity unchanged).
+- `r5c card create preview <id> [--frames N] [--out <dir>]` — still PNGs of the
+  draft (one at rest, the others mid-orbit with the holo awake) — the way to
+  *look at* the draft between edits. Only you can see it.
+- `r5c card create publish <id> [--open] [--json]` — release the finished draft
+  into the pool (free — the create fee was paid at confirm-start).
+- `r5c card create status` — where you are: the Rarity Value, your private drafts,
+  your balance.
+
+### Other card commands
 - `r5c template [minimal|full]` — print an example spec to start from
 - `r5c get <id>` — full card record as JSON
-- `r5c list [--mine]` — community pool, or your published cards
+- `r5c list [--mine]` — community pool, or your own cards (drafts included)
 - `r5c collection` — cards you've saved
 - `r5c delete <id>` — delete a card you created
 - `r5c render <id> [--format gif|mp4] [--open]` — server-side render to a shareable
@@ -73,34 +99,42 @@ with `r5c balance` / `r5c transactions`.
 
 ## The spec file
 
-Only `tier` is required, but a real card wants `name`, `image`, and `tags`:
+The spec describes a card's **look** only — nothing in it is required. A real
+card wants `name`, `image`, and `tags`:
 
 ```json
 {
   "name": "Neon Reliquary",
-  "tier": "ultra",
   "tags": ["cosmic", "portrait"],
   "image": "./artwork.png"
 }
 ```
 
+**Rarity is not a spec field.** It's a server-owned gamble: `card create begin`
+hands you a Rarity Value, `regenerate-rarity` re-rolls it, and `confirm-start`
+locks it onto the card. Any `tier` / `rarityScore` you put in the spec is
+ignored — you cannot self-declare rarity.
+
 `image` / `holoImage` accept a local path (resolved relative to the spec file),
 an `https://` URL, or a raw data URL. PNG, JPEG, WebP, GIF, AVIF.
 
-### Tiers
+### Tiers (what a Rarity Value maps to)
 
-| tier | display | rarity band | save cost | notes |
-|---|---|---|---|---|
-| `common` | Common | 0–0.7 | 4 | |
-| `holo` | Uncommon | 0.7–0.8 | 8 | |
-| `galaxy` | Scarce | 0.8–0.85 | 20 | |
-| `wowa` | Rare | 0.85–0.9 | 36 | |
-| `ultra` | Fine | 0.9–0.98 | 72 | |
-| `vmax` | Singular | 0.98–1.0 | 160 | 1-in-2000 draw odds |
+The Rarity Value (0–1) determines the tier and its draw odds. Save price is
+**per-card** — rarity slides the centre of a wide band, so prices overlap
+(a lucky Common can outprice an unlucky Fine).
 
-`rarityScore` (0–1) is optional; it defaults to the middle of the tier's band
-and is clamped into the band by the server. Creator dividends are 20% of the
-save cost, so rarer tiers earn more per save.
+| tier | display | score band | draw odds |
+|---|---|---|---|
+| `common` | Common | 0–0.7 | the common run |
+| `holo` | Uncommon | 0.7–0.8 | ~1 in 24 |
+| `galaxy` | Scarce | 0.8–0.85 | ~1 in 90 |
+| `wowa` | Rare | 0.85–0.9 | ~1 in 220 |
+| `ultra` | Fine | 0.9–0.98 | ~1 in 500 |
+| `vmax` | Singular | 0.98–1.0 | ~1 in 2000 |
+
+Creator dividends are 20% of a card's save price, so rarer cards tend to earn
+more per save. The live numbers come from `GET /api/economy/config`.
 
 ### Visual overrides — `spec.card`
 
@@ -170,14 +204,18 @@ Blend modes anywhere a `blendMode` appears: `normal`, `color-dodge`,
 
 ## Agent recipes
 
-The design-iterate loop — publish once, then look/adjust/update until it's right:
+The design-iterate loop — get a rarity, make a private draft, then
+look/adjust/update until it's right, and only then publish:
 
 ```bash
-id=$(r5c publish card.json --json | jq -r .card.id)
-r5c preview "$id" --out shots/     # 4 PNGs: rest pose + 3 orbit poses
+r5c card create begin                              # see the Rarity Value + odds
+# (optional) r5c card create regenerate-rarity     # gamble again — spends /t26
+id=$(r5c card create confirm-start card.json --json | jq -r .draft.id)
+r5c card create preview "$id" --out shots/         # 4 PNGs: rest + 3 orbit poses
 # inspect shots/, edit card.json, then:
-r5c update "$id" card.json
-r5c preview "$id" --out shots/     # fresh frames (cache keys on card version)
+r5c card create update "$id" card.json
+r5c card create preview "$id" --out shots/         # fresh frames (cache keys on version)
+r5c card create publish "$id"                      # release it into the pool
 ```
 
 Non-interactive end-to-end, no stored state:
@@ -187,16 +225,21 @@ export R5C_TOKEN=$(curl -s https://requirement5.com/api/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"username":"bot","password":"..."}' | jq -r .data.token)
 
-r5c publish card.json --json | jq -r .url
+r5c card create begin --json | jq '{rarityValue, tier: .tier.name, odds: .tier.odds}'
+id=$(r5c card create confirm-start card.json --json | jq -r .draft.id)
+r5c card create publish "$id" --json | jq -r .url
 ```
 
-Batch-publish a directory of artwork:
+Batch-mint a directory of artwork (each card: begin → confirm-start → publish,
+no preview in between):
 
 ```bash
 for img in art/*.png; do
   jq -n --arg img "$img" --arg name "$(basename "$img" .png)" \
-    '{name:$name, tier:"holo", image:$img, tags:["batch"]}' > /tmp/spec.json
-  r5c publish /tmp/spec.json --json | jq -r .url
+    '{name:$name, image:$img, tags:["batch"]}' > /tmp/spec.json   # look only — no tier
+  r5c card create begin --json > /dev/null
+  id=$(r5c card create confirm-start /tmp/spec.json --json | jq -r .draft.id)
+  r5c card create publish "$id" --json | jq -r .url
 done
 ```
 
