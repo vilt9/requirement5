@@ -447,6 +447,14 @@ const ShareCard = () => {
           <div className="body"><AboutR5c /></div>
         </AboutBox>
 
+        {user && user.balance < 0 && (
+          <TopUpNote>
+            Your account is {fmtT26(user.balance)} in debt.{' '}
+            {fmtT26(user.balance - (config?.debtFloor ?? -1000))} /t26 until you reach
+            the debt ceiling. <Link to="/account">Learn about purchasing /t26</Link>.
+          </TopUpNote>
+        )}
+
         <Details>
           {/* Rarity & standing — the server roll; drives the tier and the price. */}
           <Detail label="Rarity Value">{num(rarity, 3)}</Detail>
@@ -702,6 +710,21 @@ const Note = styled.div`
 `;
 
 // Collapsed by default, but inviting — the lore behind R5c, one click away.
+// Shown under the About box only when the viewer's own balance is negative — a
+// small note of remaining debt headroom with an underlined link to the account
+// page's purchase options.
+const TopUpNote = styled.p`
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--amber-dim);
+
+  a {
+    color: var(--gold-bright);
+    text-decoration: underline;
+  }
+`;
+
 const AboutBox = styled.details`
   border: 1px solid var(--panel-border);
   border-radius: 8px;

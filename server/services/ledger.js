@@ -4,7 +4,6 @@
 import { memoryDb } from '../config/database.js';
 import { round6, ECONOMY } from './economy.js';
 
-const todayUTC = () => new Date().toISOString().slice(0, 10);
 const DAY_MS = 86400000;
 
 export class InsufficientFundsError extends Error {
@@ -114,35 +113,10 @@ export const transfer = (fromUserId, toUserId, type, amount, meta = {}) => {
   return debit;
 };
 
-// Daily yield accounting. Returns the actually-credited amount (0 past the cap).
+// Credit a draw's yield in full. Generating is unbounded — there is no daily
+// cap, so every generate pays out its whole yield.
 export const creditDrawYield = (userId, fullAmount, meta = {}) => {
-  const user = memoryDb.getUserById(userId);
-  if (!user) throw new Error(`Unknown user: ${userId}`);
-
-  const day = todayUTC();
-  const usedToday = user.yield_day === day ? user.yield_today : 0;
-  const remaining = Math.max(0, round6(ECONOMY.DAILY_YIELD_CAP - usedToday));
-  const credited = round6(Math.min(fullAmount, remaining));
-
-  memoryDb.updateUser(userId, {
-    yield_day: day,
-    yield_today: round6(usedToday + credited)
-  });
-
-  if (credited > 0) {
-    issue(userId, 'draw_yield', credited, meta);
-  } else {
-    // Record the capped draw so the ledger tells the whole story.
-    const fresh = memoryDb.getUserById(userId);
-    memoryDb.createTransaction({
-      user_id: userId, type: 'draw_yield', amount: 0,
-      balance_after: fresh.balance, capped: true, ...meta
-    });
-  }
+  const credited = round6(Math.max(0, Number(fullAmount) || 0));
+  if (credited > 0) issue(userId, 'draw_yield', credited, meta);
   return credited;
-};
-
-export const yieldRemainingToday = (user) => {
-  const usedToday = user.yield_day === todayUTC() ? user.yield_today : 0;
-  return Math.max(0, round6(ECONOMY.DAILY_YIELD_CAP - usedToday));
 };

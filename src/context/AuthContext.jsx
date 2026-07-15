@@ -21,7 +21,6 @@ const round6 = (n) => Math.round(n * 1e6) / 1e6;
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [config, setConfig] = useState(null);   // economy config: tiers, costs, odds
-  const [yieldRemaining, setYieldRemaining] = useState(null);
   const [loading, setLoading] = useState(true);
   const [stash, setStash] = useState(readStash);
 
@@ -67,7 +66,6 @@ export function AuthProvider({ children }) {
     try {
       const data = await api('/api/economy/balance');
       setUser(current => (current ? { ...current, balance: data.balance } : current));
-      setYieldRemaining(data.yieldRemainingToday);
     } catch (error) {
       console.error('Could not refresh balance:', error);
     }
@@ -83,8 +81,6 @@ export function AuthProvider({ children }) {
       try {
         const me = await api('/api/auth/me');
         setUser(me);
-        const balance = await api('/api/economy/balance');
-        setYieldRemaining(balance.yieldRemainingToday);
       } catch {
         setToken(null);
       }
@@ -132,7 +128,6 @@ export function AuthProvider({ children }) {
   const logout = () => {
     setToken(null);
     setUser(null);
-    setYieldRemaining(null);
   };
 
   // Endpoints that return a fresh balance can push it straight in.
@@ -227,7 +222,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider value={{
-      user, config, yieldRemaining, loading,
+      user, config, loading,
       signup, login, claim, logout, refreshBalance, setBalance,
       stash, bumpStash, nextCard, earnFlash, flashSpend
     }}>

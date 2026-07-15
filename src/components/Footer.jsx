@@ -35,12 +35,18 @@ const Footer = () => {
             <Metric><b>{fmt(totals.circulating)}</b> /t26 in play</Metric>
             <Sep>·</Sep>
             <Metric><b>{fmt(totals.creators)}</b> creators</Metric>
+            <Sep>·</Sep>
           </>
         ) : (
-          <Metric><Dimmed>a living, player-run card economy</Dimmed></Metric>
+          <>
+            <Metric><Dimmed>a living, player-run card economy</Dimmed></Metric>
+            <Sep>·</Sep>
+          </>
         )}
+        <FooterLink to="/analytics">Analytics</FooterLink>
+        <Sep>·</Sep>
+        <FooterLink to="/account">Purchase /t26</FooterLink>
       </Banner>
-      <AnalyticsLink to="/analytics">Cohort analytics →</AnalyticsLink>
       {/* origin-attestation link. easy to miss on purpose. */}
       <VoidDot to="/verify" aria-hidden="true" tabIndex={-1} />
     </Bar>
@@ -75,7 +81,7 @@ const Metric = styled.span`
 const Sep = styled.span`color: var(--amber-dim);`;
 const Dimmed = styled.span`color: var(--amber-dim);`;
 
-const AnalyticsLink = styled(Link)`
+const FooterLink = styled(Link)`
   color: var(--gold-bright);
   font-weight: 700;
   white-space: nowrap;

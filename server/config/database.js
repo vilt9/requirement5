@@ -255,8 +255,6 @@ const memoryDb = {
       ...user,
       id: user.id || crypto.randomUUID(),
       balance: user.balance || 0,
-      yield_today: 0,
-      yield_day: null,
       created_at: now()
     };
     db.users.push(newUser);

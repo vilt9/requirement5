@@ -1,5 +1,5 @@
 import { memoryDb } from '../config/database.js';
-import { issue, absorb, InsufficientFundsError, creditDrawYield, yieldRemainingToday } from '../services/ledger.js';
+import { issue, absorb, InsufficientFundsError, creditDrawYield } from '../services/ledger.js';
 import { ECONOMY } from '../services/economy.js';
 import User from '../models/User.js';
 
@@ -76,31 +76,18 @@ describe('issue and absorb', () => {
   });
 });
 
-describe('daily yield cap', () => {
-  test('credits until the cap, then records zero-yield draws', async () => {
+describe('draw yield', () => {
+  test('credits the full yield every time — generating is uncapped', async () => {
     const user = await makeUser();
-    // burn through the cap with big yields
+    // Big yields that would have blown past the old 100/day cap all credit in full.
     expect(creditDrawYield(user.id, 40)).toBe(40);
     expect(creditDrawYield(user.id, 40)).toBe(40);
-    expect(creditDrawYield(user.id, 40)).toBe(20); // capped at 100 total
-    expect(creditDrawYield(user.id, 5)).toBe(0);
+    expect(creditDrawYield(user.id, 40)).toBe(40);
+    expect(creditDrawYield(user.id, 5)).toBe(5);
 
     const fresh = memoryDb.getUserById(user.id);
-    expect(fresh.balance).toBe(ECONOMY.STARTING_GRANT + ECONOMY.DAILY_YIELD_CAP);
-    expect(yieldRemainingToday(fresh)).toBe(0);
-
-    const capped = memoryDb.getTransactionsByUser(user.id).find(t => t.capped);
-    expect(capped).toBeDefined();
-    expect(capped.amount).toBe(0);
-  });
-
-  test('cap resets on a new day', async () => {
-    const user = await makeUser();
-    creditDrawYield(user.id, 100);
-    expect(yieldRemainingToday(memoryDb.getUserById(user.id))).toBe(0);
-    // simulate yesterday
-    memoryDb.updateUser(user.id, { yield_day: '2000-01-01' });
-    expect(yieldRemainingToday(memoryDb.getUserById(user.id))).toBe(ECONOMY.DAILY_YIELD_CAP);
-    expect(creditDrawYield(user.id, 5)).toBe(5);
+    expect(fresh.balance).toBe(ECONOMY.STARTING_GRANT + 125);
+    // no capped / zero-yield records exist any more
+    expect(memoryDb.getTransactionsByUser(user.id).some(t => t.capped)).toBe(false);
   });
 });

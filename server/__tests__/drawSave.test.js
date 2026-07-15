@@ -400,12 +400,12 @@ describe('economy endpoints', () => {
     expect(res.body.data.tierCounts.common).toBe(1);
   });
 
-  test('balance endpoint reports balance and the daily yield headroom', async () => {
+  test('balance endpoint reports the balance', async () => {
     const { token } = await signup('walleter');
     const res = await request(app).get('/api/economy/balance').set(auth(token));
     expect(res.status).toBe(200);
     expect(res.body.data.balance).toBe(ECONOMY.STARTING_GRANT);
-    expect(res.body.data.yieldRemainingToday).toBe(ECONOMY.DAILY_YIELD_CAP);
+    expect(res.body.data.inDebt).toBe(false);
   });
 
   test('balance endpoint requires auth', async () => {

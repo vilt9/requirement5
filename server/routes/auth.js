@@ -3,16 +3,19 @@ import User, { publicUser } from '../models/User.js';
 import { signToken, requireAuth } from '../middleware/auth.js';
 import { issue } from '../services/ledger.js';
 import { memoryDb } from '../config/database.js';
-import { ECONOMY } from '../services/economy.js';
 
 const router = express.Router();
 
+// Anti-abuse ceiling on the client-claimed logged-out stash. Generating itself
+// is uncapped, but this value is reported by an untrusted client, so we clamp
+// the one-time claim to keep a forged stash from minting silly amounts.
+const STASH_CLAIM_CAP = 100;
+
 // Logged-out visitors earn a local "stash" per generate; it rides along on
-// signup/login and is credited here. Client-claimed, so clamp it to one day's
-// yield cap — the stakes are toy, the clamp keeps them that way.
+// signup/login and is credited here.
 const claimStash = (userId, stash) => {
   // Stashes are fractional (each generate earns a small random amount).
-  const amount = Math.min(ECONOMY.DAILY_YIELD_CAP,
+  const amount = Math.min(STASH_CLAIM_CAP,
     Math.max(0, Math.round((Number(stash) || 0) * 1e6) / 1e6));
   if (amount > 0) issue(userId, 'claimed_yield', amount);
   return memoryDb.getUserById(userId);

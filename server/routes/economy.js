@@ -1,7 +1,7 @@
 import express from 'express';
 import { memoryDb } from '../config/database.js';
 import { economyConfig, TIERS } from '../services/economy.js';
-import { yieldRemainingToday, accrueInterest } from '../services/ledger.js';
+import { accrueInterest } from '../services/ledger.js';
 import { requireAuth } from '../middleware/auth.js';
 import { storageInfo } from '../storage/index.js';
 
@@ -19,7 +19,6 @@ router.get('/balance', requireAuth, (req, res) => {
     success: true,
     data: {
       balance: user.balance,
-      yieldRemainingToday: yieldRemainingToday(user),
       inDebt: user.balance < 0
     }
   });

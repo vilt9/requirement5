@@ -5,6 +5,13 @@ import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
 import { Page, Panel, Row, PillButton, TextInput, Divider, Dim, ErrorText } from '../components/UI';
 import { fmtT26 } from '../utils/economyRandom';
+import TopUpPanel from '../components/TopUpPanel';
+
+// The app root is centered (leftover starter CSS); this page reads better
+// left-aligned like a ledger.
+const LeftPage = styled(Page)`
+  text-align: left;
+`;
 
 const TXN_LABELS = {
   grant: 'Signup grant',
@@ -81,7 +88,7 @@ const Stack = ({ children }) => (
 );
 
 const Account = () => {
-  const { user, config, yieldRemaining, login, signup, logout, refreshBalance } = useAuth();
+  const { user, config, login, signup, logout, refreshBalance } = useAuth();
   const [transactions, setTransactions] = useState([]);
   const location = useLocation();
   const navigate = useNavigate();
@@ -104,7 +111,7 @@ const Account = () => {
 
   if (!user) {
     return (
-      <Page>
+      <LeftPage>
         <Panel>
           Accounts hold your /t26 balance, your collection, and your published cards.
           New accounts receive a grant of {config?.startingGrant ?? 50} /t26 from the cloud.
@@ -113,24 +120,25 @@ const Account = () => {
           <AuthForm title="Log in" submitLabel="Log in" mode="login" onSubmit={login} />
           <AuthForm title="Create account" submitLabel="Sign up" mode="signup" onSubmit={signup} />
         </Row>
-      </Page>
+      </LeftPage>
     );
   }
 
   return (
-    <Page>
+    <LeftPage>
       <Panel>
         Account: {user.username}<br />
-        Balance: <b style={user.balance < 0 ? { color: '#ff8a8a' } : undefined}>{fmtT26(user.balance)} /t26</b><br />
-        Yield remaining today: {yieldRemaining != null ? fmtT26(yieldRemaining) : '—'} /t26 <Dim>(cap {config?.dailyYieldCap} /t26 per day)</Dim><br />
+        Balance: <b style={user.balance < 0 ? { color: '#ff8a8a' } : undefined}>{fmtT26(user.balance, 6)} /t26</b><br />
         Erosion: suppressed on this platform
         {user.balance < 0 && (
           <>
             <Divider />
             <DebtNote>
-              In debt. Interest accrues at {((config?.debtInterestDaily ?? 0.0147) * 100).toFixed(2)}% per day,
-              compounding, until you’re back in the black. Spending stops at the{' '}
-              {fmtT26(config?.debtFloor ?? -1000)} /t26 floor — generate to earn your way out.
+              You have a negative balance. The negative balance limit is{' '}
+              {fmtT26(config?.debtFloor ?? -1000, 0)} /t26.
+              <br /><br />
+              Interest accrues at {((config?.debtInterestDaily ?? 0.0147) * 100).toFixed(2)}% per day,
+              compounding, while your balance is negative.
             </DebtNote>
           </>
         )}
@@ -140,6 +148,8 @@ const Account = () => {
         <Divider />
         <PillButton $secondary onClick={logout}>Log out</PillButton>
       </Panel>
+
+      <TopUpPanel />
 
       <Panel>
         Ledger — most recent first:
@@ -160,7 +170,7 @@ const Account = () => {
           </LedgerLine>
         ))}
       </Panel>
-    </Page>
+    </LeftPage>
   );
 };
 
