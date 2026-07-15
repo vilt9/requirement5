@@ -1,7 +1,8 @@
 import {
   TIERS, ECONOMY, getTier, tierForScore, rollTier, PRICE_BANDS,
-  saveCostFor, drawYieldFor, rollPublishStake, creatorDividendFor,
-  saveValueFor, dividendFor, round6, economyConfig
+  saveCostFor, drawYieldFor, rollPublishStake,
+  savePriceFor, linkedSurchargeFor, dividendFor, round6, economyConfig,
+  LINKED_SURCHARGE_BAND
 } from '../services/economy.js';
 
 describe('economy tiers', () => {
@@ -93,15 +94,27 @@ describe('economy amounts (per-card pricing)', () => {
     }
   });
 
-  test('dividend is the dividend rate of the card price, scaled by provenance', () => {
+  test('linked saves cost a per-card surcharge; the dividend is 70% of the price paid', () => {
     const id = 'some-card-id-123';
-    const cost = saveCostFor(id);
     const round2 = (n) => Math.round(n * 100) / 100;
-    expect(creatorDividendFor(id)).toBe(round2(cost * ECONOMY.DIVIDEND_RATE));
-    // provenance weight applies to the (already-rounded) dividend
-    expect(dividendFor(id, 'direct')).toBe(round2(creatorDividendFor(id) * 0.5));
-    expect(saveValueFor(id, 'discovered')).toBe(cost);
-    expect(saveValueFor(id, 'direct')).toBe(round2(cost * 0.5));
+    const base = saveCostFor(id);
+
+    // Discovered save = base price; dividend is 70% of it.
+    expect(savePriceFor(id, 'discovered')).toBe(base);
+    expect(dividendFor(id, 'discovered')).toBe(round2(base * ECONOMY.DIVIDEND_RATE));
+
+    // Linked save = base × a fixed per-card surcharge in the band; costs more.
+    const mult = linkedSurchargeFor(id);
+    expect(mult).toBeGreaterThanOrEqual(LINKED_SURCHARGE_BAND[0]);
+    expect(mult).toBeLessThanOrEqual(LINKED_SURCHARGE_BAND[1]);
+    const linked = savePriceFor(id, 'linked');
+    expect(linked).toBe(round2(base * mult));
+    expect(linked).toBeGreaterThan(base);
+    // 'direct' is a legacy alias for 'linked'
+    expect(savePriceFor(id, 'direct')).toBe(linked);
+    // Dividend follows the higher price — the designer earns more on a linked save.
+    expect(dividendFor(id, 'linked')).toBe(round2(linked * ECONOMY.DIVIDEND_RATE));
+    expect(dividendFor(id, 'linked')).toBeGreaterThan(dividendFor(id, 'discovered'));
   });
 
   test('round6 keeps six decimals', () => {

@@ -7,7 +7,8 @@ import { useAuth } from '../context/AuthContext';
 import { api, ApiError, apiBase } from '../utils/api';
 import { poolCardToCardData, asOdds } from '../utils/poolCard';
 import { generateCardAttributes } from '../utils/cardGenerator';
-import { saveCostFor, fmtT26 } from '../utils/economyRandom';
+import { saveCostFor, savePriceFor, linkedSurchargeFor, fmtT26 } from '../utils/economyRandom';
+import InfoTip from '../components/InfoTip';
 import { scrubTo } from '../utils/cardMotion';
 import { prefetchedCards } from '../utils/drawQueue';
 import { HOLO_NAMES } from '../utils/holoNames';
@@ -233,7 +234,7 @@ const ShareCard = () => {
       } else {
         const result = await api(`/api/cards/${id}/save`, {
           method: 'POST',
-          body: { provenance: isDiscovered ? 'discovered' : 'direct' }
+          body: { provenance: isDiscovered ? 'discovered' : 'linked' }
         });
         setBalance(result.balance);
         setSaveResult(result);
@@ -344,12 +345,25 @@ const ShareCard = () => {
     : (Number.isFinite(Number(cc.rarity)) ? Math.max(0, Math.min(1, Number(cc.rarity))) : 0.35);
   const tier = tierOf(rarity);
   // Price tracks that rarity as a wide distribution, seeded from the id. The
-  // server computes the identical number.
+  // server computes the identical number. `cardPrice` is the base (discovered)
+  // price; a save reached via a shared link pays the surcharged `myPrice`.
   const cardPrice = saveCostFor(id, rarity);
+  const myProvenance = discovered ? 'discovered' : 'linked';
+  const linkedMult = linkedSurchargeFor(id);
+  const myPrice = savePriceFor(id, myProvenance, rarity);
 
   const saved = saveResult && saveResult !== 'exists';
   const mainLabel = saveResult === 'exists' ? 'In collection ✓' : saved ? 'Saved ✓' : 'Save';
-  const subLabel = saveResult ? null : `−${fmtT26(cardPrice)} /t26`;
+  const subLabel = saveResult ? null : `−${fmtT26(myPrice)} /t26`;
+
+  // Shared explanation for the discovered-vs-linked (i) tooltips.
+  const saveTypeHelp = (
+    <>
+      <b>Discovered save</b> — you found this card by generating; you pay the base
+      price. <b>Linked save</b> — you opened it from a shared link, so it costs a
+      surcharge (this card: ×{linkedMult}). The designer earns 70% either way.
+    </>
+  );
   const totalPublished = rarities ? rarities.length : null;
   const tierPeers = rarities && tier ? rarities.filter(r => tierOf(r)?.key === tier.key).length : null;
   const drawWeight = tier && tierPeers > 0 ? tier.probability / tierPeers : null;
@@ -383,9 +397,25 @@ const ShareCard = () => {
             {ownerSave && (
               <div className="sub">
                 <Dim>
-                  in <span className="owner">{ownerSave.username}</span>’s collection
-                  {ownerSave.cost != null && <> — saved for {fmtT26(ownerSave.cost)} /t26</>}
-                  {ownerSave.saved_at && <> on {new Date(ownerSave.saved_at).toISOString().slice(0, 10)}</>}
+                  Saved by <span className="owner">{ownerSave.username}</span>
+                  {ownerSave.cost != null && <> — {fmtT26(ownerSave.cost)} /t26</>}
+                  {' '}<SaveTag $linked={ownerSave.provenance === 'linked' || ownerSave.provenance === 'direct'}>
+                    {(ownerSave.provenance === 'linked' || ownerSave.provenance === 'direct') ? 'linked save' : 'discovered save'}
+                  </SaveTag>
+                  <InfoTip label="Discovered vs linked save">{saveTypeHelp}</InfoTip>
+                  {ownerSave.saved_at && <> · {new Date(ownerSave.saved_at).toISOString().slice(0, 10)}</>}
+                </Dim>
+              </div>
+            )}
+            {!saveResult && !provisional && (
+              <div className="sub">
+                <Dim>
+                  Saving this is a{' '}
+                  <SaveTag $linked={myProvenance === 'linked'}>
+                    {myProvenance === 'linked' ? 'linked save' : 'discovered save'}
+                  </SaveTag>
+                  {' '}— −{fmtT26(myPrice)} /t26
+                  <InfoTip label="Discovered vs linked save">{saveTypeHelp}</InfoTip>
                 </Dim>
               </div>
             )}
@@ -585,6 +615,14 @@ const Meta = styled.div`
   .sub { margin-top: 2px; font-size: 13px; }
   .sub .owner { color: var(--gold-bright); }
   .tags { margin-top: 6px; }
+`;
+
+// A small inline chip marking a save as discovered (base price) or linked
+// (surcharge). Sits next to an InfoTip that explains the difference.
+const SaveTag = styled.span`
+  font-weight: 600;
+  color: ${p => (p.$linked ? 'var(--gold-bright)' : 'var(--amber-text)')};
+  margin-right: 3px;
 `;
 
 const Actions = styled.div`

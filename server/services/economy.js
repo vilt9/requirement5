@@ -30,7 +30,7 @@ export const TIERS = [...RARE_TIERS, COMMON];
 
 export const ECONOMY = {
   STARTING_GRANT: 50,
-  DIVIDEND_RATE: 0.2,
+  DIVIDEND_RATE: 0.7,
   // Overdraft: you can spend into the red down to this floor; at it, spending
   // stops. A negative balance accrues interest, compounded daily.
   DEBT_FLOOR: -1000,
@@ -189,21 +189,35 @@ export const creatorDividendFor = (cardId, rarity = 0.35) =>
   round2(saveCostFor(cardId, rarity) * ECONOMY.DIVIDEND_RATE);
 
 // Save provenance — how the saver reached the card. A "discovered" save (you
-// pressed Generate and the card surfaced) is worth more than a "direct" save
-// (you opened a shared link). The weight scales the save's value and the creator
-// dividend, so link-hopping to save is deliberately worth less than discovery.
+// pressed Generate and the card surfaced) pays the base price. A "linked" save
+// (you opened someone's shared collection link) pays a surcharge on top — a
+// highish, per-card multiplier — so grabbing a card off a share link costs more
+// than finding it yourself. 'direct' is accepted as a legacy alias for 'linked'.
 // Default is 'discovered' so the existing generate→save flow is unchanged.
-export const DISCOVERY_WEIGHTS = { discovered: 1, direct: 0.5 };
+export const LINKED_SURCHARGE_BAND = [1.5, 3];
 
-export const normalizeProvenance = (p) => (p === 'direct' ? 'direct' : 'discovered');
+export const normalizeProvenance = (p) => (p === 'linked' || p === 'direct' ? 'linked' : 'discovered');
 
-// A save's "worth": the card's own price scaled by provenance.
-export const saveValueFor = (cardId, provenance = 'discovered', rarity = 0.35) =>
-  round2(saveCostFor(cardId, rarity) * DISCOVERY_WEIGHTS[normalizeProvenance(provenance)]);
+// The card's linked-save multiplier: a fixed, id-seeded value in the surcharge
+// band, so a given card's linked price is as stable as its base price.
+export const linkedSurchargeFor = (cardId) => {
+  const [min, max] = LINKED_SURCHARGE_BAND;
+  return round2(min + rand01(`${cardId}:linked`) * (max - min));
+};
 
-// The creator dividend for a save, scaled by provenance.
+// What a saver actually pays: the base price, times the linked surcharge when
+// the save is linked.
+export const savePriceFor = (cardId, provenance = 'discovered', rarity = 0.35) => {
+  const base = saveCostFor(cardId, rarity);
+  return normalizeProvenance(provenance) === 'linked'
+    ? round2(base * linkedSurchargeFor(cardId))
+    : base;
+};
+
+// The creator dividend for a save: 70% of the price actually paid (so a
+// surcharged linked save earns the designer more).
 export const dividendFor = (cardId, provenance = 'discovered', rarity = 0.35) =>
-  round2(creatorDividendFor(cardId, rarity) * DISCOVERY_WEIGHTS[normalizeProvenance(provenance)]);
+  round2(savePriceFor(cardId, provenance, rarity) * ECONOMY.DIVIDEND_RATE);
 
 // Everything the frontend needs to render odds, costs and bands. Tiers carry
 // rarity/odds only — prices are per-card (see PRICE_BANDS).

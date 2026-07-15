@@ -15,6 +15,7 @@ import PublishStage from '../components/CardCustomizer/PublishStage';
 import CodingAgentGuide from '../components/CardCustomizer/CodingAgentGuide';
 import { generateBaseBackground, generateCardAttributes } from '../utils/cardGenerator';
 import { applyPreset } from '../utils/presets';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth, tierForScore } from '../context/AuthContext';
 import { api } from '../utils/api';
 import { regenCostFor, createCostFor } from '../utils/economyRandom';
@@ -82,6 +83,9 @@ const CardCustomizer = () => {
     imageLibrary, addToLibrary, removeFromLibrary
   } = useCards();
   const { config, user, loading, setBalance, flashSpend } = useAuth();
+  // /create?draft=<id> resumes an existing private draft in the design stage.
+  const [searchParams] = useSearchParams();
+  const editDraftId = searchParams.get('draft');
   const [customCard, setCustomCard] = useState(null);
   const [mode, setMode] = useState('manual');
   const [stage, setStage] = useState('start');
@@ -152,10 +156,38 @@ const CardCustomizer = () => {
     return () => observer.disconnect();
   }, []);
 
+  // Resume an existing private draft (/create?draft=<id>): load its design into
+  // the customizer at the design stage. The draft already has its locked rarity
+  // and was paid for at confirm-start, so we skip the roll/Start stage.
+  useEffect(() => {
+    if (!editDraftId || loading) return;
+    let cancelled = false;
+    (async () => {
+      if (!user) { if (!cancelled) setDraftChecked(true); return; }
+      try {
+        const card = await api(`/api/cards/${editDraftId}`);
+        if (cancelled) return;
+        const cc = card?.state_data?.customCard;
+        if (card && card.creator_id === user.id && !card.is_public && cc) {
+          setCustomCard({ ...cc, rarity: card.rarity_score });
+          setDraftId(card.id);
+          setRoll({ rarityScore: card.rarity_score, rerolls: 0, committed: true, tier: tierForScore(config, card.rarity_score) });
+          setPaidCreate(true);
+          setStage('design');
+        } else {
+          flash('That draft could not be opened for editing.');
+        }
+      } catch { /* fall through to a normal fresh start */ }
+      if (!cancelled) setDraftChecked(true);
+    })();
+    return () => { cancelled = true; };
+  }, [editDraftId, user, loading, config]);
+
   // Restore a saved draft before anything else can seed the design — resuming
   // at the exact stage you left (a fresh roll navigated away from comes back to
-  // Start, not mid-design).
+  // Start, not mid-design). Skipped when resuming a specific draft by id.
   useEffect(() => {
+    if (editDraftId) return;
     let cancelled = false;
     localforage.getItem('r5cCreateDraft')
       .then((draft) => {
@@ -182,9 +214,23 @@ const CardCustomizer = () => {
     return () => clearTimeout(timer);
   }, [customCard, stage, rolls, anonRolls, paidCreate, draftChecked]);
 
+  // Persist the design to the SERVER draft too (debounced), so it can be resumed
+  // from the collection on any device — not just this browser. Only while a
+  // private draft is open (pre-publish); handlePublished clears draftId.
+  useEffect(() => {
+    if (!user || !draftId || !customCard) return;
+    const timer = setTimeout(() => {
+      api(`/api/cards/${draftId}`, {
+        method: 'PUT',
+        body: { stateData: { customCard, timestamp: new Date().toISOString(), version: '1.0' }, tags: customCard?.tags || [] }
+      }).catch(() => {});
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [user, draftId, customCard]);
+
   // No draft claimed the slot → start a fresh roll at the Start stage.
   useEffect(() => {
-    if (!draftChecked || customCard) return;
+    if (editDraftId || !draftChecked || customCard) return;
     setCustomCard(rollBaseCard());
     setStage('start');
     setRolls(0);
@@ -215,10 +261,10 @@ const CardCustomizer = () => {
   // Logged in with no active roll loaded → pull one from the server (the source
   // of truth for rarity). Logged out clears it (client-side rolls apply).
   useEffect(() => {
-    if (loading || !draftChecked || !customCard) return;
+    if (editDraftId || loading || !draftChecked || !customCard) return;
     if (!user) { setRoll(null); setPrices(null); setDraftId(null); return; }
     if (!roll) fetchRoll();
-  }, [user, loading, draftChecked, customCard, roll, fetchRoll]);
+  }, [editDraftId, user, loading, draftChecked, customCard, roll, fetchRoll]);
 
   // The upload previews ARE the card's images — derived, never separately
   // stored. A fresh card starts with empty slots; a set loaded with images
@@ -328,7 +374,12 @@ const CardCustomizer = () => {
       // stepping back and forth never double-charges.
       if (!roll?.committed) {
         try {
-          const data = await api('/api/cards/create/confirm-start', { method: 'POST' });
+          // Seed the draft with the current design so it can be resumed from the
+          // collection (the server draft holds the state, not just the browser).
+          const data = await api('/api/cards/create/confirm-start', {
+            method: 'POST',
+            body: { stateData: { customCard, timestamp: new Date().toISOString(), version: '1.0' }, tags: customCard?.tags || [] }
+          });
           setDraftId(data.draft.id);
           setRoll(prev => (prev ? { ...prev, committed: true } : prev));
           setBalance(data.balance);
@@ -541,6 +592,8 @@ const CardCustomizer = () => {
               <StartStage
                 rarity={user ? roll?.rarityScore : customCard?.rarity}
                 tierName={user ? roll?.tier?.name : tierForScore(config, customCard?.rarity)?.name}
+                tierColor={tierForScore(config, user ? roll?.rarityScore : customCard?.rarity)?.color}
+                dividendRate={config?.pricing?.dividendRate ?? 0.7}
                 rolls={user ? (roll?.rerolls ?? 0) : rolls}
                 regenCost={user ? (prices?.reroll ?? 0) : regenCostFor(rolls, customCard?.id)}
                 createCost={user ? (prices?.create ?? 0) : createCostFor(rolls, customCard?.id)}

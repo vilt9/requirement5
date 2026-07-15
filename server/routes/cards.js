@@ -2,7 +2,7 @@ import express from 'express';
 import Card from '../models/Card.js';
 import { memoryDb } from '../config/database.js';
 import crypto from 'node:crypto';
-import { getTier, saveCostFor, saveValueFor, dividendFor, createCostFor, regenCostFor, rollRarity, normalizeProvenance, round2, round6, tierForScore, ECONOMY } from '../services/economy.js';
+import { getTier, saveCostFor, savePriceFor, dividendFor, createCostFor, regenCostFor, rollRarity, normalizeProvenance, round2, round6, tierForScore, ECONOMY } from '../services/economy.js';
 import { absorb, issue, accrueInterest, InsufficientFundsError } from '../services/ledger.js';
 import { cardStats } from '../services/drawEngine.js';
 import { requireAuth, optionalAuth } from '../middleware/auth.js';
@@ -229,17 +229,18 @@ router.post('/:id/save', requireAuth, async (req, res) => {
       return res.status(409).json({ success: false, error: 'Already in your collection' });
     }
 
-    // How the saver reached this card. 'discovered' (pressed Generate) is worth
-    // more than 'direct' (opened a shared link). Defaults to 'discovered' so the
-    // existing generate→save flow is unchanged. Price tracks the card's stored
-    // rarity (as a wide distribution), seeded from its id.
+    // How the saver reached this card. 'discovered' (pressed Generate) pays the
+    // base price; 'linked' (opened someone's shared collection link) pays the
+    // base plus a per-card surcharge. Defaults to 'discovered' so the existing
+    // generate→save flow is unchanged. Price tracks the card's stored rarity
+    // (as a wide distribution), seeded from its id.
     const provenance = normalizeProvenance(req.body?.provenance);
-    const cost = saveCostFor(card.id, card.rarity_score);
+    const cost = savePriceFor(card.id, provenance, card.rarity_score);
     // No creator account (cloud-claimed draws) → no dividend; the cloud
     // absorbs the whole cost.
     const hasCreator = !!memoryDb.getUserById(card.creator_id);
     const dividend = hasCreator ? dividendFor(card.id, provenance, card.rarity_score) : 0;
-    const value = saveValueFor(card.id, provenance, card.rarity_score);
+    const value = cost; // the price paid is the save's worth
 
     absorb(req.user.id, 'save', cost, { card_id: card.id });
     // Dividend leaves the absorbed pot and goes to the creator.

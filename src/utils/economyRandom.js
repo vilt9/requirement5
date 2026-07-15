@@ -86,6 +86,21 @@ export const regenCostFor = (rolls, seed) =>
 export const createCostFor = (rolls, seed) =>
   Math.round((2 + 0.2 * (Number(rolls) || 0) + rand01(`${seed}:create`)) * 100) / 100;
 
+// Linked-save surcharge — EXACT mirror of server/services/economy.js. A save
+// reached via a shared link costs the base price times this per-card multiplier
+// (a fixed, id-seeded value in a highish band). Discovered saves pay the base.
+export const LINKED_SURCHARGE_BAND = [1.5, 3];
+export const linkedSurchargeFor = (cardId) => {
+  const [min, max] = LINKED_SURCHARGE_BAND;
+  return Math.round((min + rand01(`${cardId}:linked`) * (max - min)) * 100) / 100;
+};
+export const savePriceFor = (cardId, provenance = 'discovered', rarity = 0.35) => {
+  const base = saveCostFor(cardId, rarity);
+  return (provenance === 'linked' || provenance === 'direct')
+    ? Math.round(base * linkedSurchargeFor(cardId) * 100) / 100
+    : base;
+};
+
 // Display: whole-ish amounts read with 2 decimals (3 for running totals, via
 // dp); sub-1 amounts keep their full 6-decimal precision (that's the texture
 // of the currency).

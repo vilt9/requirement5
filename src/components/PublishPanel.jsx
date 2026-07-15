@@ -75,7 +75,7 @@ const PublishPanel = ({ customCard, draftId, onPublished }) => {
             {tier && <> — {tier.name}{tier.odds ? `, appears at 1 : ${tier.odds.toLocaleString()}` : ''}</>}.
             Every card rolls its own save price
             ({config?.pricing?.saveCost ? `${config.pricing.saveCost.min}–${config.pricing.saveCost.max}` : '1.5–48'} /t26);
-            you earn {Math.round((config?.pricing?.dividendRate ?? 0.2) * 100)}% of it per save.</Dim>
+            you earn {Math.round((config?.pricing?.dividendRate ?? 0.7) * 100)}% of it per save.</Dim>
           </div>
         )}
         {customCard?.tags?.length > 0 && (

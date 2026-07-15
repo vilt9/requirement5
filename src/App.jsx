@@ -5,8 +5,7 @@ import { AuthProvider } from './context/AuthContext';
 import Navigation from './components/Navigation/Navigation';
 import GenerateGate from './pages/GenerateGate';
 import Pool from './pages/Pool';
-import Collection from './pages/Collection';
-import UserCollection from './pages/UserCollection';
+import CollectionPage, { LegacyUserCollectionRedirect } from './pages/CollectionPage';
 import CardCustomizer from './pages/CardCustomizer';
 import Account from './pages/Account';
 import ClaimAccount from './pages/ClaimAccount';
@@ -158,9 +157,12 @@ function App() {
               <Routes>
                 <Route path="/" element={<GenerateGate />} />
                 <Route path="/pool" element={<Pool />} />
-                <Route path="/collection" element={<Collection />} />
-                {/* Someone else's collection, read-only (from Discover) */}
-                <Route path="/u/:username" element={<UserCollection />} />
+                {/* Collection lives at /<username>/collection (shareable).
+                    /collection sends you to your own; /u/:username is the old
+                    path, redirected. */}
+                <Route path="/collection" element={<CollectionPage />} />
+                <Route path="/:username/collection" element={<CollectionPage />} />
+                <Route path="/u/:username" element={<LegacyUserCollectionRedirect />} />
                 {/* The create flow (roll → design → publish). /customize is the
                     old path, kept as a redirect. */}
                 <Route path="/create" element={<CardCustomizer />} />
