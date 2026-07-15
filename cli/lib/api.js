@@ -41,7 +41,10 @@ export async function request(method, route, { body, auth = false } = {}) {
   }
 
   if (!res.ok || payload.success === false) {
-    const hint = res.status === 401 ? ' (token missing/expired — run `r5c login`)'
+    // The token hint only makes sense when a token was actually sent — i.e. an
+    // authenticated request. A 401 from login/signup means bad credentials, not
+    // a stale token, so don't tell the user to re-run `r5c login`.
+    const hint = (res.status === 401 && auth) ? ' (token missing/expired — run `r5c login`)'
       : res.status === 402 ? ' (not enough /t26 — check `r5c balance`)'
       : '';
     throw new ApiError(`${payload.error || `HTTP ${res.status}`}${hint}`, { status: res.status, body: payload });

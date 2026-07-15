@@ -11,6 +11,12 @@ export const DEFAULT_API_URL = 'https://requirement5.com';
 const CONFIG_DIR = process.env.R5C_CONFIG_DIR || path.join(os.homedir(), '.r5c');
 const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
 
+// The resolved config file path (honors R5C_CONFIG_DIR) — so messages can name
+// the real location instead of hardcoding ~/.r5c/config.json.
+export function configPath() {
+  return CONFIG_PATH;
+}
+
 export function loadConfig() {
   try {
     return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));

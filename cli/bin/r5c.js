@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import * as api from '../lib/api.js';
-import { apiUrl, token, loadConfig, setSession, clearSession, setApiUrl, DEFAULT_API_URL } from '../lib/config.js';
+import { apiUrl, token, loadConfig, setSession, clearSession, setApiUrl, configPath, DEFAULT_API_URL } from '../lib/config.js';
 import { buildPublishPayload, TEMPLATES, SpecError } from '../lib/spec.js';
 import { HELP, COMMAND_HELP } from '../lib/help.js';
 
@@ -32,6 +32,15 @@ function parseArgv(argv) {
 }
 
 const out = (value) => console.log(typeof value === 'string' ? value : JSON.stringify(value, null, 2));
+
+// The installed package version, read from package.json next to this bin.
+function pkgVersion() {
+  try {
+    return JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
+  } catch {
+    return 'unknown';
+  }
+}
 
 function fail(message) {
   console.error(`r5c: ${message}`);
@@ -119,7 +128,7 @@ async function cmdLogin({ flags }) {
 
 async function cmdLogout() {
   clearSession();
-  out('Logged out (token removed from ~/.r5c/config.json).');
+  out(`Logged out (token removed from ${configPath()}).`);
 }
 
 async function cmdWhoami({ flags }) {
@@ -314,7 +323,11 @@ async function cmdDelete({ positional }) {
 
 async function cmdRender({ positional, flags }) {
   const id = positional[0] || fail('render needs a card id');
-  const format = flags.format === 'mp4' ? 'mp4' : 'gif';
+  let format = 'gif';
+  if (flags.format !== undefined) {
+    if (flags.format === 'gif' || flags.format === 'mp4') format = flags.format;
+    else process.stderr.write(`r5c: ignoring --format "${flags.format}" (use gif or mp4); rendering gif\n`);
+  }
   out(`Rendering ${id} as ${format} (first render takes ~30s)...`);
   const { data } = await api.get(`/api/cards/${id}/render?format=${format}`);
   out(data.url);
@@ -323,7 +336,16 @@ async function cmdRender({ positional, flags }) {
 
 async function cmdPreview({ positional, flags }) {
   const id = positional[0] || fail('preview needs a card id');
-  const count = Math.max(1, Math.min(8, parseInt(flags.frames, 10) || 4));
+  let count = 4;
+  if (flags.frames !== undefined) {
+    const n = parseInt(flags.frames, 10);
+    if (Number.isNaN(n)) {
+      process.stderr.write(`r5c: ignoring --frames "${flags.frames}" (not a number); using ${count}\n`);
+    } else {
+      count = Math.max(1, Math.min(8, n));
+      if (n !== count) process.stderr.write(`r5c: --frames ${n} out of range 1-8; using ${count}\n`);
+    }
+  }
   if (!flags.json) out(`Capturing ${count} still frame(s) of ${id} (rest pose + orbit poses)...`);
   const { data } = await api.get(`/api/cards/${id}/render?format=frames&count=${count}`);
   // Local storage hands back relative /uploads/... paths; resolve against the API.
@@ -384,7 +406,12 @@ async function main() {
   const [command, ...rest] = process.argv.slice(2);
   const parsed = parseArgv(rest);
 
-  if (!command || command === 'help' || parsed.flags.help) {
+  if (command === 'version' || command === '--version' || command === '-v' || parsed.flags.version) {
+    out(`r5c ${pkgVersion()}`);
+    return;
+  }
+
+  if (!command || command === 'help' || command === '--help' || command === '-h' || parsed.flags.help) {
     const topic = command === 'help' ? parsed.positional[0] : command;
     out(COMMAND_HELP[topic] || HELP);
     return;

@@ -1,8 +1,11 @@
 {
   "name": "@requirement5cards/r5c",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Command-line client for Requirement5cards (R5c) — create, publish, and render trading cards from the terminal.",
   "type": "module",
+  "scripts": {
+    "test": "node --test \"test/*.test.js\""
+  },
   "license": "LicenseRef-FSL-1.1-ALv2",
   "homepage": "https://requirement5.com",
   "repository": {

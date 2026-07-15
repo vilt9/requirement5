@@ -4,6 +4,9 @@ export default {
     '^.+\\.js$': 'babel-jest'
   },
   testMatch: ['**/__tests__/**/*.js', '**/*.test.js'],
+  // The CLI package ships its own zero-dependency test runner (node --test);
+  // its test files use the node:test API and must not be run by jest.
+  testPathIgnorePatterns: ['/node_modules/', '/cli/'],
   collectCoverageFrom: [
     'server/**/*.js',
     'src/**/*.js',
