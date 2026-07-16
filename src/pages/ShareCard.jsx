@@ -5,7 +5,7 @@ import { LuCircleArrowRight } from 'react-icons/lu';
 import Card from '../components/Card/Card';
 import { useAuth } from '../context/AuthContext';
 import { api, ApiError, apiBase } from '../utils/api';
-import { poolCardToCardData, asOdds } from '../utils/poolCard';
+import { poolCardToCardData } from '../utils/poolCard';
 import { generateCardAttributes } from '../utils/cardGenerator';
 import { saveCostFor, savePriceFor, linkedSurchargeFor, fmtT26 } from '../utils/economyRandom';
 import InfoTip from '../components/InfoTip';
@@ -366,7 +366,6 @@ const ShareCard = () => {
   );
   const totalPublished = rarities ? rarities.length : null;
   const tierPeers = rarities && tier ? rarities.filter(r => tierOf(r)?.key === tier.key).length : null;
-  const drawWeight = tier && tierPeers > 0 ? tier.probability / tierPeers : null;
   const poolShare = tierPeers != null && totalPublished > 0 ? tierPeers / totalPublished : null;
   const topPct = rarities && rarities.length
     ? Math.max(1, Math.round((1 - rarities.filter(r => r < rarity).length / rarities.length) * 100))
@@ -501,7 +500,6 @@ const ShareCard = () => {
             </DetailRow>
           )}
           <Detail label="Class">{klass}</Detail>
-          <Detail label="Draw weight">{drawWeight != null ? `${drawWeight.toExponential(2)} (${asOdds(drawWeight)})` : null}</Detail>
           <Detail label="Pool share">{poolShare != null ? `${(poolShare * 100).toFixed(1)}%` : null}</Detail>
           <Detail label="Price">{`${fmtT26(cardPrice)} /t26`}</Detail>
           <Detail label="Creator dividend">{config?.pricing?.dividendRate != null

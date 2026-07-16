@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
-import { Page, Panel, Row, Divider, Dim, RarityBands, TagList } from '../components/UI';
+import { Page, Panel, Divider, Dim, RarityBands, TagList } from '../components/UI';
 import { ensureTags } from '../utils/tags';
 
 // The pool, with open books: tier composition, the cloud's accounts,
@@ -36,25 +36,15 @@ const Pool = () => {
   return (
     <Page>
       <Panel>
-        The pool is the shared deck every generate draws from. Publishing adds a card to it
-        (stake: {config?.pricing?.publishStake
-          ? `${config.pricing.publishStake.min}–${config.pricing.publishStake.max}`
-          : '1–4'} /t26); every save of your card pays you a dividend.
-        All books are open.
+        The pool is the shared deck every generate draws from. Publishing adds a card to it;
+        every save of your card pays you a dividend. All books are open.
       </Panel>
 
-      <Row>
-        <Panel>
-          Draw odds per tier:
-          <Divider />
-          <RarityBands config={config} />
-        </Panel>
-        <Panel>
-          Pool composition — published cards per tier:
-          <Divider />
-          <RarityBands config={config} counts={cloud?.tierCounts} />
-        </Panel>
-      </Row>
+      <Panel>
+        Pool composition — published cards per tier:
+        <Divider />
+        <RarityBands config={config} counts={cloud?.tierCounts} />
+      </Panel>
 
       <Panel>
         The cloud's books:

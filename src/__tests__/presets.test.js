@@ -72,7 +72,7 @@ describe('makePreset', () => {
 
   test('falls back to a default name and empty tags', () => {
     const preset = makePreset('', { rarity: 0.1 });
-    expect(preset.name).toBe('Untitled set');
+    expect(preset.name).toBe('Untitled template');
     expect(preset.tags).toEqual([]);
   });
 });

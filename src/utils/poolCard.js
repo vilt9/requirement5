@@ -30,9 +30,3 @@ export const poolCardToCardData = (record) => {
     rarity: typeof customCard.rarity === 'number' ? customCard.rarity : 0.5
   };
 };
-
-// "1 : 238" from a probability
-export const asOdds = (p) => {
-  if (!p || p <= 0) return null;
-  return `1 : ${Math.round(1 / p).toLocaleString()}`;
-};

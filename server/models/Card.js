@@ -8,6 +8,11 @@ export default class Card {
         // the store generates one when absent.
         ...(cardData.id ? { id: cardData.id } : {}),
         name: cardData.name || 'Unnamed Card',
+        // Optional creator blurb about the card, and the set it belongs to
+        // (the namespaced set name — see server/utils/setName.js). Both null
+        // when not given; set_id points at a row in `sets`.
+        info: cardData.info ?? null,
+        set_id: cardData.setId ?? null,
         state_data: cardData.stateData || {},
         creator_id: cardData.creatorId || 'anonymous',
         is_public: cardData.isPublic !== false, // Default to public

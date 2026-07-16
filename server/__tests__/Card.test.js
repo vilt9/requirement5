@@ -37,6 +37,8 @@ describe('Card Model', () => {
       // The store assigns the id; the model passes everything else through.
       const expectedCard = {
         name: 'Test Card',
+        info: null,
+        set_id: null,
         state_data: { test: 'data' },
         creator_id: 'user123',
         is_public: true,
@@ -61,6 +63,8 @@ describe('Card Model', () => {
       const expectedCard = {
         id: 'card_1',
         name: 'Unnamed Card',
+        info: null,
+        set_id: null,
         state_data: { test: 'data' },
         creator_id: 'anonymous',
         is_public: true,

@@ -48,7 +48,7 @@ const buildResult = (userId, card, yieldSeed) => {
   return {
     source: card ? 'pool' : 'synthetic',
     tier: tier
-      ? { key: tier.key, name: tier.name, probability: tier.probability, scoreRange: tier.scoreRange, multiplier: tier.multiplier }
+      ? { key: tier.key, name: tier.name, scoreRange: tier.scoreRange, multiplier: tier.multiplier }
       : null,
     card: card || null,
     stats: card ? cardStats(card) : null,

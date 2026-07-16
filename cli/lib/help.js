@@ -17,13 +17,14 @@ ACCOUNT
   transactions                                 Show your /t26 ledger
 
 CREATE A CARD  (r5c card create ... — mirrors the website's /create flow)
-  card create begin                            Start the creation; shows your Rarity Value + odds (free)
+  card create begin                            Start the creation; shows your Rarity Value (free)
   card create regenerate-rarity                Gamble a fresh Rarity Value — climbing /t26 fee
   card create confirm-start [spec.json]        Pay the create fee, lock the rarity onto a PRIVATE draft
   card create update <id> <spec.json>          Shape the private draft (free, repeatable)
   card create preview <id> [--frames N] [--out <dir>]   Look at the draft: still PNGs (rest + orbit poses)
   card create publish <id> [--open] [--json]   Release the finished draft into the pool (free)
   card create status                           Where am I? Rarity Value, your drafts, balance
+  card create sets                             List your sets (labels, blurbs, card counts)
 
 OTHER CARD COMMANDS
   template [minimal|full]                      Print an example spec to start from
@@ -51,15 +52,29 @@ MORE
   cli/CLI.md            Full documentation
 `;
 
-const SPEC_HELP = `THE CARD SPEC (r5c publish <spec.json>)
+const SPEC_HELP = `THE CARD SPEC (r5c card create confirm-start <spec.json>)
 
-A spec describes a card's LOOK. Its RARITY is not in the spec — it's a server
-gamble (\`r5c card create begin\` / \`regenerate-rarity\`), locked onto the card
-at confirm-start. Nothing here is required; add "image" for a real card. Start
-from \`r5c template\`.
+A spec describes a card's LOOK and its metadata. Its RARITY is not in the spec —
+that's a server gamble (\`r5c card create begin\` / \`regenerate-rarity\`), locked
+onto the card at confirm-start. Only "name" is required; add "image" for a real
+card. Start from \`r5c template\`.
 
 TOP LEVEL
-  name        string    Card title
+  name        string    Card title. REQUIRED — publishing without one fails.
+  info        string    Optional blurb about the card (max 280 chars)
+  setName     string    Optional set to publish this card into. What you type is
+                        the label; the server CANONICALIZES it and stores it
+                        namespaced to you as <username>_<label>. The rule:
+                        lowercased, spaces and underscores become dashes,
+                        punctuation stripped, repeats collapsed. So
+                        "Salt Marsh" -> salt-marsh, and the stored name is
+                        alice_salt-marsh. Your original capitalisation is NOT
+                        kept — the label is what's shown everywhere afterwards.
+                        Because of that, "Deep Sea", "deep sea" and "DEEP_SEA"
+                        are all the SAME set. Reuse a label to add to that set;
+                        \`r5c card create sets\` lists the ones you have.
+  setInfo     string    Optional blurb about the SET (max 280). Omit it and a set
+                        you already have keeps the info it already had.
   tags        string[]  Search/discovery tags
   (tier / rarityScore are ignored if present — rarity comes from your Rarity
    Value gamble. Tier bands, for reference: common 0–.7, holo .7–.8,
@@ -181,6 +196,8 @@ NOTES
   - New accounts start with 50 /t26. You may spend into the red down to -1000
     (debt accrues 1.47%/day). When others save your card you earn a dividend.
   - The published card lives at <api-url>/card/<id>.
+  - A "set" groups your published cards and is namespaced to your username, so it
+    can never collide with another creator's. \`r5c card create sets\` lists yours.
   - Loop: card create begin → (regenerate-rarity to taste) → confirm-start card.json
     → preview <id> --out shots/ → look → update <id> card.json (free; rarity stays)
     → preview again → publish <id>.
@@ -197,13 +214,16 @@ export const COMMAND_HELP = {
   card: `r5c card create <step> — the guided creation flow (mirrors the website)
 
   begin                      Start (or resume) the creation. Prints your Rarity
-                             Value: the number, its tier, the odds a card that
-                             rare appears at, both prices, and your balance. Free.
+                             Value: the number, its tier, both prices, and your
+                             balance. Free.
   regenerate-rarity          Gamble a fresh Rarity Value for a climbing /t26 fee.
   confirm-start [spec.json]  Accept the current Rarity Value: pays the create fee,
                              locks the rarity, and makes a PRIVATE draft card. An
                              optional spec seeds the draft's look.
-  update <id> <spec.json>    Shape the private draft (free, repeatable).
+  update <id> <spec.json>    Shape the private draft (free, repeatable). Honours
+                             every spec field, including name/info/setName/setInfo.
+  sets                       List your sets — labels, blurbs, and counts of the
+                             PUBLISHED cards in each (private drafts don't count).
   preview <id> [--out dir]   Look at the draft: still PNGs (rest + orbit poses).
   publish <id> [--open]      Release the finished draft into the pool (free — the
                              create fee was paid at confirm-start).
@@ -213,9 +233,9 @@ Nobody sees the card until you publish. Rarity is a gamble, never a spec field.
 regenerate-rarity and confirm-start spend /t26 (you may go to -1000 in debt).`,
   update: `r5c card create update <id> <spec.json> [--json]
 
-Rebuilds a card YOU own from the spec file and replaces its LOOK — name, tags,
-images, every visual parameter. Free, and the rarity does NOT change (that was
-the gamble). Used to shape a private draft before publishing:
+Rebuilds a card YOU own from the spec file and replaces its LOOK and metadata —
+name, info, set, tags, images, every visual parameter. Free, and the rarity does
+NOT change (that was the gamble). Used to shape a private draft before publishing:
 
   r5c card create begin                        # see the Rarity Value
   r5c card create confirm-start card.json      # private draft (prints the id)

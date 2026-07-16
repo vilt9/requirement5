@@ -34,7 +34,11 @@ export const MASK_TYPES = ['vignette', 'horizontal-fade', 'vertical-fade', 'diag
 // texture systems, each with its own params block.
 export const HOLO_EFFECTS = ['overlay', 'rareHolo', 'rareHoloGalaxy', 'wowaHolo', 'rareHoloVmax'];
 
-const SPEC_KEYS = ['name', 'tier', 'rarityScore', 'tags', 'image', 'holoImage', 'card'];
+const SPEC_KEYS = ['name', 'info', 'setName', 'setInfo', 'tier', 'rarityScore', 'tags', 'image', 'holoImage', 'card'];
+
+// Free-text blurb caps, mirroring server/utils/setName.js.
+const INFO_MAX = 280;
+const SET_LABEL_MAX = 48;
 
 export class SpecError extends Error {}
 
@@ -246,11 +250,37 @@ function validate(spec, customCard) {
       problems.push(`unknown top-level key "${key}" (allowed: ${SPEC_KEYS.join(', ')})`);
     }
   }
+  // A published card must carry a name — the server rejects a publish without
+  // one, so catch it here where the fix is obvious rather than at release time.
+  if (spec.name === undefined || String(spec.name).trim() === '') {
+    problems.push('"name" is required — a published card must have a name');
+  }
+  if (spec.info !== undefined && typeof spec.info !== 'string') {
+    problems.push('"info" must be a string (an optional blurb about the card)');
+  }
+  if (typeof spec.info === 'string' && spec.info.length > INFO_MAX) {
+    problems.push(`"info" must be ${INFO_MAX} characters or fewer`);
+  }
+  if (spec.setName !== undefined && typeof spec.setName !== 'string') {
+    problems.push('"setName" must be a string (the set to publish this card into)');
+  }
+  if (typeof spec.setName === 'string' && spec.setName.length > SET_LABEL_MAX) {
+    problems.push(`"setName" must be ${SET_LABEL_MAX} characters or fewer`);
+  }
+  if (spec.setInfo !== undefined && typeof spec.setInfo !== 'string') {
+    problems.push('"setInfo" must be a string (a blurb about the set)');
+  }
+  if (typeof spec.setInfo === 'string' && spec.setInfo.length > INFO_MAX) {
+    problems.push(`"setInfo" must be ${INFO_MAX} characters or fewer`);
+  }
+  if (spec.setInfo !== undefined && spec.setName === undefined) {
+    problems.push('"setInfo" needs a "setName" — it describes the set the card joins');
+  }
   // tier / rarityScore are no longer set here — a card's rarity comes from a
-  // server rarity roll (r5c roll / reroll), not the spec. If present they're
-  // accepted but ignored, so old specs don't break.
+  // server-assigned Rarity Value (card create begin / regenerate-rarity), not
+  // the spec. If present they're accepted but ignored, so old specs don't break.
   if (spec.tier !== undefined && !TIERS.includes(spec.tier)) {
-    problems.push(`"tier" (ignored — rarity comes from your roll) must be one of: ${TIERS.join(', ')} if set`);
+    problems.push(`"tier" (ignored — rarity is assigned by the server) must be one of: ${TIERS.join(', ')} if set`);
   }
   if (spec.tags !== undefined && (!Array.isArray(spec.tags) || spec.tags.some((t) => typeof t !== 'string'))) {
     problems.push('"tags" must be an array of strings');
@@ -317,7 +347,14 @@ export function buildPublishPayload(spec, baseDir) {
   validate(spec, customCard);
 
   return {
-    name: spec.name || 'Untitled card',
+    name: spec.name,
+    // Card metadata the server stores alongside the design. setName is the
+    // typed label — the server namespaces it as `<username>_<label>` and owns
+    // the canonical form. Omitted keys are left untouched server-side, so a
+    // spec without setName never detaches a card from a set it already has.
+    ...(spec.info !== undefined ? { info: spec.info } : {}),
+    ...(spec.setName !== undefined ? { setName: spec.setName } : {}),
+    ...(spec.setInfo !== undefined ? { setInfo: spec.setInfo } : {}),
     tags,
     stateData: {
       customCard,
@@ -337,6 +374,9 @@ const MINIMAL_TEMPLATE = {
 
 const FULL_TEMPLATE = {
   name: 'Neon Reliquary',
+  info: 'A shrine to the last working streetlight.',
+  setName: 'neon city',
+  setInfo: 'Cards from the sodium-lit end of town.',
   tags: ['cosmic', 'portrait', 'gold'],
   image: './artwork.png',
   holoImage: './holo-overlay.png',

@@ -63,7 +63,7 @@ const Triangle = ({ cohorts, weeks, cell, rowLabel }) => {
 // matches the backend's ACTIVITY_KINDS keys on each cohort's `kinds` map.
 const ACTIVITIES = [
   { key: 'draw', label: 'Draws', noun: 'draws' },
-  { key: 'reroll', label: 'Rerolls', noun: 'rerolls' },
+  { key: 'reroll', label: 'Regenerations', noun: 'regenerations' },
   { key: 'save', label: 'Saves', noun: 'saves' },
   { key: 'star', label: 'Stars', noun: 'stars' },
   { key: 'create', label: 'Card creates', noun: 'creates' }

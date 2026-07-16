@@ -6,6 +6,7 @@ import { getTier, saveCostFor, savePriceFor, dividendFor, createCostFor, regenCo
 import { absorb, issue, accrueInterest, InsufficientFundsError } from '../services/ledger.js';
 import { cardStats } from '../services/drawEngine.js';
 import { requireAuth, optionalAuth } from '../middleware/auth.js';
+import { setNameFor, setLabelOf, normalizeInfo } from '../utils/setName.js';
 import path from 'path';
 import { offloadImages, storeBuffer, UPLOADS_DIR } from '../storage/index.js';
 import { renderCard, renderStills, MIME } from '../services/capture.js';
@@ -20,15 +21,13 @@ const router = express.Router();
 // makes the card public, and consumes the gamble. Nothing here lets a caller
 // self-declare rarity — the same endpoints serve the web and the CLI.
 
-const oddsFor = (tier) => (tier.key === 'common' ? null : Math.round(1 / tier.probability));
-
 // The full, self-explaining view of a rarity gamble: the number, what it means
-// (tier + odds + where it sits), the two prices, your balance and the debt rules.
+// (tier + where it sits), the two prices, your balance and the debt rules.
 const rarityView = (roll, user) => {
   const tier = tierForScore(roll.rarity_score) || getTier('common');
   return {
     rarityValue: roll.rarity_score,
-    tier: { key: tier.key, name: tier.name, odds: oddsFor(tier), scoreRange: tier.scoreRange, multiplier: tier.multiplier },
+    tier: { key: tier.key, name: tier.name, scoreRange: tier.scoreRange, multiplier: tier.multiplier },
     regenerations: roll.rerolls,
     prices: {
       regenerate: regenCostFor(roll.rerolls, roll.id),
@@ -81,6 +80,42 @@ router.post('/create/regenerate-rarity', requireAuth, (req, res) => {
   }
 });
 
+// The names a draft gets handed when its creator hasn't chosen one yet (see
+// Card.create and confirm-start). They're fine on a draft but never on a
+// published card, so publish treats them as "unnamed" rather than as a name.
+const DRAFT_PLACEHOLDER_NAMES = new Set(['untitled card', 'unnamed card']);
+
+// Resolve the optional set fields of a create/publish body into a set_id,
+// creating the set (or refreshing its info) as a side effect. The set name is
+// namespaced by username server-side — a client never picks the stored name.
+//
+// Returns `undefined` when the body says nothing about sets, so callers can
+// tell "leave the card's set alone" apart from `null`, "detach from any set".
+const resolveSet = (user, body) => {
+  if (body.setName === undefined) return undefined;
+  const setId = setNameFor(user.username, body.setName);
+  if (!setId) return null;
+  memoryDb.upsertSet({
+    id: setId,
+    owner_id: user.id,
+    label: setLabelOf(setId, user.username),
+    // null leaves an existing set's info untouched — that's what makes
+    // publishing into a set you already have keep its blurb.
+    info: normalizeInfo(body.setInfo)
+  });
+  return setId;
+};
+
+// Both spec-carrying entry points (the CLI's confirm-start, the web's publish)
+// accept the same card metadata, so they read it the same way.
+const cardMetaPatch = (user, body) => {
+  const patch = {};
+  if (body.info !== undefined) patch.info = normalizeInfo(body.info);
+  const setId = resolveSet(user, body);
+  if (setId !== undefined) patch.set_id = setId;
+  return patch;
+};
+
 // confirm-start — accept the current Rarity Value: pay the (gentle) create fee
 // and lock the rarity onto a PRIVATE draft card. Idempotent: once paid, calling
 // it again returns the same draft without re-charging (so stepping back and
@@ -93,6 +128,7 @@ router.post('/create/confirm-start', requireAuth, async (req, res) => {
     if (!roll) return res.status(404).json({ success: false, error: 'No creation in progress — run `card create begin` first' });
 
     const { name, stateData, tags } = req.body || {};
+    const meta = cardMetaPatch(req.user, req.body || {});
     const score = roll.rarity_score;
     const tier = tierForScore(score) || getTier('common');
 
@@ -106,7 +142,8 @@ router.post('/create/confirm-start', requireAuth, async (req, res) => {
     if (draft) {
       // Re-confirming an existing draft: keep its design, refresh rarity, and
       // apply the seed spec if one was passed this time.
-      const patch = { tier: tier.key, rarity_score: score };
+      const patch = { tier: tier.key, rarity_score: score, ...meta };
+      if (name !== undefined) patch.name = name;
       if (seed) {
         patch.state_data = seed.value;
         patch.image_keys = [...(draft.image_keys || []), ...seed.stored.map(s => s.key)];
@@ -115,6 +152,8 @@ router.post('/create/confirm-start', requireAuth, async (req, res) => {
     } else {
       const result = await Card.create({
         name: name || 'Untitled card',
+        info: meta.info,
+        setId: meta.set_id,
         stateData: seed ? seed.value : {},
         creatorId: req.user.id,
         isPublic: false, // a private draft until you publish
@@ -135,7 +174,7 @@ router.post('/create/confirm-start', requireAuth, async (req, res) => {
       data: {
         draft: draftView(draft),
         rarityValue: score,
-        tier: { key: tier.key, name: tier.name, odds: oddsFor(tier) },
+        tier: { key: tier.key, name: tier.name },
         createFee,
         regenerations: roll.rerolls,
         balance: memoryDb.getUserById(req.user.id).balance,
@@ -176,6 +215,7 @@ router.get('/create/status', requireAuth, (req, res) => {
 router.post('/create/publish', requireAuth, async (req, res) => {
   try {
     const { id, name, stateData, tags } = req.body || {};
+    const meta = cardMetaPatch(req.user, req.body || {});
     const roll = memoryDb.getActiveRollByUser(req.user.id);
     const draft = id
       ? memoryDb.getCardById(id)
@@ -187,8 +227,18 @@ router.post('/create/publish', requireAuth, async (req, res) => {
     if (draft.creator_id !== req.user.id) return res.status(403).json({ success: false, error: 'Not your draft' });
     if (draft.is_public) return res.status(409).json({ success: false, error: 'Already published' });
 
-    const patch = { is_public: true, updated_at: new Date().toISOString() };
-    if (name !== undefined) patch.name = name;
+    // A published card must carry a real name — it's the one thing a viewer
+    // always sees. A draft may sit on the placeholder name it was opened with;
+    // releasing it into the pool may not, so the placeholders count as unnamed.
+    const finalName = String(name !== undefined ? name : draft.name ?? '').trim();
+    if (!finalName || DRAFT_PLACEHOLDER_NAMES.has(finalName.toLowerCase())) {
+      return res.status(400).json({
+        success: false,
+        error: 'Card name is required to publish — set "name" in your spec and apply it with `card create update <id> <spec.json>`'
+      });
+    }
+
+    const patch = { is_public: true, updated_at: new Date().toISOString(), ...meta, name: finalName };
     if (tags !== undefined) patch.tags = tags;
     if (stateData && typeof stateData === 'object') {
       const { value, stored } = await offloadImages(stateData, req.user.username);
@@ -445,6 +495,18 @@ router.get('/collections/discover', optionalAuth, (req, res) => {
   res.json({ success: true, data: { collections, remaining: Math.max(0, pool.length - collections.length) } });
 });
 
+// The signed-in user's own sets, for the publish panel's picker. `label` is what
+// they typed; `name` is the stored, namespaced id to send back as `setName`.
+router.get('/sets/mine', requireAuth, (req, res) => {
+  const sets = memoryDb.getSetsByOwner(req.user.id).map(set => ({
+    name: set.id,
+    label: set.label,
+    info: set.info,
+    cardCount: memoryDb.countCardsInSet(set.id)
+  }));
+  res.json({ success: true, data: { sets } });
+});
+
 // Collections the signed-in user has starred, newest first.
 router.get('/collections/starred/mine', requireAuth, (req, res) => {
   const collections = memoryDb.getStarsByUser(req.user.id)
@@ -690,7 +752,11 @@ router.put('/:id', requireAuth, async (req, res) => {
     }
 
     const { name, stateData, tier: tierKey, rarityScore, tags, ...rest } = req.body || {};
-    const updateData = { ...rest };
+    // The metadata keys are request-shaped, not card-shaped: letting them ride
+    // the `rest` passthrough would write a junk `setName` onto the card while
+    // leaving set_id untouched. Strip them, then apply the resolved form.
+    for (const field of ['info', 'setName', 'setInfo']) delete rest[field];
+    const updateData = { ...rest, ...cardMetaPatch(req.user, req.body || {}) };
     for (const field of PROTECTED_CARD_FIELDS) delete updateData[field];
 
     if (name !== undefined) updateData.name = name;

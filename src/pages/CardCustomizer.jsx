@@ -254,7 +254,7 @@ const CardCustomizer = () => {
       setDraftId(null);
       setStage('start');
       setSelectedPresetId('');
-      flash('Logged in — fresh roll. Rerolls made while logged out don’t carry over.');
+      flash('Logged in — fresh Rarity Value. Regenerations made while logged out don’t carry over.');
     }
   }, [user, anonRolls, loading, draftChecked]);
 
@@ -267,7 +267,7 @@ const CardCustomizer = () => {
   }, [editDraftId, user, loading, draftChecked, customCard, roll, fetchRoll]);
 
   // The upload previews ARE the card's images — derived, never separately
-  // stored. A fresh card starts with empty slots; a set loaded with images
+  // stored. A fresh card starts with empty slots; a template loaded with images
   // fills them; the library is where past uploads live.
   const mainImagePreview = customCard?.customImageUrl || null;
   const holoImagePreview = customCard?.customHoloImageUrl || null;
@@ -410,7 +410,7 @@ const CardCustomizer = () => {
   const handleResetToStart = () => {
     setStage('start');
     setActiveTab('image');
-    flash('Back to the roll — your card is kept.');
+    flash('Back to Start — your card is kept.');
   };
 
   // Roll a fresh coherent base background (palette + fade + texture) in one click.
@@ -425,8 +425,8 @@ const CardCustomizer = () => {
     setCustomCard({ ...customCard, tags });
   };
 
-  // --- Preset sets ---
-  // Apply a saved set's design + default tags onto the current card (keeps the image).
+  // --- Base templates (device-local design presets) ---
+  // Apply a saved template's design + default tags onto the current card (keeps the image).
   const handleLoadPreset = (presetId) => {
     setSelectedPresetId(presetId);
     if (!presetId || !customCard) return;
@@ -438,15 +438,15 @@ const CardCustomizer = () => {
     flash(`Loaded set "${preset.name}"${preset.images ? ' (with images)' : ''}.`);
   };
 
-  // Save the current design + tags as a named set (optionally with the images).
+  // Save the current design + tags as a named template (optionally with the images).
   const handleSavePreset = async () => {
     if (!customCard) return;
-    const name = presetName.trim() || `Set ${(presets?.length || 0) + 1}`;
+    const name = presetName.trim() || `Template ${(presets?.length || 0) + 1}`;
     const preset = await savePreset(name, customCard, { includeImages });
     if (preset) {
       setSelectedPresetId(preset.id);
       setPresetName('');
-      flash(`Saved set "${preset.name}"${includeImages ? ' with images' : ''}.`);
+      flash(`Saved template "${preset.name}"${includeImages ? ' with images' : ''}.`);
     }
   };
 
@@ -608,15 +608,15 @@ const CardCustomizer = () => {
 
           {stage === 'design' && (
             <>
-              {/* Load a saved base set — tucked into an expandable so it sits
-                  quietly above the design tabs without crowding them. Loading a
-                  set swaps the design but never the rolled rarity. */}
+              {/* Load a saved base template — tucked into an expandable so it
+                  sits quietly above the design tabs without crowding them.
+                  Loading one swaps the design but never the Rarity Value. */}
               <LoadSet className="load-set">
-                <summary>Load a base set</summary>
+                <summary>Load a base template</summary>
                 <div className="body">
                   <Dim>
-                    Load one of your base sets to build on — this swaps the design
-                    in, but never changes your rolled rarity.
+                    Load one of your base templates to build on — this swaps the
+                    design in, but never changes your Rarity Value.
                   </Dim>
                   <div className="row">
                     <Select
@@ -624,7 +624,7 @@ const CardCustomizer = () => {
                       value={selectedPresetId}
                       onChange={(e) => handleLoadPreset(e.target.value)}
                     >
-                      <option value="">Load a set…</option>
+                      <option value="">Load a template…</option>
                       {presets.map((p) => (
                         <option key={p.id} value={p.id}>{p.name}</option>
                       ))}
@@ -635,13 +635,13 @@ const CardCustomizer = () => {
                         type="button"
                         className="preset-delete"
                         onClick={async () => { await deletePreset(selectedPresetId); setSelectedPresetId(''); }}
-                        title="Delete this set"
+                        title="Delete this template"
                       >✕</PillButton>
                     )}
                   </div>
                   {presets.length === 0 && (
                     <Dim style={{ fontStyle: 'italic' }}>
-                      No sets yet — they appear here once you save a design at the publish step.
+                      No templates yet — they appear here once you save a design at the publish step.
                     </Dim>
                   )}
                 </div>
@@ -901,7 +901,7 @@ const StageBody = styled.div`
   }
 `;
 
-// Collapsed-by-default loader for saved base sets — sits between the stepper
+// Collapsed-by-default loader for saved base templates — sits between the stepper
 // and the design tabs. Native <details>, so no extra open/close state.
 const LoadSet = styled.details`
   flex-shrink: 0;

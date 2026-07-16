@@ -30,6 +30,9 @@ const db = {
   saves: [],
   // A user starring another user's collection (user_id starrer, owner_id owner).
   stars: [],
+  // Named sets a creator groups their published cards into. id is the
+  // namespaced name ("<username>_<label>"); cards point at one via set_id.
+  sets: [],
   // Usage events (generate clicks). Append-only; user_id null when logged out.
   events: [],
   // In-progress rarity rolls (one active per user). Ephemeral — deliberately
@@ -45,8 +48,8 @@ const db = {
 // Track which rows changed since the last flush so we only upsert the deltas
 // (transactions are append-only and unbounded — a full-snapshot flush would grow
 // linearly). Counters + cloud are tiny and rewritten every flush.
-const dirty = { cards: new Set(), users: new Set(), transactions: new Set(), saves: new Set(), stars: new Set(), events: new Set() };
-const removed = { cards: new Set(), users: new Set(), saves: new Set(), stars: new Set() };
+const dirty = { cards: new Set(), users: new Set(), transactions: new Set(), saves: new Set(), stars: new Set(), sets: new Set(), events: new Set() };
+const removed = { cards: new Set(), users: new Set(), saves: new Set(), stars: new Set(), sets: new Set() };
 let truncateRequested = false;
 
 const markDirty = (table, id) => {
@@ -122,7 +125,7 @@ const load = () => {
   if (IS_TEST || !fs.existsSync(DB_FILE)) return;
   try {
     const loaded = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-    for (const key of ['cards', 'users', 'transactions', 'saves', 'stars', 'events']) {
+    for (const key of ['cards', 'users', 'transactions', 'saves', 'stars', 'sets', 'events']) {
       if (Array.isArray(loaded[key])) db[key] = loaded[key];
     }
     if (loaded.cloud) db.cloud = { ...db.cloud, ...loaded.cloud };
@@ -391,6 +394,46 @@ const memoryDb = {
 
   getStarsByUser: (userId) => db.stars.filter(s => s.user_id === userId),
 
+  // ---------- sets (named groupings of a creator's published cards) ----------
+  // The id IS the namespaced name ("<username>_<label>") — see utils/setName.js.
+  getSetById: (id) => db.sets.find(s => s.id === id),
+
+  getSetsByOwner: (ownerId) =>
+    db.sets.filter(s => s.owner_id === ownerId).sort((a, b) => a.id.localeCompare(b.id)),
+
+  // Create-or-update by name. `info` only overwrites when a non-null value is
+  // given, so publishing into an existing set without retyping its info keeps
+  // the info the set already had.
+  upsertSet: ({ id, owner_id, label, info }) => {
+    const existing = db.sets.find(s => s.id === id);
+    if (existing) {
+      if (info != null && info !== existing.info) {
+        existing.info = info;
+        existing.updated_at = now();
+        markDirty('sets', existing.id);
+        persistSoon();
+      }
+      return existing;
+    }
+    const set = {
+      id,
+      owner_id,
+      label,
+      info: info ?? null,
+      created_at: now(),
+      updated_at: now()
+    };
+    db.sets.push(set);
+    markDirty('sets', set.id);
+    persistSoon();
+    return set;
+  },
+
+  // Published cards only — a set groups what's in the pool, so a private draft
+  // must not inflate the count (it would read as "my publish landed" when it
+  // hasn't). Drafts still carry set_id and join the count once released.
+  countCardsInSet: (setId) => db.cards.filter(c => c.set_id === setId && c.is_public).length,
+
   // ---------- rolls (in-progress rarity gamble; ephemeral, not persisted) ----
   createRoll: (roll) => {
     const newRoll = {
@@ -444,6 +487,7 @@ const memoryDb = {
     db.transactions.length = 0;
     db.saves.length = 0;
     db.stars.length = 0;
+    db.sets.length = 0;
     db.events.length = 0;
     db.rolls.length = 0;
     db.cloud = { total_issued: 0, total_absorbed: 0 };

@@ -75,6 +75,22 @@ export const TextInput = styled.input`
   &:focus { outline: none; border-color: var(--gold); }
 `;
 
+// TextInput's longer sibling, for the free-text blurbs on a card or a set.
+export const TextArea = styled.textarea`
+  background: var(--field-bg);
+  color: var(--amber-text);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  padding: 7px 9px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  width: 100%;
+  min-height: 54px;
+  resize: vertical;
+  &::placeholder { color: var(--amber-dim); }
+  &:focus { outline: none; border-color: var(--gold); }
+`;
+
 export const Select = styled.select`
   background: var(--field-bg);
   color: var(--amber-text);
@@ -101,7 +117,7 @@ export const Kv = ({ k, children }) => (
   <div>{k}: {children}</div>
 );
 
-// Rarity band: name, proportional bar, odds — colors appear here and nowhere else.
+// Rarity band: name, proportional bar, and a right-hand value.
 const BandLine = styled.div`
   display: flex;
   align-items: center;
@@ -110,16 +126,16 @@ const BandLine = styled.div`
   .name { width: 12ch; flex-shrink: 0; }
   .band { flex: 1; height: 8px; background: #222; border-radius: 4px; overflow: hidden; }
   .band i { display: block; height: 100%; border-radius: 4px; }
-  .odds { width: 12ch; text-align: right; flex-shrink: 0; }
+  .value { width: 12ch; text-align: right; flex-shrink: 0; }
 `;
 
 // Bars carry weight by width alone — the per-tier colours were dropped because
 // the colour→rarity code confused people; one neutral gold reads as "a bar".
-export const BandRow = ({ name, width, odds, right }) => (
+export const BandRow = ({ name, width, right }) => (
   <BandLine>
     <span className="name">{name}</span>
     <span className="band"><i style={{ width, background: 'var(--gold)' }} /></span>
-    <span className="odds">{right ?? odds}</span>
+    <span className="value">{right}</span>
   </BandLine>
 );
 
@@ -129,6 +145,8 @@ export const BAND_WIDTHS = {
   vmax: '2%', ultra: '6%', wowa: '12%', galaxy: '22%', holo: '45%', common: '100%'
 };
 
+// Counts-driven: the bands report what's actually in the pool. There is
+// deliberately no "odds per tier" mode — see the note on BAND_WIDTHS.
 export const RarityBands = ({ config, counts }) => {
   if (!config?.tiers) return null;
   return (
@@ -138,11 +156,7 @@ export const RarityBands = ({ config, counts }) => {
           key={tier.key}
           name={tier.name}
           width={BAND_WIDTHS[tier.key] || '100%'}
-          right={
-            counts
-              ? `${counts[tier.key] ?? 0} cards`
-              : (tier.odds ? `1 : ${tier.odds.toLocaleString()}` : 'remainder')
-          }
+          right={`${counts?.[tier.key] ?? 0} cards`}
         />
       ))}
     </div>

@@ -26,17 +26,17 @@ const PublishStage = ({
     <PublishPanel customCard={customCard} draftId={draftId} onPublished={onPublished} />
 
     <Block>
-      <BlockTitle>Keep this design as a set</BlockTitle>
-      <Dim>A set stores the design — colours, effects, background, tags — as a starting point for future cards.</Dim>
-      <SetRow>
+      <BlockTitle>Keep this design as a base template</BlockTitle>
+      <Dim>A base template stores the design — colours, effects, background, tags — as a starting point for future cards. It lives on this device, and is separate from the set you publish a card into.</Dim>
+      <TemplateRow>
         <TextInput
           className="preset-name"
-          placeholder="name this set"
+          placeholder="name this template"
           value={presetName}
           onChange={(e) => onPresetNameChange(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') onSavePreset(); }}
         />
-        <ImgToggle title="Also store the base & holo images in this set">
+        <ImgToggle title="Also store the base & holo images in this template">
           <input
             type="checkbox"
             checked={includeImages}
@@ -47,7 +47,7 @@ const PublishStage = ({
         <PillButton $secondary type="button" className="preset-save" onClick={onSavePreset}>
           Save set
         </PillButton>
-      </SetRow>
+      </TemplateRow>
       {feedback && <Dim className="customizer-feedback">{feedback}</Dim>}
     </Block>
   </Wrap>
@@ -72,7 +72,7 @@ const BlockTitle = styled.div`
   color: var(--gold-bright);
 `;
 
-const SetRow = styled.div`
+const TemplateRow = styled.div`
   display: flex;
   align-items: center;
   gap: 8px;

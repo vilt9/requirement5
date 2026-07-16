@@ -55,7 +55,7 @@ const StartStage = ({
         {!loggedIn && (
           <Dim className="anon-note">
             Logged out, regenerating is free — but logging in starts you on a fresh
-            roll, so bank a card you like by logging in before you fish for more.
+            Rarity Value, so bank a card you like by logging in before you fish for more.
           </Dim>
         )}
       </Block>
@@ -70,7 +70,7 @@ const StartStage = ({
           </p>
           <p>
             Rarer cards command higher average prices, so they earn more per save.
-            Every card rolls its own price around a centre set by its rarity:
+            Every card gets its own price, spread around a centre set by its rarity:
           </p>
           <EarnTable>
             <thead>

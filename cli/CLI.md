@@ -14,7 +14,7 @@ cd cli && npm link                                 # from a repo checkout
 # One-minute card
 r5c signup --username ada_l --email ada@example.com --password 'correct-horse-9'
 r5c template > card.json               # edit: point "image" at your artwork
-r5c card create begin                  # see your Rarity Value (and its odds)
+r5c card create begin                  # see your Rarity Value
 r5c card create confirm-start card.json  # pay the create fee → a private draft
 r5c card create publish <id>           # release it → https://requirement5.com/card/<id>
 ```
@@ -64,8 +64,7 @@ spend into the red down to **−1000 /t26** (debt accrues 1.47%/day, compounding
 The guided flow, mirroring the website's `/create` page:
 
 - `r5c card create begin` — start the creation; prints your **Rarity Value**, its
-  tier, the odds a card that rare appears at ("1 in 220"), the two prices, and
-  your balance. Free and idempotent.
+  tier, the two prices, and your balance. Free and idempotent.
 - `r5c card create regenerate-rarity` — gamble a fresh Rarity Value for a climbing
   /t26 fee. Prints the new value and the updated prices.
 - `r5c card create confirm-start [spec.json]` — accept the current Rarity Value:
@@ -80,6 +79,8 @@ The guided flow, mirroring the website's `/create` page:
   into the pool (free — the create fee was paid at confirm-start).
 - `r5c card create status` — where you are: the Rarity Value, your private drafts,
   your balance.
+- `r5c card create sets` — your sets: each label, its blurb, and how many cards
+  are in it. Use it to reuse an existing set rather than inventing a near-duplicate.
 
 ### Other card commands
 - `r5c template [minimal|full]` — print an example spec to start from
@@ -99,19 +100,58 @@ The guided flow, mirroring the website's `/create` page:
 
 ## The spec file
 
-The spec describes a card's **look** only — nothing in it is required. A real
-card wants `name`, `image`, and `tags`:
+The spec describes a card's **look** and its metadata. Only `name` is required —
+a card cannot be published without one. A real card wants `image` and `tags` too:
 
 ```json
 {
   "name": "Neon Reliquary",
+  "info": "A shrine to the last working streetlight.",
   "tags": ["cosmic", "portrait"],
   "image": "./artwork.png"
 }
 ```
 
+### Card metadata
+
+| Field | Required | What it is |
+|---|---|---|
+| `name` | **yes** | The card title. Publishing without one is rejected. |
+| `info` | no | A blurb about the card (max 280 chars). |
+| `setName` | no | A set to publish the card into (max 48 chars). |
+| `setInfo` | no | A blurb about the *set* (max 280 chars). |
+
+### Sets
+
+A **set** groups your published cards. You type a label; the server stores it
+namespaced to your username, so your sets can never collide with another
+creator's:
+
+```json
+{ "name": "Abyssal Drifter", "setName": "Deep Sea", "image": "./art.png" }
+```
+
+`"Deep Sea"` is stored as `alice_deep-sea`. The label is **canonicalized**:
+lowercased, spaces and underscores become dashes, punctuation stripped, repeats
+collapsed — so `"Salt Marsh"` becomes `salt-marsh`. Your capitalisation is not
+preserved, and `"Deep Sea"`, `"deep sea"` and `"DEEP_SEA"` all name the *same*
+set (which is what prevents near-duplicates).
+
+Reuse the same label to add more cards to that set — `r5c card create sets` lists
+the ones you already have, with the number of **published** cards in each
+(private drafts don't count until released).
+
+`setInfo` describes the set rather than the card, and it's sticky: set it once,
+and later cards that join the same set keep it unless you pass a new value.
+Omitting `setName` never removes a card from a set it already belongs to.
+
+> A published card's **set** is not the same thing as the website's **base
+> template** (the Design stage's "Load a base template"). A template is a
+> device-local reusable *look*; a set is a server-side grouping of finished
+> cards.
+
 **Rarity is not a spec field.** It's a server-owned gamble: `card create begin`
-hands you a Rarity Value, `regenerate-rarity` re-rolls it, and `confirm-start`
+hands you a Rarity Value, `regenerate-rarity` regenerates it, and `confirm-start`
 locks it onto the card. Any `tier` / `rarityScore` you put in the spec is
 ignored — you cannot self-declare rarity.
 
@@ -120,18 +160,19 @@ an `https://` URL, or a raw data URL. PNG, JPEG, WebP, GIF, AVIF.
 
 ### Tiers (what a Rarity Value maps to)
 
-The Rarity Value (0–1) determines the tier and its draw odds. Save price is
-**per-card** — rarity slides the centre of a wide band, so prices overlap
-(a lucky Common can outprice an unlucky Fine).
+The Rarity Value (0–1) determines the tier: a tier is simply a **band** of that
+value, so the band's width is how often it comes up. Save price is **per-card** —
+rarity slides the centre of a wide band, so prices overlap (a lucky Common can
+outprice an unlucky Fine).
 
-| tier | display | score band | draw odds |
-|---|---|---|---|
-| `common` | Common | 0–0.7 | the common run |
-| `holo` | Uncommon | 0.7–0.8 | ~1 in 24 |
-| `galaxy` | Scarce | 0.8–0.85 | ~1 in 90 |
-| `wowa` | Rare | 0.85–0.9 | ~1 in 220 |
-| `ultra` | Fine | 0.9–0.98 | ~1 in 500 |
-| `vmax` | Singular | 0.98–1.0 | ~1 in 2000 |
+| tier | display | score band |
+|---|---|---|
+| `common` | Common | 0–0.7 |
+| `holo` | Uncommon | 0.7–0.8 |
+| `galaxy` | Scarce | 0.8–0.85 |
+| `wowa` | Rare | 0.85–0.9 |
+| `ultra` | Fine | 0.9–0.98 |
+| `vmax` | Singular | 0.98–1.0 |
 
 Creator dividends are 20% of a card's save price, so rarer cards tend to earn
 more per save. The live numbers come from `GET /api/economy/config`.
@@ -145,7 +186,6 @@ from `backgroundColor.baseHue`. The one-stop terminal reference is
 ```json
 {
   "name": "Neon Reliquary",
-  "tier": "ultra",
   "image": "./artwork.png",
   "holoImage": "./holo-overlay.png",
   "card": {
@@ -208,7 +248,7 @@ The design-iterate loop — get a rarity, make a private draft, then
 look/adjust/update until it's right, and only then publish:
 
 ```bash
-r5c card create begin                              # see the Rarity Value + odds
+r5c card create begin                              # see the Rarity Value
 # (optional) r5c card create regenerate-rarity     # gamble again — spends /t26
 id=$(r5c card create confirm-start card.json --json | jq -r .draft.id)
 r5c card create preview "$id" --out shots/         # 4 PNGs: rest + 3 orbit poses
@@ -225,7 +265,7 @@ export R5C_TOKEN=$(curl -s https://requirement5.com/api/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"username":"bot","password":"..."}' | jq -r .data.token)
 
-r5c card create begin --json | jq '{rarityValue, tier: .tier.name, odds: .tier.odds}'
+r5c card create begin --json | jq '{rarityValue, tier: .tier.name}'
 id=$(r5c card create confirm-start card.json --json | jq -r .draft.id)
 r5c card create publish "$id" --json | jq -r .url
 ```

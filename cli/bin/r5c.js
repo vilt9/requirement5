@@ -152,12 +152,10 @@ async function cmdTransactions({ flags }) {
 // draft) → design the draft (update/preview) → publish (release it into the
 // pool). The rarity is a server-owned gamble; you never declare it.
 
-// One line that says what a Rarity Value MEANS: the number, its tier, and the
-// odds a card that rare appears at ("1 in 220").
+// One line that says what a Rarity Value MEANS: the number and its tier.
 function rarityLine(d) {
   const t = d.tier || {};
-  const meaning = t.odds ? `appears at 1 in ${t.odds}` : 'the common run';
-  return `Rarity Value: ${d.rarityValue}  ·  ${t.name || '—'}  (${meaning})`;
+  return `Rarity Value: ${d.rarityValue}  ·  ${t.name || '—'}`;
 }
 
 async function cardBegin({ flags }) {
@@ -214,6 +212,22 @@ async function cardStatus({ flags }) {
   out(balanceReport(data.balance));
 }
 
+// Your sets, so you can reuse an existing label rather than guessing at one and
+// accidentally starting a near-duplicate ("deep-sea" vs "deepsea").
+async function cardSets({ flags }) {
+  const { data } = await api.get('/api/cards/sets/mine', { auth: true });
+  if (flags.json) return out(data);
+  if (!data.sets.length) {
+    out('No sets yet — add `"setName": "my set"` to a spec to start one.');
+    return;
+  }
+  out('Your sets:');
+  for (const s of data.sets) {
+    out(`  ${s.label.padEnd(24)} ${String(`${s.cardCount} card${s.cardCount === 1 ? '' : 's'}`).padEnd(9)} ${s.name}`);
+    if (s.info) out(`    ${s.info}`);
+  }
+}
+
 async function cardCreatePublish({ positional, flags }) {
   const id = positional[0];
   const { data } = await api.post('/api/cards/create/publish', id ? { id } : {}, { auth: true });
@@ -237,6 +251,7 @@ async function cmdCard({ positional, flags }) {
     'regenerate-rarity': cardRegen,
     'confirm-start': cardConfirm,
     status: cardStatus,
+    sets: cardSets,
     update: cmdUpdate,             // shape the private draft (PUT the card)
     preview: cmdPreview,           // look at the private draft
     publish: cardCreatePublish,    // release the draft into the pool

@@ -1,4 +1,4 @@
-import { poolCardToCardData, asOdds } from '../utils/poolCard';
+import { poolCardToCardData } from '../utils/poolCard';
 
 describe('poolCardToCardData', () => {
   test('unwraps a server record (state_data) into render props with defaults', () => {
@@ -31,16 +31,3 @@ describe('poolCardToCardData', () => {
   });
 });
 
-describe('asOdds', () => {
-  test('renders a probability as 1 : N', () => {
-    expect(asOdds(0.5)).toBe('1 : 2');
-    expect(asOdds(0.004)).toBe('1 : 250');
-  });
-
-  test('returns null for zero / negative / nullish probabilities', () => {
-    expect(asOdds(0)).toBeNull();
-    expect(asOdds(-0.1)).toBeNull();
-    expect(asOdds(null)).toBeNull();
-    expect(asOdds(undefined)).toBeNull();
-  });
-});

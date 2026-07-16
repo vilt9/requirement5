@@ -14,8 +14,36 @@ test('a minimal spec expands into a coherent payload', () => {
   assert.equal(p.stateData.customCard.customImageUrl, IMG);
 });
 
-test('name defaults when omitted', () => {
-  assert.equal(buildPublishPayload({}, '/tmp').name, 'Untitled card');
+test('name is required — a published card must have one', () => {
+  assert.throws(() => buildPublishPayload({ image: IMG }, '/tmp'), /"name" is required/);
+  assert.throws(() => buildPublishPayload({ name: '   ', image: IMG }, '/tmp'), /"name" is required/);
+});
+
+test('card info and set fields survive into the payload', () => {
+  const p = buildPublishPayload(
+    { name: 'Hi', info: 'a blurb', setName: 'Deep Sea', setInfo: 'from the trench', image: IMG },
+    '/tmp'
+  );
+  assert.equal(p.info, 'a blurb');
+  // The typed label goes over the wire as-is — the SERVER namespaces it.
+  assert.equal(p.setName, 'Deep Sea');
+  assert.equal(p.setInfo, 'from the trench');
+});
+
+test('omitted metadata keys stay absent, so they never clear server-side values', () => {
+  const p = buildPublishPayload({ name: 'Hi', image: IMG }, '/tmp');
+  assert.ok(!('info' in p), 'info absent');
+  assert.ok(!('setName' in p), 'setName absent');
+  assert.ok(!('setInfo' in p), 'setInfo absent');
+});
+
+test('setInfo without setName is rejected', () => {
+  assert.throws(() => buildPublishPayload({ name: 'Hi', setInfo: 'orphan', image: IMG }, '/tmp'), /needs a "setName"/);
+});
+
+test('over-long info and setName are rejected', () => {
+  assert.throws(() => buildPublishPayload({ name: 'Hi', info: 'x'.repeat(281), image: IMG }, '/tmp'), /"info" must be 280/);
+  assert.throws(() => buildPublishPayload({ name: 'Hi', setName: 'x'.repeat(49), image: IMG }, '/tmp'), /"setName" must be 48/);
 });
 
 test('a non-object spec is rejected', () => {
@@ -23,20 +51,20 @@ test('a non-object spec is rejected', () => {
 });
 
 test('unknown top-level keys are rejected with a helpful message', () => {
-  assert.throws(() => buildPublishPayload({ foo: 1 }, '/tmp'), /unknown top-level key/);
+  assert.throws(() => buildPublishPayload({ name: 'Hi', foo: 1 }, '/tmp'), /unknown top-level key/);
 });
 
 test('a bad tier is rejected', () => {
-  assert.throws(() => buildPublishPayload({ tier: 'legendary' }, '/tmp'), /tier/);
+  assert.throws(() => buildPublishPayload({ name: 'Hi', tier: 'legendary' }, '/tmp'), /tier/);
 });
 
 test('non-string tags are rejected', () => {
-  assert.throws(() => buildPublishPayload({ tags: [1, 2] }, '/tmp'), /tags/);
+  assert.throws(() => buildPublishPayload({ name: 'Hi', tags: [1, 2] }, '/tmp'), /tags/);
 });
 
 test('an invalid CSS blend mode is rejected', () => {
   assert.throws(
-    () => buildPublishPayload({ card: { effectParams: { customHoloBlendMode: 'nope' } } }, '/tmp'),
+    () => buildPublishPayload({ name: 'Hi', card: { effectParams: { customHoloBlendMode: 'nope' } } }, '/tmp'),
     /blend mode/
   );
 });

@@ -9,18 +9,24 @@ export const round6 = (n) => Math.round(n * 1e6) / 1e6;
 // Probabilities are draw probabilities; common takes the remainder.
 // Names are plain scarcity words (set A). Keys stay stable so nothing else breaks.
 // Rarity colours: the "Deep Sea" ramp — navy → ice cyan, brightening with rarity.
+// A tier is a BAND of the rarity score, and nothing else. A card's tier is
+// decided by rollRarity() (a uniform 0..1 draw) landing in one of these bands —
+// so a tier's frequency IS its band width and is not stored separately. Tiers
+// used to also carry a `probability`, which no live code path ever read; it
+// nonetheless fed a user-facing "appears at 1 : N" label that was wrong by up to
+// 40x. Don't reintroduce it: if a frequency is ever needed, derive it from
+// scoreRange so it cannot drift from what the roll actually does.
 const RARE_TIERS = [
-  { key: 'vmax',   name: 'Singular', probability: 0.0005, multiplier: 40, scoreRange: [0.98, 1.0],  color: '#9fe8ff' },
-  { key: 'ultra',  name: 'Fine',     probability: 0.002,  multiplier: 18, scoreRange: [0.9, 0.98],  color: '#45d0f0' },
-  { key: 'wowa',   name: 'Rare',     probability: 1 / 220, multiplier: 9, scoreRange: [0.85, 0.9],  color: '#1eb2ea' },
-  { key: 'galaxy', name: 'Scarce',   probability: 1 / 90,  multiplier: 5, scoreRange: [0.8, 0.85],  color: '#2f8fd0' },
-  { key: 'holo',   name: 'Uncommon', probability: 1 / 24,  multiplier: 2, scoreRange: [0.7, 0.8],   color: '#3f6fa0' }
+  { key: 'vmax',   name: 'Singular', multiplier: 40, scoreRange: [0.98, 1.0],  color: '#9fe8ff' },
+  { key: 'ultra',  name: 'Fine',     multiplier: 18, scoreRange: [0.9, 0.98],  color: '#45d0f0' },
+  { key: 'wowa',   name: 'Rare',     multiplier: 9,  scoreRange: [0.85, 0.9],  color: '#1eb2ea' },
+  { key: 'galaxy', name: 'Scarce',   multiplier: 5,  scoreRange: [0.8, 0.85],  color: '#2f8fd0' },
+  { key: 'holo',   name: 'Uncommon', multiplier: 2,  scoreRange: [0.7, 0.8],   color: '#3f6fa0' }
 ];
 
 const COMMON = {
   key: 'common',
   name: 'Common',
-  probability: 1 - RARE_TIERS.reduce((sum, t) => sum + t.probability, 0),
   multiplier: 1,
   scoreRange: [0, 0.7],
   color: '#3b4a5a'
@@ -145,17 +151,6 @@ export const tierForScore = (score) => {
     true) || COMMON;
 };
 
-// Roll a tier. rand is injectable for tests; defaults to Math.random.
-export const rollTier = (rand = Math.random) => {
-  const roll = rand();
-  let cumulative = 0;
-  for (const tier of RARE_TIERS) {
-    cumulative += tier.probability;
-    if (roll < cumulative) return tier;
-  }
-  return COMMON;
-};
-
 // ---- Draw weighting ---------------------------------------------------------
 // A published card's chance of being DRAWN falls off with its rarity value:
 // weight = e^(-k·rarity), so a rarer card surfaces less. The pool draw picks in
@@ -219,15 +214,13 @@ export const savePriceFor = (cardId, provenance = 'discovered', rarity = 0.35) =
 export const dividendFor = (cardId, provenance = 'discovered', rarity = 0.35) =>
   round2(savePriceFor(cardId, provenance, rarity) * ECONOMY.DIVIDEND_RATE);
 
-// Everything the frontend needs to render odds, costs and bands. Tiers carry
-// rarity/odds only — prices are per-card (see PRICE_BANDS).
+// Everything the frontend needs to render costs and bands. Tiers carry their
+// score band only — prices are per-card (see PRICE_BANDS).
 export const economyConfig = () => ({
   currency: { name: 'Slash_T2.6', symbol: '/t26', smallestUnit: 0.000001 },
   tiers: TIERS.map(t => ({
     key: t.key,
     name: t.name,
-    probability: t.probability,
-    odds: t.key === 'common' ? null : Math.round(1 / t.probability),
     multiplier: t.multiplier,
     scoreRange: t.scoreRange,
     color: t.color

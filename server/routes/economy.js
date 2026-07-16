@@ -7,7 +7,7 @@ import { storageInfo } from '../storage/index.js';
 
 const router = express.Router();
 
-// Public: tiers, probabilities, costs. The frontend renders all bands/odds from this.
+// Public: tiers, costs. The frontend renders all bands and prices from this.
 router.get('/config', (req, res) => {
   res.json({ success: true, data: economyConfig() });
 });

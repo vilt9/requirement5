@@ -50,6 +50,18 @@ CREATE TABLE IF NOT EXISTS stars (
 CREATE INDEX IF NOT EXISTS stars_user_idx  ON stars (user_id);
 CREATE INDEX IF NOT EXISTS stars_owner_idx ON stars (owner_id);
 
+-- A named set a creator groups their published cards into. The id IS the
+-- namespaced name ("<username>_<label>"), so it's unique across the app for
+-- free — usernames are already unique. owner_id is the creator; cards point at
+-- a set by id (cards.data ->> 'set_id'). Set info lives here, once, so editing
+-- it updates every card in the set.
+CREATE TABLE IF NOT EXISTS sets (
+  id       text PRIMARY KEY,
+  data     jsonb NOT NULL,
+  owner_id text GENERATED ALWAYS AS (data ->> 'owner_id') STORED
+);
+CREATE INDEX IF NOT EXISTS sets_owner_idx ON sets (owner_id);
+
 -- Small key/value rows for the counters and the cloud (system treasury).
 CREATE TABLE IF NOT EXISTS singletons (
   key   text PRIMARY KEY,
