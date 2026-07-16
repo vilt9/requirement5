@@ -146,6 +146,22 @@ describe('community endpoints', () => {
     expect(res.body.data.id).toBeDefined();
   });
 
+  test('tags aggregates public-card tags with counts, most-used first', async () => {
+    await makeCard({ name: 'A', tags: ['neon', 'wolf'] });
+    await makeCard({ name: 'B', tags: ['neon'] });
+    await makeCard({ name: 'C', tags: ['neon', 'galaxy'] });
+    // private cards do not contribute to the public tag cloud
+    await makeCard({ name: 'D', isPublic: false, tags: ['secret'] });
+
+    const res = await request(app).get('/api/cards/tags');
+    expect(res.status).toBe(200);
+    const { tags } = res.body.data;
+    expect(tags[0]).toEqual({ tag: 'neon', count: 3 });
+    expect(tags.map(t => t.tag)).not.toContain('secret');
+    const galaxy = tags.find(t => t.tag === 'galaxy');
+    expect(galaxy.count).toBe(1);
+  });
+
   test('collect requires auth, increments the counter; stats aggregate', async () => {
     const card = await makeCard();
     expect((await request(app).post(`/api/cards/${card.id}/collect`)).status).toBe(401);

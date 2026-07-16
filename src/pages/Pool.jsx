@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
@@ -11,7 +12,11 @@ const Pool = () => {
   const { config } = useAuth();
   const [cloud, setCloud] = useState(null);
   const [cards, setCards] = useState([]);
-  const [tagFilter, setTagFilter] = useState('');
+  // The active tag lives in the URL (?tag=neon) so a tag clicked anywhere in the
+  // app can link straight here, and the filtered view is shareable.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tagFilter = searchParams.get('tag') || '';
+  const navigate = useNavigate();
 
   useEffect(() => {
     api('/api/economy/cloud').then(setCloud).catch(console.error);
@@ -31,7 +36,8 @@ const Pool = () => {
     ? cards.filter(c => ensureTags(c.tags).includes(tagFilter))
     : cards;
 
-  const toggleTag = (tag) => setTagFilter(prev => (prev === tag ? '' : tag));
+  const setTagFilter = (tag) => setSearchParams(tag ? { tag } : {}, { replace: true });
+  const toggleTag = (tag) => setTagFilter(tagFilter === tag ? '' : tag);
 
   return (
     <Page>
@@ -95,7 +101,7 @@ const Pool = () => {
               </CardLine>
               {tags.length > 0 && (
                 <div className="tags">
-                  <TagList tags={tags} onTagClick={toggleTag} activeTag={tagFilter} />
+                  <TagList tags={tags} onTagClick={(t) => navigate(`/tag/${encodeURIComponent(t)}`)} />
                 </div>
               )}
             </CardRow>

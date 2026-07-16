@@ -3,7 +3,8 @@ import styled from 'styled-components';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
-import { Panel, PillButton, TextInput, TextArea, Select, Divider, Dim, ErrorText, TagList } from './UI';
+import { Panel, PillButton, TextInput, TextArea, Select, Divider, Dim, ErrorText, TagInput } from './UI';
+import { formatTag, parseTags } from '../utils/tags';
 
 // Publish the card being customized into the pool. The rarity (and so the tier)
 // is NOT chosen here — it's the value the server assigned at the Start stage.
@@ -12,13 +13,14 @@ import { Panel, PillButton, TextInput, TextArea, Select, Divider, Dim, ErrorText
 // cards — not to be confused with the Design stage's base templates, which are
 // device-local looks). The server namespaces the set name by username and owns
 // the canonical form, so this panel only ever sends the typed label.
-const PublishPanel = ({ customCard, draftId, onPublished }) => {
+const PublishPanel = ({ customCard, draftId, onPublished, onTagsChange }) => {
   const { user, setBalance } = useAuth();
   const [name, setName] = useState('');
   const [cardInfo, setCardInfo] = useState('');
   const [setLabel, setSetLabel] = useState('');
   const [setBlurb, setSetBlurb] = useState('');
   const [mySets, setMySets] = useState([]);
+  const [tagSuggestions, setTagSuggestions] = useState([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(null);
   const [published, setPublished] = useState(null); // the created card record
@@ -33,6 +35,25 @@ const PublishPanel = ({ customCard, draftId, onPublished }) => {
       .catch(() => {}); // a missing picker shouldn't block publishing
     return () => { live = false; };
   }, [user]);
+
+  // Every tag already in the pool, with its card count, so you can reuse a live
+  // tag instead of typing a near-duplicate from memory. Public, no auth needed.
+  useEffect(() => {
+    let live = true;
+    api('/api/cards/tags')
+      .then(data => { if (live) setTagSuggestions(data.tags || []); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, []);
+
+  const tags = useMemo(() => (Array.isArray(customCard?.tags) ? customCard.tags : []), [customCard]);
+
+  // Clicking a suggestion toggles it onto (or off) the card. parseTags keeps the
+  // result normalized and deduped, matching what the free-text box produces.
+  const toggleTag = (tag) => {
+    if (!onTagsChange) return;
+    onTagsChange(tags.includes(tag) ? tags.filter(t => t !== tag) : parseTags([...tags, tag]));
+  };
 
   // Mirror the server's normalizer so the preview matches what gets stored.
   // The server remains the authority — this is a preview, not validation.
@@ -175,11 +196,26 @@ const PublishPanel = ({ customCard, draftId, onPublished }) => {
           </Field>
         )}
 
-        {customCard?.tags?.length > 0 && (
-          <div>
-            <Dim>Tags:</Dim>
-            <div style={{ marginTop: 4 }}><TagList tags={customCard.tags} /></div>
-          </div>
+        {onTagsChange && (
+          <Field>
+            <label htmlFor="publish-tags">Tags <Dim>optional</Dim></label>
+            <Dim>Saved with the card; shown across the pool and your collection. Click one below to reuse it, or type a new one.</Dim>
+            <TagInput value={tags} onChange={onTagsChange} />
+            {tagSuggestions.length > 0 && (
+              <SuggestWrap>
+                {tagSuggestions.map(s => (
+                  <SuggestChip
+                    key={s.tag}
+                    type="button"
+                    $active={tags.includes(s.tag)}
+                    onClick={() => toggleTag(s.tag)}
+                  >
+                    {formatTag(s.tag)}<span className="n">{s.count}</span>
+                  </SuggestChip>
+                ))}
+              </SuggestWrap>
+            )}
+          </Field>
         )}
         {error && <ErrorText>{error}</ErrorText>}
         {message && <div className="publish-success">{message}</div>}
@@ -201,7 +237,7 @@ const PublishPanel = ({ customCard, draftId, onPublished }) => {
 };
 
 const Stack = ({ children }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{children}</div>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>{children}</div>
 );
 
 // A labelled field: the label sits above its input, and the set picker sits
@@ -213,13 +249,42 @@ const Field = styled.div`
 
   label {
     color: var(--amber-text);
-    font-size: 11px;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+    font-size: 12px;
   }
 
   .set-preview {
     font-size: 11px;
+  }
+`;
+
+// The pool's existing tags, as toggle chips. An active chip (already on the card)
+// reads gold-filled; the count sits in a dimmer pill on the right.
+const SuggestWrap = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 2px;
+`;
+
+const SuggestChip = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  cursor: pointer;
+  color: ${p => (p.$active ? 'var(--ink)' : 'var(--amber-text)')};
+  background: ${p => (p.$active ? 'var(--gold)' : 'var(--panel)')};
+  border: 1px solid ${p => (p.$active ? 'var(--gold)' : 'var(--panel-border)')};
+
+  &:hover { border-color: var(--gold); }
+
+  .n {
+    font-size: 10px;
+    opacity: 0.7;
+    ${p => (p.$active ? '' : 'color: var(--amber-dim);')}
   }
 `;
 

@@ -300,7 +300,7 @@ const UserCollectionView = ({ username }) => {
                   {stats && <div><Dim>{stats.timesSaved} saved / {stats.timesDrawn} drawn</Dim></div>}
                   <div><Dim>Saved for {fmtT26(cost)} /t26 · {new Date(save.created_at).toISOString().slice(0, 10)}</Dim></div>
                   {ensureTags(card.tags).length > 0 && (
-                    <div style={{ marginTop: 4 }}><TagList tags={ensureTags(card.tags)} onTagClick={toggleTag} activeTag={tagFilter} /></div>
+                    <div style={{ marginTop: 4 }}><TagList tags={ensureTags(card.tags)} onTagClick={(t) => navigate(`/tag/${encodeURIComponent(t)}`)} /></div>
                   )}
                   <Divider />
                   <Dim><Link to={url}>{isOwn ? 'Your card page' : 'Their card page'}</Link></Dim>

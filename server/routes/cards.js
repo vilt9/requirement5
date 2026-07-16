@@ -507,6 +507,31 @@ router.get('/sets/mine', requireAuth, (req, res) => {
   res.json({ success: true, data: { sets } });
 });
 
+// Every tag in the pool with how many published cards carry it, most-used first.
+// Powers the publish panel's tag picker (reuse an existing tag instead of typing
+// a near-duplicate from memory) and can seed any tag-filter UI.
+router.get('/tags', async (req, res) => {
+  try {
+    const { data: cards = [] } = await Card.getCommunityCards();
+    const counts = new Map();
+    for (const card of cards) {
+      const tags = Array.isArray(card.tags) ? card.tags : [];
+      for (const raw of tags) {
+        const tag = String(raw).trim().toLowerCase();
+        if (!tag) continue;
+        counts.set(tag, (counts.get(tag) || 0) + 1);
+      }
+    }
+    const tags = [...counts.entries()]
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
+    res.json({ success: true, data: { tags } });
+  } catch (error) {
+    console.error('Error listing tags:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
 // Collections the signed-in user has starred, newest first.
 router.get('/collections/starred/mine', requireAuth, (req, res) => {
   const collections = memoryDb.getStarsByUser(req.user.id)

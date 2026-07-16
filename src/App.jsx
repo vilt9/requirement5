@@ -13,6 +13,7 @@ import ShareCard from './pages/ShareCard';
 import CaptureCard from './pages/CaptureCard';
 import About from './pages/About';
 import Analytics from './pages/Analytics';
+import TagPage from './pages/TagPage';
 import Verify from './pages/Verify';
 import Footer from './components/Footer';
 import './App.css';
@@ -171,6 +172,8 @@ function App() {
                 <Route path="/claim/:token" element={<ClaimAccount />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/analytics" element={<Analytics />} />
+                {/* All published cards carrying one tag, shown as a visual wall. */}
+                <Route path="/tag/:tag" element={<TagPage />} />
                 <Route path="/card/:id" element={<ShareCard />} />
                 {/* A collector's copy of a card: same page, plus whose
                     collection it's in and what they paid. */}

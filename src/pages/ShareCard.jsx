@@ -418,7 +418,11 @@ const ShareCard = () => {
                 </Dim>
               </div>
             )}
-            {tags.length > 0 && <div className="tags"><TagList tags={tags} /></div>}
+            {tags.length > 0 && (
+              <div className="tags">
+                <TagList tags={tags} onTagClick={(t) => navigate(`/tag/${encodeURIComponent(t)}`)} />
+              </div>
+            )}
           </Meta>
         )}
 

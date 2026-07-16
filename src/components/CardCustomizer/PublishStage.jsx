@@ -1,9 +1,9 @@
 import styled from 'styled-components';
 import PublishPanel from '../PublishPanel';
-import { TagInput, TextInput, PillButton, Dim } from '../UI';
+import { TextInput, PillButton, Dim } from '../UI';
 
-// Stage 3 of the customizer: the finishing moves. Tag the card, publish it to
-// the pool, and optionally keep the design as a reusable set.
+// Stage 3 of the customizer: the finishing moves. Name the card, tag it, publish
+// it to the pool, and optionally keep the design as a reusable base template.
 const PublishStage = ({
   customCard,
   draftId,
@@ -17,13 +17,7 @@ const PublishStage = ({
   feedback
 }) => (
   <Wrap className="publish-stage">
-    <Block className="tag-section">
-      <BlockTitle>Tags</BlockTitle>
-      <Dim>Saved with the card; shown across the pool and your collection.</Dim>
-      <TagInput value={customCard?.tags || []} onChange={onTagsChange} />
-    </Block>
-
-    <PublishPanel customCard={customCard} draftId={draftId} onPublished={onPublished} />
+    <PublishPanel customCard={customCard} draftId={draftId} onPublished={onPublished} onTagsChange={onTagsChange} />
 
     <Block>
       <BlockTitle>Keep this design as a base template</BlockTitle>
