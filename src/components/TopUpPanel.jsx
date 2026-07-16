@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
+import { api } from '../utils/api';
 import { Panel, PillButton, Divider } from './UI';
 
 // Rough /t26 cost of the two things you actually spend on, measured from the
@@ -9,19 +10,52 @@ import { Panel, PillButton, Divider } from './UI';
 const PER_SAVE = 9.5;
 const PER_CREATE = 2.5;
 
-// Three purchase tiers — no names, just the price and what it buys. /t26 climbs
-// faster than the dollars (100 → 140 /t26 per $), so bigger bundles are better
-// value.
-const BUNDLES = [
-  { usd: 2.99, t26: 300 },
-  { usd: 9.99, t26: 1200 },
-  { usd: 49.99, t26: 7000 }
+// Fallback catalogue for the brief moment before the server's bundles load (and
+// if that call fails). The server is authoritative — the id sent at checkout is
+// priced there — so these figures only ever drive the initial paint.
+const FALLBACK_BUNDLES = [
+  { id: 't26_300', usd: 2.99, t26: 300 },
+  { id: 't26_1200', usd: 9.99, t26: 1200 },
+  { id: 't26_7000', usd: 49.99, t26: 7000 }
 ];
 
-// Purchase options for /t26. Frontend-only for now — "Buy" just acknowledges;
-// there's no checkout wired yet.
+// Purchase options for /t26. "Buy" opens Stripe Checkout; the purchase is
+// credited by the server webhook when payment completes.
 const TopUpPanel = () => {
+  const [bundles, setBundles] = useState(FALLBACK_BUNDLES);
+  const [enabled, setEnabled] = useState(true);
   const [note, setNote] = useState(null);
+  const [busyId, setBusyId] = useState(null);
+
+  useEffect(() => {
+    api('/api/payments/bundles')
+      .then(data => {
+        if (Array.isArray(data?.bundles) && data.bundles.length) setBundles(data.bundles);
+        setEnabled(!!data?.enabled);
+      })
+      .catch(() => { /* keep the fallback catalogue */ });
+  }, []);
+
+  const buy = async (bundle) => {
+    setNote(null);
+    setBusyId(bundle.id);
+    try {
+      const { url } = await api('/api/payments/checkout', {
+        method: 'POST',
+        body: { bundle: bundle.id }
+      });
+      if (url) {
+        window.location.assign(url); // hand off to Stripe's hosted checkout
+        return;
+      }
+      setNote('Could not start checkout — please try again.');
+    } catch (err) {
+      setNote(err.status === 503
+        ? 'Top-ups aren’t available just yet — check back soon.'
+        : err.message || 'Could not start checkout — please try again.');
+    }
+    setBusyId(null);
+  };
 
   return (
     <Panel>
@@ -37,8 +71,8 @@ const TopUpPanel = () => {
       </Copy>
 
       <Grid>
-        {BUNDLES.map((b) => (
-          <Tier key={b.usd}>
+        {bundles.map((b) => (
+          <Tier key={b.id}>
             <span className="price">${b.usd.toFixed(2)}</span>
             <span className="amount">{b.t26.toLocaleString()} /t26</span>
             <span className="rate">$1 = {Math.round(b.t26 / b.usd)} /t26</span>
@@ -46,8 +80,8 @@ const TopUpPanel = () => {
               ≈ {Math.round(b.t26 / PER_SAVE).toLocaleString()} saves*<br />
               ≈ {Math.round(b.t26 / PER_CREATE).toLocaleString()} creations*
             </span>
-            <PillButton onClick={() => setNote('Checkout is coming soon — thanks for reinforcing the channel.')}>
-              Buy
+            <PillButton onClick={() => buy(b)} disabled={busyId !== null}>
+              {busyId === b.id ? 'Starting…' : 'Buy'}
             </PillButton>
           </Tier>
         ))}
@@ -57,6 +91,12 @@ const TopUpPanel = () => {
         * Estimates based on average prices across the site — actual save and
         create costs vary from card to card.
       </Footnote>
+
+      {!enabled && (
+        <Footnote>
+          Top-ups are being set up — the Buy buttons aren’t live on this server yet.
+        </Footnote>
+      )}
 
       {note && <Note>{note}</Note>}
     </Panel>

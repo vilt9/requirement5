@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { useAuth } from '../context/AuthContext';
@@ -22,7 +22,8 @@ const TXN_LABELS = {
   publish_stake: 'Publish stake',
   reroll: 'Card regeneration',
   create_stake: 'Card create fee',
-  interest: 'Debt interest'
+  interest: 'Debt interest',
+  topup: 'Top-up purchase'
 };
 
 const AuthForm = ({ title, submitLabel, mode, onSubmit }) => {
@@ -90,8 +91,15 @@ const Stack = ({ children }) => (
 const Account = () => {
   const { user, config, login, signup, logout, refreshBalance } = useAuth();
   const [transactions, setTransactions] = useState([]);
+  const [topupNote, setTopupNote] = useState(null);
   const location = useLocation();
   const navigate = useNavigate();
+
+  const loadTransactions = useCallback(() => {
+    api('/api/economy/transactions')
+      .then(setTransactions)
+      .catch(error => console.error('Could not load transactions:', error));
+  }, []);
 
   // Arrived here mid-action (e.g. saving a card while logged out)? Once the
   // login/signup lands, send them straight back to finish what they started.
@@ -104,10 +112,34 @@ const Account = () => {
   useEffect(() => {
     if (!user) return;
     refreshBalance();
-    api('/api/economy/transactions')
-      .then(setTransactions)
-      .catch(error => console.error('Could not load transactions:', error));
-  }, [user, refreshBalance]);
+    loadTransactions();
+  }, [user, refreshBalance, loadTransactions]);
+
+  // Back from Stripe Checkout (?topup=success|cancel). The purchase is credited
+  // asynchronously by the webhook, which races this redirect — so we poll the
+  // balance/ledger a few times to catch the credit as it lands, then drop the
+  // query param so a refresh doesn't replay the notice.
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const outcome = params.get('topup');
+    if (!outcome) return;
+    if (outcome === 'success') {
+      setTopupNote('Thanks — your top-up is being credited. Your balance updates below in a moment.');
+      let tries = 0;
+      const tick = () => { refreshBalance(); loadTransactions(); };
+      tick();
+      const timer = setInterval(() => {
+        tick();
+        if (++tries >= 5) clearInterval(timer);
+      }, 2000);
+      navigate('/account', { replace: true });
+      return () => clearInterval(timer);
+    }
+    if (outcome === 'cancel') {
+      setTopupNote('Checkout cancelled — no charge was made.');
+      navigate('/account', { replace: true });
+    }
+  }, [location.search, navigate, refreshBalance, loadTransactions]);
 
   if (!user) {
     return (
@@ -149,6 +181,8 @@ const Account = () => {
         <PillButton $secondary onClick={logout}>Log out</PillButton>
       </Panel>
 
+      {topupNote && <Panel><TopupNote>{topupNote}</TopupNote></Panel>}
+
       <TopUpPanel />
 
       <Panel>
@@ -176,6 +210,11 @@ const Account = () => {
 
 const DebtNote = styled.div`
   color: #ff8a8a;
+  line-height: 1.6;
+`;
+
+const TopupNote = styled.div`
+  color: var(--gold-bright);
   line-height: 1.6;
 `;
 

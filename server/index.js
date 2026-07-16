@@ -8,6 +8,7 @@ import authRoutes from './routes/auth.js';
 import economyRoutes from './routes/economy.js';
 import drawRoutes from './routes/draw.js';
 import analyticsRoutes from './routes/analytics.js';
+import paymentsRoutes, { webhookHandler } from './routes/payments.js';
 import { UPLOADS_DIR } from './storage/index.js';
 import linkTrace from './middleware/linkTrace.js';
 
@@ -18,6 +19,11 @@ const PORT = process.env.PORT || 4000;
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors());
 app.use(linkTrace);
+
+// Stripe webhook needs the RAW request bytes for signature verification, so it
+// must be mounted before the JSON body parser (which would consume the body).
+app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), webhookHandler);
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
@@ -39,6 +45,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/economy', economyRoutes);
 app.use('/api/draw', drawRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/payments', paymentsRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
