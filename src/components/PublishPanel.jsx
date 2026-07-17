@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
-import { Panel, PillButton, TextInput, TextArea, Select, Divider, Dim, ErrorText, TagInput } from './UI';
+import { PillButton, TextInput, TextArea, Select, Dim, ErrorText, TagInput } from './UI';
 import { formatTag, parseTags } from '../utils/tags';
 
 // Publish the card being customized into the pool. The rarity (and so the tier)
@@ -117,19 +117,17 @@ const PublishPanel = ({ customCard, draftId, onPublished, onTagsChange }) => {
 
   if (!user) {
     return (
-      <Panel>
-        Publish to the pool
-        <Divider />
+      <Section>
+        <Heading>Publish to the pool</Heading>
         <Dim>Publishing a card needs an account. <Link to="/account">Sign up or log in</Link> to
         publish — your design is saved right here and will be waiting when you're back.</Dim>
-      </Panel>
+      </Section>
     );
   }
 
   return (
-    <Panel>
-      Publish to the pool
-      <Divider />
+    <Section>
+      <Heading>Publish to the pool</Heading>
       <Stack>
         <Field>
           <label htmlFor="publish-name">Card name</label>
@@ -199,7 +197,7 @@ const PublishPanel = ({ customCard, draftId, onPublished, onTagsChange }) => {
         {onTagsChange && (
           <Field>
             <label htmlFor="publish-tags">Tags <Dim>optional</Dim></label>
-            <Dim>Saved with the card; shown across the pool and your collection. Click one below to reuse it, or type a new one.</Dim>
+            <Dim>Tags help people discover your card. Use existing tags or create your own.</Dim>
             <TagInput value={tags} onChange={onTagsChange} />
             {tagSuggestions.length > 0 && (
               <SuggestWrap>
@@ -232,9 +230,24 @@ const PublishPanel = ({ customCard, draftId, onPublished, onTagsChange }) => {
           </PillButton>
         </div>
       </Stack>
-    </Panel>
+    </Section>
   );
 };
+
+// Flat on the page — a gold heading over the form, matching the Start and Design
+// stages (no bordered box), so the publish step doesn't read as nested/cluttered.
+const Section = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 12px;
+  line-height: 1.5;
+`;
+
+const Heading = styled.div`
+  font-size: 13px;
+  color: var(--gold-bright);
+`;
 
 const Stack = ({ children }) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>{children}</div>

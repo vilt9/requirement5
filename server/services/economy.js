@@ -54,7 +54,7 @@ export const ECONOMY = {
 // page shows must be exactly the price the server charges.
 export const PRICE_BANDS = {
   saveCost: [1.5, 48],     // /t26 to save a card into your collection
-  drawYield: [0.01, 0.35], // /t26 earned per generate
+  drawYield: [0.018, 0.63], // /t26 earned per generate
   publishStake: [1, 4]     // /t26 to publish a card into the pool
 };
 
@@ -124,16 +124,25 @@ export const saveCostFor = (cardId, rarity = 0.35) =>
 export const drawYieldFor = (seed) =>
   round6(logBand(bell01(`${seed}:yield`), PRICE_BANDS.drawYield));
 
-// Create-flow pricing: a linear base that climbs with the reroll count, plus a
-// seeded uniform fraction so the /t26 reads in the currency's fractional style.
+// Create-flow pricing: a linear base that climbs with the reroll count. Each
+// reroll adds its whole-number step plus a small mean-zero wobble drawn fresh
+// from that reroll's index, so the pennies jump around as the price climbs while
+// the average step is unchanged (+1.0 regen, +0.2 create). The wobble stays
+// smaller than the step, so the price never ticks backwards.
 // Mirrored in src/utils/economyRandom.js — keep the two in sync.
-// Regenerate climbs steeply (+1 per reroll — the gambling tax); creating climbs
-// gently (+0.2 per reroll), so fishing costs you at the reroll, not at the mint.
+// Regenerate climbs steeply (the gambling tax); creating climbs gently, so
+// fishing costs you at the reroll, not at the mint.
 const rand01 = (seed) => mulberry32(fnv1a(seed))();
-export const regenCostFor = (rolls, seed) =>
-  round2(1 + 1.0 * (Number(rolls) || 0) + rand01(`${seed}:regen`));   // 1.xx, 2.xx, 3.xx …
-export const createCostFor = (rolls, seed) =>
-  round2(2 + 0.2 * (Number(rolls) || 0) + rand01(`${seed}:create`));  // 2.xx, then slow
+const WOBBLE = 0.4; // peak-to-peak jitter on each step; < the create step of 0.2*2
+const climb = (start, slope, rolls, seed) => {
+  let total = start + rand01(`${seed}:base`);
+  for (let i = 1; i <= (Number(rolls) || 0); i++) {
+    total += slope + WOBBLE * (rand01(`${seed}:${i}`) - 0.5);
+  }
+  return round2(total);
+};
+export const regenCostFor = (rolls, seed) => climb(1, 1.0, rolls, `${seed}:regen`);
+export const createCostFor = (rolls, seed) => climb(2, 0.2, rolls, `${seed}:create`);
 
 // The rarity gamble: a uniform 0..1 draw the SERVER owns, so neither the web
 // nor the CLI can self-declare a card's rarity. The tier follows from the score.

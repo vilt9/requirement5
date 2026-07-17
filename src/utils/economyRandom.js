@@ -8,7 +8,7 @@
 
 export const PRICE_BANDS = {
   saveCost: [1.5, 48],     // /t26 to save a card into your collection
-  drawYield: [0.01, 0.35], // /t26 earned per generate
+  drawYield: [0.018, 0.63], // /t26 earned per generate
   publishStake: [1, 4]     // /t26 to publish a card into the pool
 };
 
@@ -75,16 +75,25 @@ export const saveCostFor = (cardId, rarity = 0.35) =>
 export const drawYieldFor = (seed) =>
   Math.round(logBand(bell01(`${seed}:yield`), PRICE_BANDS.drawYield) * 1e6) / 1e6;
 
-// Create-flow pricing: linear base climbing with the reroll count + a seeded
-// uniform fraction so it reads in the currency's fractional style. EXACT mirror
-// of server/services/economy.js — the price shown must equal the price charged.
-// Regenerate climbs steeply (+1 per reroll); creating climbs gently (+0.2), so
+// Create-flow pricing: linear base climbing with the reroll count. Each reroll
+// adds its whole-number step plus a small mean-zero wobble drawn fresh from that
+// reroll's index, so the pennies jump around as the price climbs while the
+// average step is unchanged (+1.0 regen, +0.2 create). The wobble stays smaller
+// than the step, so the price never ticks backwards. EXACT mirror of
+// server/services/economy.js — the price shown must equal the price charged.
+// Regenerate climbs steeply (the gambling tax); creating climbs gently, so
 // fishing costs you at the reroll, not at the mint.
 const rand01 = (seed) => mulberry32(fnv1a(seed))();
-export const regenCostFor = (rolls, seed) =>
-  Math.round((1 + 1.0 * (Number(rolls) || 0) + rand01(`${seed}:regen`)) * 100) / 100;
-export const createCostFor = (rolls, seed) =>
-  Math.round((2 + 0.2 * (Number(rolls) || 0) + rand01(`${seed}:create`)) * 100) / 100;
+const WOBBLE = 0.4; // peak-to-peak jitter on each step; < the create step of 0.2*2
+const climb = (start, slope, rolls, seed) => {
+  let total = start + rand01(`${seed}:base`);
+  for (let i = 1; i <= (Number(rolls) || 0); i++) {
+    total += slope + WOBBLE * (rand01(`${seed}:${i}`) - 0.5);
+  }
+  return Math.round(total * 100) / 100;
+};
+export const regenCostFor = (rolls, seed) => climb(1, 1.0, rolls, `${seed}:regen`);
+export const createCostFor = (rolls, seed) => climb(2, 0.2, rolls, `${seed}:create`);
 
 // Linked-save surcharge — EXACT mirror of server/services/economy.js. A save
 // reached via a shared link costs the base price times this per-card multiplier

@@ -95,8 +95,8 @@ const StartStage = ({
       <NextRow>
         <PillButton type="button" className="stage-next" onClick={onNext}>
           {paidCreate
-            ? <>Continue <LuCircleArrowRight /></>
-            : <>Start <span className="cost">−{fmtT26(createCost)} /t26</span> <LuCircleArrowRight /></>}
+            ? <>Start Designing <LuCircleArrowRight /></>
+            : <>Start Designing <span className="cost">−{fmtT26(createCost)} /t26</span> <LuCircleArrowRight /></>}
         </PillButton>
       </NextRow>
     </Wrap>

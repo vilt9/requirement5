@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import localforage from 'localforage';
 import styled from 'styled-components';
-import { LuCircleArrowRight, LuRotateCcw } from 'react-icons/lu';
+import { LuCircleArrowRight } from 'react-icons/lu';
 import Card from '../components/Card/Card';
 import { useCards } from '../context/CardContext';
 import HoloEffectToggles from '../components/CardCustomizer/HoloEffectToggles';
@@ -404,15 +404,6 @@ const CardCustomizer = () => {
     setDraftId(null);
   };
 
-  // Reset (from the Design stage): drop back to the roll, keeping the current
-  // card AND its accrued reroll count — a way back to rolling, not a way to
-  // dodge the climbing price.
-  const handleResetToStart = () => {
-    setStage('start');
-    setActiveTab('image');
-    flash('Back to Start — your card is kept.');
-  };
-
   // Roll a fresh coherent base background (palette + fade + texture) in one click.
   const handleRandomizeBackground = () => {
     if (!customCard) return;
@@ -724,9 +715,6 @@ const CardCustomizer = () => {
               <StageFooter className="controls-footer">
                 {feedback && <Dim className="customizer-feedback">{feedback}</Dim>}
                 <FooterActions>
-                  <ResetButton type="button" className="stage-reset" onClick={handleResetToStart}>
-                    <LuRotateCcw /> Reset
-                  </ResetButton>
                   <NextButton type="button" className="stage-next" onClick={() => setStage('publish')}>
                     Publish <LuCircleArrowRight />
                   </NextButton>
@@ -1019,24 +1007,6 @@ const NextButton = styled.button`
   gap: 6px;
   svg { font-size: 15px; }
   &:hover { background: var(--gold-bright); }
-`;
-
-const ResetButton = styled.button`
-  font-family: var(--font-mono);
-  font-weight: 600;
-  font-size: 12px;
-  padding: 7px 14px;
-  border-radius: 20px;
-  cursor: pointer;
-  border: 1px solid var(--panel-border);
-  background: transparent;
-  color: var(--gold-bright);
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  svg { font-size: 14px; }
-  &:hover { background: var(--panel-hover); border-color: var(--gold-bright); color: var(--white); }
 `;
 
 export default CardCustomizer;

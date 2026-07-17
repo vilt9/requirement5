@@ -330,6 +330,12 @@ const UserCollectionView = ({ username }) => {
       )}
 
       {isOwn && savedCards.length > 0 && <LocalSaves cards={savedCards} onDelete={deleteCard} />}
+
+      {/* Visitor / shared view: the person's own collection comes first; the
+          "discover other collections" browse area sits at the very bottom so it
+          never pushes the shared collection down the page. (On your own
+          collection it lives up top instead.) */}
+      {!isOwn && <DiscoverCollections />}
     </Page>
   );
 };

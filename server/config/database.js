@@ -268,6 +268,22 @@ const memoryDb = {
 
   getUserById: (id) => db.users.find(u => u.id === id),
 
+  // A card enriched for public display. Cards store only the creator's uuid and a
+  // set_id; a viewer needs the human username and the set's label. Returns a
+  // shallow copy — the stored record is never mutated.
+  withCreatorAndSet: (card) => {
+    if (!card) return card;
+    const creator = card.creator_id && card.creator_id !== 'cloud'
+      ? db.users.find(u => u.id === card.creator_id)
+      : null;
+    const set = card.set_id ? db.sets.find(s => s.id === card.set_id) : null;
+    return {
+      ...card,
+      creator_username: creator?.username || null,
+      set: set ? { id: set.id, label: set.label, info: set.info || null } : null
+    };
+  },
+
   getUserByUsername: (username) =>
     db.users.find(u => u.username.toLowerCase() === String(username).toLowerCase()),
 

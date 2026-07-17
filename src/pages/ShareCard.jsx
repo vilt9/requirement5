@@ -1,14 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import styled from 'styled-components';
-import { LuCircleArrowRight } from 'react-icons/lu';
+import { LuCircleArrowRight, LuLink, LuSearchCheck } from 'react-icons/lu';
 import Card from '../components/Card/Card';
 import { useAuth } from '../context/AuthContext';
 import { api, ApiError, apiBase } from '../utils/api';
 import { poolCardToCardData } from '../utils/poolCard';
 import { generateCardAttributes } from '../utils/cardGenerator';
-import { saveCostFor, savePriceFor, linkedSurchargeFor, fmtT26 } from '../utils/economyRandom';
-import InfoTip from '../components/InfoTip';
+import { saveCostFor, savePriceFor, fmtT26 } from '../utils/economyRandom';
 import { scrubTo } from '../utils/cardMotion';
 import { prefetchedCards } from '../utils/drawQueue';
 import { HOLO_NAMES } from '../utils/holoNames';
@@ -50,8 +49,8 @@ const ShareCard = () => {
   // A generated card starts its run at the TOP of the track: flat for a
   // breath, then straight into the shiny zone — the fastest read on whether
   // this card's holo is a keeper or the next Generate beckons. `earned` rides
-  // along on every Generate navigation (and never on a shared link), so it's
-  // the "arrived via Generate" signal; `discovered` only marks pool finds.
+  // along on every Generate navigation (and never on a shared link), the same
+  // "arrived via Generate" signal as `discovered` — both mark the discovered path.
   //
   // The rewind waits for the card's art: resetting the moment navigation
   // lands replays the flat→shiny reveal against the PREVIOUS card's pixels
@@ -193,8 +192,9 @@ const ShareCard = () => {
   // (not replaced) so Back walks through the cards you've seen.
   const generate = useCallback(() => {
     const entry = nextCard();
+    // Reached via Generate ⇒ a discovered save (whatever the card's source).
     navigate(`/card/${entry.id}`, {
-      state: { discovered: entry.discovered, earned: entry.earned }
+      state: { discovered: true, earned: entry.earned }
     });
   }, [nextCard, navigate]);
 
@@ -347,23 +347,14 @@ const ShareCard = () => {
   // Price tracks that rarity as a wide distribution, seeded from the id. The
   // server computes the identical number. `cardPrice` is the base (discovered)
   // price; a save reached via a shared link pays the surcharged `myPrice`.
-  const cardPrice = saveCostFor(id, rarity);
+  const cardPrice = saveCostFor(id, rarity);               // discovered (base) price
   const myProvenance = discovered ? 'discovered' : 'linked';
-  const linkedMult = linkedSurchargeFor(id);
+  const linkedPrice = savePriceFor(id, 'linked', rarity);  // base × surcharge
   const myPrice = savePriceFor(id, myProvenance, rarity);
 
   const saved = saveResult && saveResult !== 'exists';
-  const mainLabel = saveResult === 'exists' ? 'In collection ✓' : saved ? 'Saved ✓' : 'Save';
+  const mainLabel = saveResult === 'exists' ? 'In collection ✓' : saved ? 'Saved ✓' : (discovered ? 'D-Save' : 'L-Save');
   const subLabel = saveResult ? null : `−${fmtT26(myPrice)} /t26`;
-
-  // Shared explanation for the discovered-vs-linked (i) tooltips.
-  const saveTypeHelp = (
-    <>
-      <b>Discovered save</b> — you found this card by generating; you pay the base
-      price. <b>Linked save</b> — you opened it from a shared link, so it costs a
-      surcharge (this card: ×{linkedMult}). The designer earns 70% either way.
-    </>
-  );
   const totalPublished = rarities ? rarities.length : null;
   const tierPeers = rarities && tier ? rarities.filter(r => tierOf(r)?.key === tier.key).length : null;
   const poolShare = tierPeers != null && totalPublished > 0 ? tierPeers / totalPublished : null;
@@ -371,6 +362,12 @@ const ShareCard = () => {
     ? Math.max(1, Math.round((1 - rarities.filter(r => r < rarity).length / rarities.length) * 100))
     : null;
   const klass = card.class || cc.class || null;
+
+  // Creator: cards store a uuid, but the enriched record carries the username.
+  // Link it to that creator's collection; the set (if any) links to its wall.
+  const creatorName = card.creator_id === 'cloud' ? 'synthetic' : (card.creator_username || null);
+  const creatorLink = card.creator_username ? `/${card.creator_username}/collection` : null;
+  const ownerLinked = ownerSave && (ownerSave.provenance === 'linked' || ownerSave.provenance === 'direct');
 
   return (
     <Page>
@@ -387,44 +384,10 @@ const ShareCard = () => {
       </Hero>
 
       <Column>
-        {/* Unclaimed draws carry no name/provenance lines — the card speaks
-            for itself and vertical space above the fold is precious. */}
-        {!synthetic && (
-          <Meta>
-            <div className="name">{card.name || 'Untitled card'}</div>
-            <div className="sub"><Dim>{card.creator_id === 'cloud' ? 'synthetic' : `by ${card.creator_id}`}</Dim></div>
-            {ownerSave && (
-              <div className="sub">
-                <Dim>
-                  Saved by <span className="owner">{ownerSave.username}</span>
-                  {ownerSave.cost != null && <> — {fmtT26(ownerSave.cost)} /t26</>}
-                  {' '}<SaveTag $linked={ownerSave.provenance === 'linked' || ownerSave.provenance === 'direct'}>
-                    {(ownerSave.provenance === 'linked' || ownerSave.provenance === 'direct') ? 'linked save' : 'discovered save'}
-                  </SaveTag>
-                  <InfoTip label="Discovered vs linked save">{saveTypeHelp}</InfoTip>
-                  {ownerSave.saved_at && <> · {new Date(ownerSave.saved_at).toISOString().slice(0, 10)}</>}
-                </Dim>
-              </div>
-            )}
-            {!saveResult && !provisional && (
-              <div className="sub">
-                <Dim>
-                  Saving this is a{' '}
-                  <SaveTag $linked={myProvenance === 'linked'}>
-                    {myProvenance === 'linked' ? 'linked save' : 'discovered save'}
-                  </SaveTag>
-                  {' '}— −{fmtT26(myPrice)} /t26
-                  <InfoTip label="Discovered vs linked save">{saveTypeHelp}</InfoTip>
-                </Dim>
-              </div>
-            )}
-            {tags.length > 0 && (
-              <div className="tags">
-                <TagList tags={tags} onTagClick={(t) => navigate(`/tag/${encodeURIComponent(t)}`)} />
-              </div>
-            )}
-          </Meta>
-        )}
+        {/* The card's name, creator and provenance used to sit here, above the
+            dock — but their height varies card to card, which bounced the
+            Generate button up and down on desktop. They now live in their own
+            table below (see CardInfo), so the dock keeps a fixed position. */}
 
         {/* Generate + Save live in a fixed dock at the bottom of the screen —
             always visible, so the next card is one tap away from anywhere. The
@@ -446,11 +409,86 @@ const ShareCard = () => {
               onClick={() => save()}
               disabled={busy || provisional || saveResult === 'exists' || !!saveResult}
             >
-              <span className="main">{mainLabel}</span>
+              <span className="main">
+                {mainLabel}
+                {!saveResult && (myProvenance === 'linked'
+                  ? <LuLink aria-hidden />
+                  : <LuSearchCheck aria-hidden />)}
+              </span>
               {subLabel && <span className="sub">{subLabel}</span>}
             </SaveButton>
           </div>
         </FixedDock>
+
+        {/* Card name + creator, front and central right under the buttons.
+            Collapsed by default; opening it reveals the full identity table
+            (prices, set, tags). Synthetic draws have no identity, so it's
+            skipped for them. */}
+        {!synthetic && (
+          <CardIdentity>
+            <summary>
+              <span className="stack">
+                <span className="name">{card.name || 'Untitled card'}</span>
+                {creatorName && <span className="by">{creatorName}</span>}
+              </span>
+            </summary>
+            <div className="body">
+              <Detail label="Name">{card.name || 'Untitled card'}</Detail>
+              {card.info && <DetailRow $secondary>{card.info}</DetailRow>}
+              {creatorName && (
+                <DetailRow>
+                  <span className="k">Creator: </span>
+                  {creatorLink ? <Link to={creatorLink}>{creatorName}</Link> : creatorName}
+                </DetailRow>
+              )}
+              {card.set && (
+                <>
+                  <DetailRow>
+                    <span className="k">Set: </span>
+                    <Link to={`/set/${encodeURIComponent(card.set.id)}`}>{card.set.label}</Link>
+                  </DetailRow>
+                  {card.set.info && <DetailRow $secondary>{card.set.info}</DetailRow>}
+                </>
+              )}
+              {ownerSave && (
+                <DetailRow>
+                  <span className="k">Saved by: </span>
+                  <Link to={`/${ownerSave.username}/collection`}>{ownerSave.username}</Link>
+                  {ownerSave.cost != null && <> — {fmtT26(ownerSave.cost)} /t26</>}
+                  {' '}<SaveTag $linked={ownerLinked}>{ownerLinked ? 'L-Save' : 'D-Save'}</SaveTag>
+                  {ownerSave.saved_at && <> · {new Date(ownerSave.saved_at).toISOString().slice(0, 10)}</>}
+                </DetailRow>
+              )}
+              <DetailRow>
+                <span className="k">Discovered save price: </span>
+                {fmtT26(cardPrice)} /t26
+              </DetailRow>
+              <DetailRow>
+                <span className="k">Linked save price: </span>
+                −{fmtT26(linkedPrice)} /t26
+              </DetailRow>
+              {tags.length > 0 && (
+                <DetailRow className="tags-row">
+                  <span className="k">Tags: </span>
+                  <TagList tags={tags} onTagClick={(t) => navigate(`/tag/${encodeURIComponent(t)}`)} />
+                </DetailRow>
+              )}
+              <DetailDivider />
+              <SaveExplainer>
+                <div><b>D-Save</b> — <i>discovered</i>:<br />A card you generated yourself. You pay the base price.</div>
+                <div><b>L-Save</b> — <i>linked</i>:<br />A card you were sent a link to. You pay a surcharge.</div>
+                {!saved && !saveResult && (
+                  <div style={{ marginTop: 8 }}>Save this card now and it's recorded as a{discovered ? '' : 'n'} <b>{discovered ? 'D' : 'L'}-Save</b>.</div>
+                )}
+              </SaveExplainer>
+            </div>
+          </CardIdentity>
+        )}
+
+        <AboutBox>
+          <summary>About Requirement5</summary>
+          <div className="body"><AboutR5c /></div>
+        </AboutBox>
 
         {/* Secondary actions stay in the page flow. Unclaimed cards render
             from their seed, so downloads work before a card is ever saved. */}
@@ -474,11 +512,6 @@ const ShareCard = () => {
           </Result>
         )}
         {saveError && <Result $error>{saveError}</Result>}
-
-        <AboutBox>
-          <summary>About Requirement5</summary>
-          <div className="body"><AboutR5c /></div>
-        </AboutBox>
 
         {user && user.balance < 0 && (
           <TopUpNote>
@@ -549,7 +582,6 @@ const ShareCard = () => {
           <Detail label="Animation speed" secondary>{num(cc.animationSpeed)}</Detail>
           <Detail label="Pixel density" secondary>{cc.pixelDensity}</Detail>
           <Detail label="Saved">{`${card.times_saved || 0} ${card.times_saved === 1 ? 'collection' : 'collections'}`}</Detail>
-          <Detail label="Creator">{card.creator_id === 'cloud' ? 'synthetic' : card.creator_id}</Detail>
           <Detail label="Created" secondary>{created}</Detail>
         </Details>
 
@@ -610,13 +642,6 @@ const Column = styled.div`
   @media (max-width: 640px) {
     padding-bottom: 96px;
   }
-`;
-
-const Meta = styled.div`
-  .name { font-size: 13px; color: var(--amber-text); }
-  .sub { margin-top: 2px; font-size: 13px; }
-  .sub .owner { color: var(--gold-bright); }
-  .tags { margin-top: 6px; }
 `;
 
 // A small inline chip marking a save as discovered (base price) or linked
@@ -749,6 +774,20 @@ const Note = styled.div`
   font-size: 13px;
 `;
 
+// The D-Save vs L-Save explainer, sitting just above the price tables (and below
+// the debt note). Replaces the old (i) tooltips that used to sit beside the rows.
+const SaveExplainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--amber-dim);
+
+  b { color: var(--amber-text); }
+  i { color: var(--gold-bright); }
+`;
+
 // Collapsed by default, but inviting — the lore behind R5c, one click away.
 // Shown under the About box only when the viewer's own balance is negative — a
 // small note of remaining debt headroom with an underlined link to the account
@@ -786,6 +825,42 @@ const AboutBox = styled.details`
   .body { padding: 4px 14px 16px; }
 `;
 
+// The card's name + creator, front and central right under the dock. The name
+// is the always-visible summary; opening it drops down the identity table
+// (creator, set, save prices, tags). Same collapsible look as the About box.
+const CardIdentity = styled.details`
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: var(--panel);
+
+  summary {
+    cursor: pointer;
+    padding: 10px 12px;
+    font-family: var(--font-mono);
+    list-style: none;
+    user-select: none;
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: '▸'; color: var(--amber-dim); }
+  &[open] summary::before { content: '▾'; }
+
+  /* Name over creator, each on its own line, so a very long card name wraps
+     cleanly instead of colliding with the username. */
+  .stack { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .name { font-size: 14px; color: var(--gold-bright); overflow-wrap: anywhere; }
+  .by { font-size: 12px; color: var(--amber-dim); overflow-wrap: anywhere; }
+
+  .body {
+    padding: 4px 14px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+`;
+
 // Card details, in the plain label: value style of requirement5.com under a card.
 const Details = styled.div`
   margin-top: 2px;
@@ -796,6 +871,14 @@ const DetailRow = styled.div`
   line-height: 1.7;
   color: ${p => (p.$secondary ? 'var(--amber-dim)' : 'var(--amber-text)')};
   .k { color: var(--amber-dim); }
+
+  /* Keep the "Tags:" label on the same line as its chips, wrapping as needed. */
+  &.tags-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 6px;
+  }
 `;
 
 const DetailDivider = styled.div`
