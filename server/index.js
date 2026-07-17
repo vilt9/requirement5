@@ -9,6 +9,7 @@ import economyRoutes from './routes/economy.js';
 import drawRoutes from './routes/draw.js';
 import analyticsRoutes from './routes/analytics.js';
 import paymentsRoutes, { webhookHandler } from './routes/payments.js';
+import adminRoutes from './routes/admin.js';
 import { UPLOADS_DIR } from './storage/index.js';
 import linkTrace from './middleware/linkTrace.js';
 
@@ -46,6 +47,7 @@ app.use('/api/economy', economyRoutes);
 app.use('/api/draw', drawRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/payments', paymentsRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

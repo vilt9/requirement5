@@ -6,14 +6,12 @@ import MotionBar from '../components/MotionBar';
 import { api } from '../utils/api';
 import { poolCardToCardData } from '../utils/poolCard';
 import { Page, Panel, Dim } from '../components/UI';
-import { ensureTags, normalizeTag, formatTag } from '../utils/tags';
 
-// Every published card carrying one tag, shown as a visual wall — no stats,
-// filters or prices, just the cards. Reached by clicking a tag anywhere on a
-// card; each card links through to its own page.
-const TagPage = () => {
-  const { tag: rawTag } = useParams();
-  const tag = normalizeTag(rawTag || '');
+// Every published card in one set (a creator's own named grouping), shown as a
+// visual wall — the same shape as a tag page. Reached by clicking a card's set
+// name; each card links through to its own page.
+const SetPage = () => {
+  const { setId } = useParams();
   const navigate = useNavigate();
   const [cards, setCards] = useState([]);
   const [loaded, setLoaded] = useState(false);
@@ -27,20 +25,23 @@ const TagPage = () => {
   }, []);
 
   const matches = useMemo(
-    () => cards.filter(c => ensureTags(c.tags).includes(tag)),
-    [cards, tag]
+    () => cards.filter(c => (c.set?.id || c.set_id) === setId),
+    [cards, setId]
   );
+  // The set's human label rides on the enriched card; fall back to the part of
+  // the namespaced id after the creator prefix.
+  const label = matches[0]?.set?.label || setId.slice(setId.indexOf('_') + 1) || setId;
 
   return (
     <Page>
       {matches.length > 0 && <PageMotionBar />}
       <Header>
-        <h2>{formatTag(tag)}</h2>
-        <Dim>{loaded ? `${matches.length} card${matches.length === 1 ? '' : 's'}` : 'loading…'}</Dim>
+        <h2>{label}</h2>
+        <Dim>{loaded ? `set · ${matches.length} card${matches.length === 1 ? '' : 's'}` : 'loading…'}</Dim>
       </Header>
 
       {loaded && matches.length === 0 && (
-        <Panel><Dim>No cards tagged {formatTag(tag)} yet. <Link to="/">Discover cards</Link>.</Dim></Panel>
+        <Panel><Dim>No cards in this set. <Link to="/">Discover cards</Link>.</Dim></Panel>
       )}
 
       <Grid>
@@ -102,4 +103,4 @@ const Name = styled.div`
   text-align: center;
 `;
 
-export default TagPage;
+export default SetPage;

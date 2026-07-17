@@ -87,6 +87,12 @@ const Navigation = () => {
               {link.label}
             </NavLink>
           ))}
+          {/* Only the operator (server-set is_admin) sees the review surface. */}
+          {user?.is_admin && (
+            <NavLink to="/admin" className={location.pathname === '/admin' ? 'active' : ''}>
+              Admin
+            </NavLink>
+          )}
         </Links>
         <IconLinks>
           <IconLink

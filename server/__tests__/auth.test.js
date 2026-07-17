@@ -12,7 +12,7 @@ beforeEach(() => {
 
 const signup = (body) => request(app).post('/api/auth/signup').send(body);
 const login = (body) => request(app).post('/api/auth/login').send(body);
-const valid = (username) => ({ username, email: `${username}@earth.test`, password: 'password123' });
+const valid = (username) => ({ username, email: `${username}@earth.test`, password: 'password123', dob: '1990-01-01', acceptedTerms: true });
 
 describe('POST /api/auth/signup', () => {
   test('creates a user, grants a starting balance, and returns a token', async () => {

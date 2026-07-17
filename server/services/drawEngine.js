@@ -50,7 +50,7 @@ const buildResult = (userId, card, yieldSeed) => {
     tier: tier
       ? { key: tier.key, name: tier.name, scoreRange: tier.scoreRange, multiplier: tier.multiplier }
       : null,
-    card: card || null,
+    card: card ? memoryDb.withCreatorAndSet(card) : null,
     stats: card ? cardStats(card) : null,
     yield: { full: fullYield, credited, capped: credited < fullYield },
     balance: user.balance

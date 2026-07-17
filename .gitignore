@@ -38,6 +38,10 @@ server/uploads/
 
 # Local-only Claude notes (names real infrastructure)
 CLAUDE.local.md
+
+# Internal legal drafts + risk assessments (this repo is public). The public
+# legal pages live in src/legal/ and ARE committed; these are the working docs.
+/legal/
 .e2e-data/
 test-results/
 playwright-report/

@@ -8,7 +8,7 @@ beforeEach(() => {
 });
 
 const makeUser = async (username = 'buyer') => {
-  const result = await User.create({ username, email: `${username}@earth.test`, password: 'password123' });
+  const result = await User.create({ username, email: `${username}@earth.test`, password: 'password123', dob: '1990-01-01', acceptedTerms: true });
   expect(result.success).toBe(true);
   return result.data;
 };

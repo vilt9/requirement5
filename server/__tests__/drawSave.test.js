@@ -11,7 +11,7 @@ beforeEach(() => {
 const signup = async (username) => {
   const res = await request(app)
     .post('/api/auth/signup')
-    .send({ username, email: `${username}@earth.test`, password: 'password123' });
+    .send({ username, email: `${username}@earth.test`, password: 'password123', dob: '1990-01-01', acceptedTerms: true });
   expect(res.status).toBe(201);
   return res.body.data; // { user, token }
 };

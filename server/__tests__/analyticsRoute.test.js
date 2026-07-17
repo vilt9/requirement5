@@ -26,7 +26,7 @@ describe('POST /api/analytics/event', () => {
   });
 
   it('tags the click with the user when a token rides along', async () => {
-    const { data: user } = await User.create({ username: 'clicker', email: 'c@earth.test', password: 'password123' });
+    const { data: user } = await User.create({ username: 'clicker', email: 'c@earth.test', password: 'password123', dob: '1990-01-01', acceptedTerms: true });
     const token = signToken(user);
     await request(app)
       .post('/api/analytics/event')

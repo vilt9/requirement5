@@ -46,7 +46,7 @@ export default class Card {
       if (!card) {
         return { success: false, error: 'Card not found' };
       }
-      return { success: true, data: card };
+      return { success: true, data: memoryDb.withCreatorAndSet(card) };
     } catch (error) {
       console.error('Error finding card by id:', error);
       return { success: false, error: error.message };
@@ -115,8 +115,10 @@ export default class Card {
   // New collection-related methods
   static async getCommunityCards() {
     try {
-      const allCards = memoryDb.getAllCards();
-      const publicCards = allCards.filter(card => card.is_public);
+      // memoryDb.getCommunityCards already excludes drafts and anything out of
+      // circulation (flagged/removed); enrich each with creator + set for display.
+      const publicCards = memoryDb.getCommunityCards()
+        .map(card => memoryDb.withCreatorAndSet(card));
       return { success: true, data: publicCards };
     } catch (error) {
       console.error('Error getting community cards:', error);
@@ -165,21 +167,9 @@ export default class Card {
 
   static async getCommunityStats() {
     try {
-      const allCards = memoryDb.getAllCards();
-      const publicCards = allCards.filter(card => card.is_public);
-      
-      const stats = {
-        totalCards: publicCards.length,
-        activeCreators: new Set(publicCards.map(card => card.creator_id)).size,
-        recentActivity: publicCards.filter(card => {
-          const cardDate = new Date(card.created_at);
-          const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-          return cardDate >= oneDayAgo;
-        }).length,
-        totalCollections: publicCards.reduce((sum, card) => sum + (card.collection_count || 0), 0)
-      };
-
-      return { success: true, data: stats };
+      // Delegate to the store so the "in circulation" rule (drafts + flagged +
+      // removed excluded) is applied in exactly one place.
+      return { success: true, data: memoryDb.getCommunityStats() };
     } catch (error) {
       console.error('Error getting community stats:', error);
       return { success: false, error: error.message };

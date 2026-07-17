@@ -35,6 +35,10 @@ const db = {
   sets: [],
   // Usage events (generate clicks). Append-only; user_id null when logged out.
   events: [],
+  // User reports against a card (nudity, copyright, hate, …). Append-only; a
+  // report also flips the card's moderation_status to 'flagged' (out of
+  // circulation) pending admin review.
+  reports: [],
   // In-progress rarity rolls (one active per user). Ephemeral — deliberately
   // NOT persisted: a restart just means designers re-roll. The server owns the
   // rolled rarity so neither the web nor the CLI can self-declare it.
@@ -48,7 +52,7 @@ const db = {
 // Track which rows changed since the last flush so we only upsert the deltas
 // (transactions are append-only and unbounded — a full-snapshot flush would grow
 // linearly). Counters + cloud are tiny and rewritten every flush.
-const dirty = { cards: new Set(), users: new Set(), transactions: new Set(), saves: new Set(), stars: new Set(), sets: new Set(), events: new Set() };
+const dirty = { cards: new Set(), users: new Set(), transactions: new Set(), saves: new Set(), stars: new Set(), sets: new Set(), events: new Set(), reports: new Set() };
 const removed = { cards: new Set(), users: new Set(), saves: new Set(), stars: new Set(), sets: new Set() };
 let truncateRequested = false;
 
@@ -125,7 +129,7 @@ const load = () => {
   if (IS_TEST || !fs.existsSync(DB_FILE)) return;
   try {
     const loaded = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-    for (const key of ['cards', 'users', 'transactions', 'saves', 'stars', 'sets', 'events']) {
+    for (const key of ['cards', 'users', 'transactions', 'saves', 'stars', 'sets', 'events', 'reports']) {
       if (Array.isArray(loaded[key])) db[key] = loaded[key];
     }
     if (loaded.cloud) db.cloud = { ...db.cloud, ...loaded.cloud };
@@ -135,6 +139,15 @@ const load = () => {
 };
 
 const now = () => new Date().toISOString();
+
+// A published card is "in circulation" — eligible for the pool, draws, the
+// tag/set walls, and saving — only while its moderation_status is clear. A user
+// report flips it to 'flagged'; an admin can 'remove' it. Drafts (is_public
+// false) are never in circulation regardless. Cards minted before this field
+// existed have no moderation_status, which reads as clear.
+const inCirculation = (card) =>
+  !!card && card.is_public &&
+  card.moderation_status !== 'flagged' && card.moderation_status !== 'removed';
 
 // Retained for import compatibility; real pooling lives in pgStore.js.
 const pool = {
@@ -206,16 +219,23 @@ const memoryDb = {
     });
   },
 
-  getCommunityCards: () => db.cards.filter(card => card.is_public),
+  // Public reads exclude anything out of circulation (flagged/removed) so a
+  // reported card vanishes from the pool, draws, and tag/set walls at once.
+  getCommunityCards: () => db.cards.filter(inCirculation),
 
   getPublishedCardsByTier: (tier) =>
-    db.cards.filter(card => card.is_public && card.tier === tier),
+    db.cards.filter(card => inCirculation(card) && card.tier === tier),
 
   getRandomCommunityCard: () => {
-    const publicCards = db.cards.filter(card => card.is_public);
+    const publicCards = db.cards.filter(inCirculation);
     if (publicCards.length === 0) return null;
     return publicCards[Math.floor(Math.random() * publicCards.length)];
   },
+
+  // Cards taken out of circulation by a report, for the admin review queue.
+  getFlaggedCards: () => db.cards.filter(c => c.moderation_status === 'flagged'),
+
+  isCirculating: (card) => inCirculation(card),
 
   incrementCollectionCount: (cardId) => {
     const card = db.cards.find(c => c.id === cardId);
@@ -242,7 +262,7 @@ const memoryDb = {
   },
 
   getCommunityStats: () => {
-    const publicCards = db.cards.filter(card => card.is_public);
+    const publicCards = db.cards.filter(inCirculation);
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     return {
       totalCards: publicCards.length,
@@ -342,6 +362,35 @@ const memoryDb = {
     return newEvent;
   },
   getAllEvents: () => [...db.events],
+
+  // ---------- reports (user flags against a card) ----------
+  createReport: (report) => {
+    const newReport = {
+      status: 'open',
+      reporter_id: null,
+      detail: null,
+      ...report,
+      id: crypto.randomUUID(),
+      created_at: now()
+    };
+    db.reports.push(newReport);
+    markDirty('reports', newReport.id);
+    persistSoon();
+    return newReport;
+  },
+  getAllReports: () => [...db.reports],
+  getReportsForCard: (cardId) => db.reports.filter(r => r.card_id === cardId),
+  // Mark every open report on a card resolved (called when an admin acts on it).
+  resolveReportsForCard: (cardId, resolution) => {
+    for (const r of db.reports) {
+      if (r.card_id === cardId && r.status === 'open') {
+        r.status = resolution || 'resolved';
+        r.resolved_at = now();
+        markDirty('reports', r.id);
+      }
+    }
+    persistSoon();
+  },
 
   // ---------- saves (a user's collection of pool cards) ----------
   createSave: (save) => {
@@ -505,6 +554,7 @@ const memoryDb = {
     db.stars.length = 0;
     db.sets.length = 0;
     db.events.length = 0;
+    db.reports.length = 0;
     db.rolls.length = 0;
     db.cloud = { total_issued: 0, total_absorbed: 0 };
     if (USE_PG) {

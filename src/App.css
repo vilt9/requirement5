@@ -1,6 +1,22 @@
-#root {
+/* #root / .App are a full-bleed, full-height column: nav, the framed content,
+   then the footer. The visual frame (width cap, side padding, centring) lives
+   on .app-main — NOT #root — so the footer can span the full viewport width and
+   sit flush at the bottom. .app-main grows to fill the column, pushing the
+   footer down (a flexbox sticky footer — no position: fixed, so mobile keeps
+   the footer in normal flow and it never steals vertical space). */
+.App {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.app-main {
+  flex: 1;
+  width: 100%;
   max-width: 1280px;
-  margin: 0 auto;
+  /* left/right only — the top margin (nav clearance) is set in App.jsx. */
+  margin-left: auto;
+  margin-right: auto;
   padding: 2rem;
   text-align: center;
 }
@@ -8,7 +24,7 @@
 /* Phones: the 2rem side padding costs 64px of a ~375px screen, and the nav is
    in-flow there (not fixed) so no top clearance is needed either. */
 @media (max-width: 640px) {
-  #root {
+  .app-main {
     padding: 4px 0 24px;
   }
 }

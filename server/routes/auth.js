@@ -106,8 +106,8 @@ router.get('/claim/:token', (req, res) => {
 // Public: an artist redeems a claim link, sets a password, and is logged in.
 router.post('/claim', async (req, res) => {
   try {
-    const { token, password } = req.body || {};
-    const result = await User.claim({ token, password });
+    const { token, password, dob, acceptedTerms } = req.body || {};
+    const result = await User.claim({ token, password, dob, acceptedTerms });
     if (!result.success) return res.status(result.code || 400).json(result);
     res.json({
       success: true,

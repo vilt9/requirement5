@@ -78,3 +78,15 @@ CREATE TABLE IF NOT EXISTS events (
   user_id  text GENERATED ALWAYS AS (data ->> 'user_id') STORED
 );
 CREATE INDEX IF NOT EXISTS events_type_idx ON events (type);
+
+-- User reports against a card (nudity, copyright, hate, …). Append-only. A
+-- report also flips the reported card's data ->> 'moderation_status' to
+-- 'flagged' (out of circulation) pending admin review at /admin.
+CREATE TABLE IF NOT EXISTS reports (
+  id       text PRIMARY KEY,
+  data     jsonb NOT NULL,
+  card_id  text GENERATED ALWAYS AS (data ->> 'card_id') STORED,
+  status   text GENERATED ALWAYS AS (data ->> 'status') STORED
+);
+CREATE INDEX IF NOT EXISTS reports_card_idx   ON reports (card_id);
+CREATE INDEX IF NOT EXISTS reports_status_idx ON reports (status);

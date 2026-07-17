@@ -33,15 +33,23 @@ const AuthForm = ({ title, submitLabel, mode, onSubmit }) => {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  // Signup only: a real date of birth (the 18+ gate is enforced server-side)
+  // and explicit acceptance of the Terms + Privacy Policy.
+  const [dob, setDob] = useState('');
+  const [accepted, setAccepted] = useState(false);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
 
   const submit = async (e) => {
     e.preventDefault();
+    if (isSignup && !accepted) {
+      setError('Please confirm you are 18+ and accept the Terms and Privacy Policy.');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      if (isSignup) await onSubmit(username, email, password);
+      if (isSignup) await onSubmit(username, email, password, dob, accepted);
       else await onSubmit(username, password);
     } catch (err) {
       setError(err.message);
@@ -77,6 +85,32 @@ const AuthForm = ({ title, submitLabel, mode, onSubmit }) => {
           onChange={e => setPassword(e.target.value)}
           autoComplete={isSignup ? 'new-password' : 'current-password'}
         />
+        {isSignup && (
+          <>
+            <DobField>
+              <span>Date of birth</span>
+              <TextInput
+                type="date"
+                value={dob}
+                onChange={e => setDob(e.target.value)}
+                autoComplete="bday"
+                required
+              />
+            </DobField>
+            <Consent>
+              <input
+                type="checkbox"
+                checked={accepted}
+                onChange={e => setAccepted(e.target.checked)}
+              />
+              <span>
+                I am 18 or over and I accept the{' '}
+                <Link to="/terms" target="_blank">Terms</Link> and{' '}
+                <Link to="/privacy" target="_blank">Privacy Policy</Link>.
+              </span>
+            </Consent>
+          </>
+        )}
         {error && <ErrorText>{error}</ErrorText>}
         <div><PillButton type="submit" disabled={busy}>{submitLabel}</PillButton></div>
       </Stack>
@@ -147,6 +181,7 @@ const Account = () => {
         <Panel>
           Accounts hold your /t26 balance, your collection, and your published cards.
           New accounts receive a grant of {config?.startingGrant ?? 50} /t26 from the cloud.
+          <br /><Dim>You must be 18 or over to use Requirement5.</Dim>
         </Panel>
         <Row>
           <AuthForm title="Log in" submitLabel="Log in" mode="login" onSubmit={login} />
@@ -207,6 +242,26 @@ const Account = () => {
     </LeftPage>
   );
 };
+
+const DobField = styled.label`
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--amber-dim);
+`;
+
+const Consent = styled.label`
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--amber-text);
+  cursor: pointer;
+  input { margin-top: 2px; flex-shrink: 0; accent-color: var(--gold); }
+  a { text-decoration: underline; }
+`;
 
 const DebtNote = styled.div`
   color: #ff8a8a;

@@ -11,7 +11,7 @@ let token, username;
 const signup = async (name) => {
   const res = await request(app)
     .post('/api/auth/signup')
-    .send({ username: name, email: `${name}@earth.test`, password: 'password123' });
+    .send({ username: name, email: `${name}@earth.test`, password: 'password123', dob: '1990-01-01', acceptedTerms: true });
   expect(res.status).toBe(201);
   return res.body.data;
 };

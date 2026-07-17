@@ -13,7 +13,7 @@ import { prefetchedCards } from '../utils/drawQueue';
 import { HOLO_NAMES } from '../utils/holoNames';
 import { useScrollBloom } from '../utils/useScrollBloom';
 import AboutR5c from '../components/AboutR5c';
-import { Page, Panel, PillButton, Dim, TagList } from '../components/UI';
+import { Page, Panel, PillButton, Dim, TagList, Select, TextArea, ErrorText } from '../components/UI';
 import { ensureTags } from '../utils/tags';
 
 // Public card view at /card/:id. Anyone can look and press Generate to surface the
@@ -45,6 +45,15 @@ const ShareCard = () => {
   const scrolling = useScrollBloom(); // colour values bloom into their colour while scrolling
   const [rendering, setRendering] = useState(null); // 'gif' | 'mp4' while a moving image renders
   const [renderError, setRenderError] = useState(null);
+
+  // Reporting a card. Open the form, pick a reason, submit — the server takes
+  // the card out of circulation immediately and queues it for admin review.
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState('nudity');
+  const [reportDetail, setReportDetail] = useState('');
+  const [reportBusy, setReportBusy] = useState(false);
+  const [reportDone, setReportDone] = useState(false);
+  const [reportError, setReportError] = useState(null);
 
   // A generated card starts its run at the TOP of the track: flat for a
   // breath, then straight into the shiny zone — the fastest read on whether
@@ -283,6 +292,22 @@ const ShareCard = () => {
     setRendering(null);
   }, [id, card]);
 
+  const submitReport = useCallback(async () => {
+    setReportBusy(true);
+    setReportError(null);
+    try {
+      await api(`/api/cards/${id}/report`, {
+        method: 'POST',
+        body: { reason: reportReason, detail: reportDetail.trim() || undefined }
+      });
+      setReportDone(true);
+      setReportOpen(false);
+    } catch (err) {
+      setReportError(err?.message || 'Could not send this report. Please try again.');
+    }
+    setReportBusy(false);
+  }, [id, reportReason, reportDetail]);
+
   if (status === 'loading') {
     return <Page><Column><Panel><Dim>Loading card…</Dim></Panel></Column></Page>;
   }
@@ -504,6 +529,48 @@ const ShareCard = () => {
           </PillButton>
         </Actions>
         {renderError && <Result $error>{renderError}</Result>}
+
+        {/* Report / flag. Only for real stored cards (a synthetic draw that
+            nobody has saved isn't in the pool to report). Submitting takes the
+            card out of circulation immediately, pending admin review. */}
+        {!synthetic && !provisional && (
+          <ReportArea>
+            {reportDone ? (
+              <Dim>Thanks — this card has been sent for review and taken out of circulation.</Dim>
+            ) : reportOpen ? (
+              <div className="form">
+                <div className="title">Report this card</div>
+                <Select value={reportReason} onChange={e => setReportReason(e.target.value)}>
+                  <option value="nudity">Nudity or sexual content</option>
+                  <option value="violence">Violence or gore</option>
+                  <option value="copyright">Copyright / stolen artwork</option>
+                  <option value="hate">Hate or harassment</option>
+                  <option value="illegal">Other illegal content</option>
+                  <option value="spam">Spam</option>
+                  <option value="other">Something else</option>
+                </Select>
+                <TextArea
+                  placeholder="Add any detail (optional)"
+                  value={reportDetail}
+                  onChange={e => setReportDetail(e.target.value)}
+                />
+                {reportError && <ErrorText>{reportError}</ErrorText>}
+                <div className="buttons">
+                  <PillButton onClick={submitReport} disabled={reportBusy}>
+                    {reportBusy ? 'Sending…' : 'Submit report'}
+                  </PillButton>
+                  <PillButton $secondary onClick={() => setReportOpen(false)} disabled={reportBusy}>
+                    Cancel
+                  </PillButton>
+                </div>
+              </div>
+            ) : (
+              <button type="button" className="trigger" onClick={() => setReportOpen(true)}>
+                ⚑ Report this card
+              </button>
+            )}
+          </ReportArea>
+        )}
 
         {saved && (
           <Result>
@@ -767,6 +834,31 @@ const Result = styled.div`
   line-height: 1.6;
   font-size: 13px;
   color: ${p => (p.$error ? '#ff8a8a' : 'var(--amber-text)')};
+`;
+
+// The report control: a quiet trigger that opens into a small reason form.
+const ReportArea = styled.div`
+  .trigger {
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--amber-dim);
+    cursor: pointer;
+    &:hover { color: #ff8a8a; text-decoration: underline; }
+  }
+  .form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    background: var(--panel);
+  }
+  .title { font-size: 13px; color: var(--gold-bright); }
+  .buttons { display: flex; gap: 8px; }
 `;
 
 const Note = styled.div`

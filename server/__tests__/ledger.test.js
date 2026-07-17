@@ -8,7 +8,7 @@ beforeEach(() => {
 });
 
 const makeUser = async (username = 'tester') => {
-  const result = await User.create({ username, email: `${username}@earth.test`, password: 'password123' });
+  const result = await User.create({ username, email: `${username}@earth.test`, password: 'password123', dob: '1990-01-01', acceptedTerms: true });
   expect(result.success).toBe(true);
   return result.data;
 };
@@ -27,7 +27,7 @@ describe('signup grant', () => {
 
   test('rejects duplicate usernames/emails, short passwords, bad usernames, missing/bad email', async () => {
     await makeUser('dupe'); // registers dupe@earth.test
-    const ok = (username) => ({ username, email: `${username}@earth.test`, password: 'password123' });
+    const ok = (username) => ({ username, email: `${username}@earth.test`, password: 'password123', dob: '1990-01-01', acceptedTerms: true });
     // Each case fails for exactly one reason; the others are valid.
     expect((await User.create(ok('dupe'))).success).toBe(false);            // username taken
     expect((await User.create({ ...ok('caps'), username: 'DUPE' })).success).toBe(false); // username taken (case)

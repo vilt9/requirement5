@@ -74,7 +74,10 @@ const Bubble = styled.span`
   padding: 8px 10px;
   border-radius: 6px;
   border: 1px solid var(--panel-border);
-  background: var(--panel);
+  /* Opaque, not the translucent --panel — the bubble floats over card art and
+     detail text, and must stay legible on top of them. */
+  background: #120d06;
+  backdrop-filter: blur(4px);
   color: var(--amber-text);
   font-size: 11px;
   font-weight: 400;

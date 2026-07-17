@@ -89,10 +89,10 @@ export function AuthProvider({ children }) {
     restore();
   }, []);
 
-  const signup = async (username, email, password) => {
+  const signup = async (username, email, password, dob, acceptedTerms) => {
     const data = await api('/api/auth/signup', {
       method: 'POST',
-      body: { username, email, password, stash: readStash() }
+      body: { username, email, password, dob, acceptedTerms, stash: readStash() }
     });
     setToken(data.token);
     setUser(data.user);
@@ -114,10 +114,10 @@ export function AuthProvider({ children }) {
 
   // Redeem a claim link for a "gift" account: sets the artist's password on the
   // server and logs them straight in, exactly like signup/login.
-  const claim = async (token, password) => {
+  const claim = async (token, password, dob, acceptedTerms) => {
     const data = await api('/api/auth/claim', {
       method: 'POST',
-      body: { token, password }
+      body: { token, password, dob, acceptedTerms }
     });
     setToken(data.token);
     setUser(data.user);
@@ -151,7 +151,7 @@ export function AuthProvider({ children }) {
   const mintFresh = useCallback(() => {
     const id = crypto.randomUUID();
     prefetchedCards.set(id, 'synthetic');
-    return { id, discovered: false, earned: drawYieldFor(id) };
+    return { id, earned: drawYieldFor(id) };
   }, []);
 
   const refill = useCallback(async () => {
@@ -176,10 +176,10 @@ export function AuthProvider({ children }) {
           // lottery + synthetic slice); the client just shows what it dealt.
           if (result.source === 'pool' && result.card) {
             prefetchedCards.set(result.card.id, result.card);
-            queueRef.current.push({ id: result.card.id, discovered: true, earned });
+            queueRef.current.push({ id: result.card.id, earned });
           } else {
             prefetchedCards.set(seed, 'synthetic');
-            queueRef.current.push({ id: seed, discovered: false, earned });
+            queueRef.current.push({ id: seed, earned });
           }
         });
       }

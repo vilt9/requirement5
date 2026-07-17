@@ -111,8 +111,14 @@ async function promptHidden(label) {
 async function cmdSignup({ flags }) {
   const username = flags.username || fail('signup needs --username (3-24 chars: letters, numbers, underscore)');
   const email = flags.email || fail('signup needs --email');
+  // Requirement5 is 18+ (real-money top-ups + a paid re-roll). Signup requires a
+  // real date of birth and acceptance of the Terms + Privacy Policy.
+  const dob = flags.dob || fail('signup needs --dob YYYY-MM-DD (you must be 18 or over)');
+  if (!flags['accept-terms']) {
+    fail('signup needs --accept-terms (you confirm you are 18+ and accept the Terms & Privacy Policy at https://requirement5.com/terms)');
+  }
   const password = flags.password || await promptHidden('Password (min 8 chars): ');
-  const { data } = await api.post('/api/auth/signup', { username, email, password });
+  const { data } = await api.post('/api/auth/signup', { username, email, password, dob, acceptedTerms: true });
   setSession({ token: data.token, username: data.user.username });
   out(flags.json ? data : `Signed up and logged in as ${data.user.username}. Starting balance: ${data.user.balance} /t26.`);
 }

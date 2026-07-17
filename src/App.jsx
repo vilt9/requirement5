@@ -14,7 +14,10 @@ import CaptureCard from './pages/CaptureCard';
 import About from './pages/About';
 import Analytics from './pages/Analytics';
 import TagPage from './pages/TagPage';
+import SetPage from './pages/SetPage';
 import Verify from './pages/Verify';
+import Legal from './pages/Legal';
+import Admin from './pages/Admin';
 import Footer from './components/Footer';
 import './App.css';
 
@@ -172,8 +175,17 @@ function App() {
                 <Route path="/claim/:token" element={<ClaimAccount />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/analytics" element={<Analytics />} />
+                {/* Legal — static content pages, linked from the footer. */}
+                <Route path="/terms" element={<Legal doc="terms" />} />
+                <Route path="/privacy" element={<Legal doc="privacy" />} />
+                <Route path="/content-policy" element={<Legal doc="content-policy" />} />
+                {/* Admin review surface. Guarded client-side by is_admin and
+                    server-side by the admin-email check on every /api/admin call. */}
+                <Route path="/admin" element={<Admin />} />
                 {/* All published cards carrying one tag, shown as a visual wall. */}
                 <Route path="/tag/:tag" element={<TagPage />} />
+                {/* All published cards in one set (a creator's named grouping). */}
+                <Route path="/set/:setId" element={<SetPage />} />
                 <Route path="/card/:id" element={<ShareCard />} />
                 {/* A collector's copy of a card: same page, plus whose
                     collection it's in and what they paid. */}

@@ -46,6 +46,12 @@ const Footer = () => {
         <FooterLink to="/analytics">Analytics</FooterLink>
         <Sep>·</Sep>
         <FooterLink to="/account">Purchase /t26</FooterLink>
+        <Sep>·</Sep>
+        <FooterLink to="/terms">Terms</FooterLink>
+        <Sep>·</Sep>
+        <FooterLink to="/privacy">Privacy</FooterLink>
+        <Sep>·</Sep>
+        <FooterLink to="/content-policy">Content</FooterLink>
       </Banner>
       {/* origin-attestation link. easy to miss on purpose. */}
       <VoidDot to="/verify" aria-hidden="true" tabIndex={-1} />

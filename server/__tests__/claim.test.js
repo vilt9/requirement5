@@ -52,25 +52,34 @@ describe('Gift-account adopt + claim flow', () => {
   it('lets the artist claim the account, then burns the link', async () => {
     const adopted = await adopt('claim_me');
     const claimToken = adopted.body.data.claimToken;
+    const adult = { dob: '1990-01-01', acceptedTerms: true };
 
     // Wrong token → 404.
     await request(app).post('/api/auth/claim')
-      .send({ token: 'not-a-real-token', password: 'artistpass1' }).expect(404);
+      .send({ token: 'not-a-real-token', password: 'artistpass1', ...adult }).expect(404);
 
     // Too-short password → 400.
     await request(app).post('/api/auth/claim')
-      .send({ token: claimToken, password: 'short' }).expect(400);
+      .send({ token: claimToken, password: 'short', ...adult }).expect(400);
+
+    // Under 18 → 400 (the claim-time age gate).
+    await request(app).post('/api/auth/claim')
+      .send({ token: claimToken, password: 'artistpass1', dob: '2015-01-01', acceptedTerms: true }).expect(400);
+
+    // Not accepting the terms → 400.
+    await request(app).post('/api/auth/claim')
+      .send({ token: claimToken, password: 'artistpass1', dob: '1990-01-01', acceptedTerms: false }).expect(400);
 
     // Real claim → sets password, stamps claimed_at, logs them in.
     const claimed = await request(app).post('/api/auth/claim')
-      .send({ token: claimToken, password: 'artistpass1' }).expect(200);
+      .send({ token: claimToken, password: 'artistpass1', ...adult }).expect(200);
     expect(claimed.body.data.user.username).toBe('mj_claim_me');
     expect(claimed.body.data.user.claimed_at).toBeTruthy();
     expect(typeof claimed.body.data.token).toBe('string');
 
     // The link is now dead.
     await request(app).post('/api/auth/claim')
-      .send({ token: claimToken, password: 'artistpass1' }).expect(404);
+      .send({ token: claimToken, password: 'artistpass1', ...adult }).expect(404);
 
     // The artist can log in with their new password.
     const login = await request(app).post('/api/auth/login')
@@ -94,7 +103,7 @@ describe('Gift-account adopt + claim flow', () => {
   it('refuses to re-adopt a claimed account', async () => {
     const adopted = await adopt('already_claimed');
     await request(app).post('/api/auth/claim')
-      .send({ token: adopted.body.data.claimToken, password: 'artistpass1' }).expect(200);
+      .send({ token: adopted.body.data.claimToken, password: 'artistpass1', dob: '1990-01-01', acceptedTerms: true }).expect(200);
     const again = await adopt('already_claimed');
     expect(again.status).toBe(409);
   });

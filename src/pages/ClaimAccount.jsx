@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
+import styled from 'styled-components';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
 import { Page, Panel, Divider, Dim, PillButton, TextInput, ErrorText } from '../components/UI';
@@ -16,6 +17,10 @@ const ClaimAccount = () => {
   const [info, setInfo] = useState(null);      // { username, balance, cards }
   const [loadError, setLoadError] = useState(null);
   const [password, setPassword] = useState('');
+  // Claiming is a real person taking over the account, so the same 18+ gate and
+  // Terms acceptance as a fresh signup apply here.
+  const [dob, setDob] = useState('');
+  const [accepted, setAccepted] = useState(false);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
 
@@ -27,10 +32,14 @@ const ClaimAccount = () => {
 
   const submit = async (e) => {
     e.preventDefault();
+    if (!accepted) {
+      setError('Please confirm you are 18+ and accept the Terms and Privacy Policy.');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      await claim(token, password);
+      await claim(token, password, dob, accepted);
       navigate('/collection', { replace: true });
     } catch (err) {
       setError(err.message);
@@ -89,6 +98,28 @@ const ClaimAccount = () => {
             onChange={e => setPassword(e.target.value)}
             autoComplete="new-password"
           />
+          <DobField>
+            <span>Date of birth</span>
+            <TextInput
+              type="date"
+              value={dob}
+              onChange={e => setDob(e.target.value)}
+              autoComplete="bday"
+              required
+            />
+          </DobField>
+          <Consent>
+            <input
+              type="checkbox"
+              checked={accepted}
+              onChange={e => setAccepted(e.target.checked)}
+            />
+            <span>
+              I am 18 or over and I accept the{' '}
+              <Link to="/terms" target="_blank">Terms</Link> and{' '}
+              <Link to="/privacy" target="_blank">Privacy Policy</Link>.
+            </span>
+          </Consent>
           {error && <ErrorText>{error}</ErrorText>}
           <div><PillButton type="submit" disabled={busy}>Claim this account</PillButton></div>
         </div>
@@ -97,5 +128,25 @@ const ClaimAccount = () => {
     </Page>
   );
 };
+
+const DobField = styled.label`
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--amber-dim);
+`;
+
+const Consent = styled.label`
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--amber-text);
+  cursor: pointer;
+  input { margin-top: 2px; flex-shrink: 0; accent-color: var(--gold); }
+  a { text-decoration: underline; }
+`;
 
 export default ClaimAccount;

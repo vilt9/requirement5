@@ -14,7 +14,9 @@ jest.mock('../config/database.js', () => ({
     getCommunityCards: jest.fn(),
     getRandomCommunityCard: jest.fn(),
     incrementCollectionCount: jest.fn(),
-    getCommunityStats: jest.fn()
+    getCommunityStats: jest.fn(),
+    // Enrichment used by findById/getCommunityCards — identity in the unit tests.
+    withCreatorAndSet: jest.fn((card) => card)
   }
 }));
 
@@ -278,24 +280,26 @@ describe('Card Model', () => {
 
   describe('getCommunityCards', () => {
     it('should return community cards successfully', async () => {
+      // The store now owns the "in circulation" filter (drafts + flagged +
+      // removed excluded); the model enriches whatever it hands back.
       const mockCards = [
         { id: 'card_1', is_public: true },
-        { id: 'card_2', is_public: false },
         { id: 'card_3', is_public: true }
       ];
 
-      memoryDb.getAllCards.mockReturnValue(mockCards);
+      memoryDb.getCommunityCards.mockReturnValue(mockCards);
 
       const result = await Card.getCommunityCards();
 
       expect(result.success).toBe(true);
       expect(result.data).toHaveLength(2);
       expect(result.data.every(card => card.is_public)).toBe(true);
+      expect(memoryDb.getCommunityCards).toHaveBeenCalled();
     });
 
     it('should handle errors', async () => {
       const error = new Error('Database error');
-      memoryDb.getAllCards.mockImplementation(() => { throw error; });
+      memoryDb.getCommunityCards.mockImplementation(() => { throw error; });
 
       const result = await Card.getCommunityCards();
 
@@ -385,13 +389,11 @@ describe('Card Model', () => {
 
   describe('getCommunityStats', () => {
     it('should return community statistics successfully', async () => {
-      const mockCards = [
-        { id: 'card_1', is_public: true, creator_id: 'user1', created_at: new Date().toISOString(), collection_count: 5 },
-        { id: 'card_2', is_public: true, creator_id: 'user2', created_at: new Date().toISOString(), collection_count: 3 },
-        { id: 'card_3', is_public: false, creator_id: 'user3', created_at: new Date().toISOString(), collection_count: 1 }
-      ];
-
-      memoryDb.getAllCards.mockReturnValue(mockCards);
+      // The store computes the roll-up (over cards in circulation); the model
+      // just forwards it.
+      memoryDb.getCommunityStats.mockReturnValue({
+        totalCards: 2, activeCreators: 2, recentActivity: 2, totalCollections: 8
+      });
 
       const result = await Card.getCommunityStats();
 
@@ -403,7 +405,7 @@ describe('Card Model', () => {
 
     it('should handle errors', async () => {
       const error = new Error('Database error');
-      memoryDb.getAllCards.mockImplementation(() => { throw error; });
+      memoryDb.getCommunityStats.mockImplementation(() => { throw error; });
 
       const result = await Card.getCommunityStats();
 

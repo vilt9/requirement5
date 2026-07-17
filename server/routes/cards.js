@@ -6,6 +6,8 @@ import { getTier, saveCostFor, savePriceFor, dividendFor, createCostFor, regenCo
 import { absorb, issue, accrueInterest, InsufficientFundsError } from '../services/ledger.js';
 import { cardStats } from '../services/drawEngine.js';
 import { requireAuth, optionalAuth } from '../middleware/auth.js';
+import { isAdminEmail } from '../config/admin.js';
+import { screen, screenFields } from '../utils/moderation.js';
 import { setNameFor, setLabelOf, normalizeInfo } from '../utils/setName.js';
 import path from 'path';
 import { offloadImages, storeBuffer, UPLOADS_DIR } from '../storage/index.js';
@@ -116,6 +118,17 @@ const cardMetaPatch = (user, body) => {
   return patch;
 };
 
+// Reject card metadata carrying language we don't allow before it can reach the
+// pool. Usernames are screened separately at signup; this covers everything a
+// card puts in front of other people. Only screens the fields actually present.
+const screenCardWrite = (body = {}) => screenFields({
+  'Card name': body.name,
+  'Card info': body.info,
+  'Set name': body.setName,
+  'Set info': body.setInfo,
+  Tags: Array.isArray(body.tags) ? body.tags : undefined
+});
+
 // confirm-start — accept the current Rarity Value: pay the (gentle) create fee
 // and lock the rarity onto a PRIVATE draft card. Idempotent: once paid, calling
 // it again returns the same draft without re-charging (so stepping back and
@@ -126,6 +139,9 @@ router.post('/create/confirm-start', requireAuth, async (req, res) => {
   try {
     const roll = memoryDb.getActiveRollByUser(req.user.id);
     if (!roll) return res.status(404).json({ success: false, error: 'No creation in progress — run `card create begin` first' });
+
+    const bad = screenCardWrite(req.body || {});
+    if (bad) return res.status(400).json({ success: false, error: bad.message });
 
     const { name, stateData, tags } = req.body || {};
     const meta = cardMetaPatch(req.user, req.body || {});
@@ -214,6 +230,9 @@ router.get('/create/status', requireAuth, (req, res) => {
 // it publishes your single in-progress draft.
 router.post('/create/publish', requireAuth, async (req, res) => {
   try {
+    const bad = screenCardWrite(req.body || {});
+    if (bad) return res.status(400).json({ success: false, error: bad.message });
+
     const { id, name, stateData, tags } = req.body || {};
     const meta = cardMetaPatch(req.user, req.body || {});
     const roll = memoryDb.getActiveRollByUser(req.user.id);
@@ -272,7 +291,9 @@ router.post('/:id/save', requireAuth, async (req, res) => {
     // a shared draw isn't used up by its first saver; anyone with the link can
     // still claim it at the same per-id price.
     const card = memoryDb.getCardById(req.params.id);
-    if (!card || !(card.is_public || card.creator_id === 'cloud')) {
+    const outOfCirculation = card &&
+      (card.moderation_status === 'flagged' || card.moderation_status === 'removed');
+    if (!card || outOfCirculation || !(card.is_public || card.creator_id === 'cloud')) {
       return res.status(404).json({ success: false, error: 'Card not found' });
     }
     if (memoryDb.getSave(req.user.id, card.id)) {
@@ -328,6 +349,31 @@ router.post('/:id/save', requireAuth, async (req, res) => {
     console.error('Save error:', error);
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
+});
+
+// Report a card as unsafe (nudity/sexual, violence, copyright/IP, hate, other
+// illegal). Anyone can report — logged-in or not. A report takes the card OUT
+// OF CIRCULATION immediately (moderation_status → 'flagged') so a bad image
+// stops being served the moment someone flags it; an admin then reviews it at
+// /admin and either restores or removes it. An admin's prior 'removed' verdict
+// is never undone by a fresh report.
+const REPORT_REASONS = new Set(['sexual', 'nudity', 'violence', 'copyright', 'hate', 'illegal', 'spam', 'other']);
+router.post('/:id/report', optionalAuth, (req, res) => {
+  const card = memoryDb.getCardById(req.params.id);
+  if (!card || !card.is_public) {
+    return res.status(404).json({ success: false, error: 'Card not found' });
+  }
+  const reason = String(req.body?.reason || 'other').toLowerCase();
+  if (!REPORT_REASONS.has(reason)) {
+    return res.status(400).json({ success: false, error: 'Unknown report reason' });
+  }
+  const detail = typeof req.body?.detail === 'string' ? req.body.detail.trim().slice(0, 1000) : null;
+
+  memoryDb.createReport({ card_id: card.id, reporter_id: req.user?.id || null, reason, detail });
+  if (card.moderation_status !== 'removed') {
+    memoryDb.updateCard(card.id, { moderation_status: 'flagged' });
+  }
+  res.status(201).json({ success: true, data: { status: 'flagged' } });
 });
 
 // Save a synthetic card — one generated deterministically from its uuid rather
@@ -618,15 +664,20 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get card by ID
-router.get('/:id', async (req, res) => {
+// Get card by ID. A card taken out of circulation (flagged by a report, or
+// removed by an admin) reads as "not found" to the public — only its creator
+// and an admin can still load it (so it can be reviewed / appealed).
+router.get('/:id', optionalAuth, async (req, res) => {
   try {
     const result = await Card.findById(req.params.id);
-    if (result.success) {
-      res.json(result);
-    } else {
-      res.status(404).json(result);
+    if (!result.success) return res.status(404).json(result);
+    const card = result.data;
+    const hidden = card.moderation_status === 'flagged' || card.moderation_status === 'removed';
+    const privileged = req.user && (req.user.id === card.creator_id || isAdminEmail(req.user.email));
+    if (hidden && !privileged) {
+      return res.status(404).json({ success: false, error: 'Card not found' });
     }
+    res.json(result);
   } catch (error) {
     console.error('Error fetching card:', error);
     res.status(500).json({ success: false, error: 'Internal server error' });
@@ -749,6 +800,8 @@ router.get('/:id/render/download', async (req, res) => {
 // point; this remains for direct/programmatic creation.
 router.post('/', requireAuth, async (req, res) => {
   try {
+    const bad = screenCardWrite(req.body || {});
+    if (bad) return res.status(400).json({ success: false, error: bad.message });
     const result = await Card.create({ ...req.body, creatorId: req.user.id });
     if (result.success) {
       res.status(201).json(result);
@@ -775,6 +828,9 @@ router.put('/:id', requireAuth, async (req, res) => {
     if (existing.creator_id !== req.user.id) {
       return res.status(403).json({ success: false, error: 'Not your card' });
     }
+
+    const bad = screenCardWrite(req.body || {});
+    if (bad) return res.status(400).json({ success: false, error: bad.message });
 
     const { name, stateData, tier: tierKey, rarityScore, tags, ...rest } = req.body || {};
     // The metadata keys are request-shaped, not card-shaped: letting them ride

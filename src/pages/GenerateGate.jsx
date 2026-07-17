@@ -17,9 +17,10 @@ const GenerateGate = () => {
     if (loading || ran.current) return; // wait for the session restore
     ran.current = true;
     const entry = nextCard();
+    // Reached via Generate ⇒ a discovered save (whatever the card's source).
     navigate(`/card/${entry.id}`, {
       replace: true,
-      state: { discovered: entry.discovered, earned: entry.earned }
+      state: { discovered: true, earned: entry.earned }
     });
   }, [loading, nextCard, navigate]);
 
