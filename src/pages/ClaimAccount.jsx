@@ -7,7 +7,7 @@ import { Page, Panel, Divider, Dim, PillButton, TextInput, ErrorText } from '../
 import { fmtT26 } from '../utils/economyRandom';
 
 // The landing page for a "gift" account claim link (/claim/:token). We made an
-// account from someone's Midjourney posts and published cards under it; this is
+// account from someone's posts and published cards under it; this is
 // where they take it over by setting a password.
 const ClaimAccount = () => {
   const { token } = useParams();
@@ -66,7 +66,7 @@ const ClaimAccount = () => {
   return (
     <Page>
       <Panel>
-        We turned your Midjourney art into Requirement5cards, and set aside the
+        We turned your post into Requirement5cards, and set aside the
         account <b>{info.username}</b> for you.
         <Divider />
         {info.cards.length > 0 ? (

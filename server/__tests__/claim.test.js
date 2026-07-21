@@ -30,7 +30,7 @@ describe('Gift-account adopt + claim flow', () => {
   it('mints an unclaimed account with a sanitized username, a token, and a claim link', async () => {
     const res = await adopt('Cosmic-Painter!');
     expect(res.status).toBe(201);
-    expect(res.body.data.user.username).toBe('mj_cosmicpainter');
+    expect(res.body.data.user.username).toBe('cosmicpainter');
     expect(res.body.data.user.claimed_at).toBeNull();
     expect(res.body.data.user.balance).toBeGreaterThan(0);   // got the starting grant
     expect(typeof res.body.data.token).toBe('string');        // publishing token
@@ -73,7 +73,7 @@ describe('Gift-account adopt + claim flow', () => {
     // Real claim → sets password, stamps claimed_at, logs them in.
     const claimed = await request(app).post('/api/auth/claim')
       .send({ token: claimToken, password: 'artistpass1', ...adult }).expect(200);
-    expect(claimed.body.data.user.username).toBe('mj_claim_me');
+    expect(claimed.body.data.user.username).toBe('claim_me');
     expect(claimed.body.data.user.claimed_at).toBeTruthy();
     expect(typeof claimed.body.data.token).toBe('string');
 
@@ -83,14 +83,14 @@ describe('Gift-account adopt + claim flow', () => {
 
     // The artist can log in with their new password.
     const login = await request(app).post('/api/auth/login')
-      .send({ username: 'mj_claim_me', password: 'artistpass1' }).expect(200);
-    expect(login.body.data.user.username).toBe('mj_claim_me');
+      .send({ username: 'claim_me', password: 'artistpass1' }).expect(200);
+    expect(login.body.data.user.username).toBe('claim_me');
   });
 
   it('previews an unclaimed account (handle + balance) without revealing the token', async () => {
     const adopted = await adopt('preview_artist');
     const res = await request(app).get(`/api/auth/claim/${adopted.body.data.claimToken}`).expect(200);
-    expect(res.body.data.username).toBe('mj_preview_artist');
+    expect(res.body.data.username).toBe('preview_artist');
     expect(res.body.data.balance).toBeGreaterThan(0);
     expect(Array.isArray(res.body.data.cards)).toBe(true);
     expect(JSON.stringify(res.body.data)).not.toContain(adopted.body.data.claimToken);

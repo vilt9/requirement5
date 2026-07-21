@@ -24,12 +24,14 @@ const ageFromDob = (dob) => {
   return age;
 };
 
-// A Reddit/X handle → a valid, unclaimed R5c username: `mj_<handle>`, lowercased,
+// A Reddit/X handle → a matching, valid, unclaimed R5c username: lowercased,
 // non-username chars dropped, clamped to the 24-char limit. Empty/garbage handles
-// fall back to a random suffix so we never produce an invalid username.
+// fall back to a random generic username so we never produce an invalid one.
 export const usernameForHandle = (handle) => {
   const clean = String(handle || '').toLowerCase().replace(/[^a-z0-9_]/g, '');
-  const base = clean ? `mj_${clean}` : `mj_${crypto.randomBytes(4).toString('hex')}`;
+  if (clean.length >= 3) return clean.slice(0, 24);
+  const suffix = crypto.randomBytes(4).toString('hex');
+  const base = clean ? `${clean}_${suffix}` : `artist_${suffix}`;
   return base.slice(0, 24);
 };
 
