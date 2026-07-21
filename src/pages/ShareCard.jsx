@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
-import styled from 'styled-components';
+import styled, { createGlobalStyle } from 'styled-components';
 import { LuCircleArrowRight, LuLink, LuSearchCheck } from 'react-icons/lu';
 import Card from '../components/Card/Card';
 import { useAuth } from '../context/AuthContext';
@@ -396,6 +396,7 @@ const ShareCard = () => {
 
   return (
     <Page>
+      <FooterClearance />
       <Hero>
         {cardData
           ? (
@@ -742,6 +743,11 @@ const FixedDock = styled.div`
     gap: 10px;
     align-items: stretch;
   }
+  /* On phones the dock is width-constrained; let the two buttons share the
+     row evenly so neither gets squeezed narrow enough to break a label. */
+  @media (max-width: 640px) {
+    .buttons > button { flex: 1 1 0; }
+  }
   button {
     font-family: var(--font-mono);
     font-weight: 600;
@@ -787,6 +793,17 @@ const FixedDock = styled.div`
   }
 `;
 
+// The fixed dock floats over the very bottom of the viewport, which on phones
+// lands right on top of the site footer — the last row of links ends up hidden
+// behind the buttons. While this page is mounted, pad the footer so the whole
+// bar can scroll up clear of the dock. Only applies at phone widths, where the
+// dock is actually fixed.
+const FooterClearance = createGlobalStyle`
+  @media (max-width: 640px) {
+    .App > footer { padding-bottom: 104px; }
+  }
+`;
+
 // The pulled card's rarity, sat at the top of the dock so it's the first thing
 // read after a Generate. The value and tier name take the tier's own colour, so
 // a Singular glows pink and a Common stays muted — an instant "how rare is this".
@@ -825,7 +842,7 @@ const SaveButton = styled(PillButton)`
   line-height: 1.1;
   padding: 6px 16px;
   gap: 1px;
-  .main { font-size: 13px; display: inline-flex; align-items: center; gap: 5px; }
+  .main { font-size: 13px; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
   .main svg { font-size: 15px; margin-top: -4px; }
   .sub { font-size: 11px; font-weight: 600; letter-spacing: 0; opacity: 0.85; }
 `;
