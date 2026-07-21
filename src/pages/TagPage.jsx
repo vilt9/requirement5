@@ -68,6 +68,11 @@ const PageMotionBar = styled(MotionBar)`
   right: 20px;
   width: 40px;
   z-index: 60;
+  /* Narrow viewports hug the bar to the edge — a 20px inset reads as crowding
+     into the page at phone width. Wider viewports keep the roomier gap. */
+  @media (max-width: 640px) {
+    right: 4px;
+  }
 `;
 
 const Header = styled.div`
