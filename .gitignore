@@ -39,6 +39,10 @@ server/uploads/
 # Local-only Claude notes (names real infrastructure)
 CLAUDE.local.md
 
+# Private operator context for creator acquisition. This names production
+# infrastructure and workflows that must not appear in the public repository.
+/GROWTH_OPERATOR.local.md
+
 # Internal legal drafts + risk assessments (this repo is public). The public
 # legal pages live in src/legal/ and ARE committed; these are the working docs.
 /legal/

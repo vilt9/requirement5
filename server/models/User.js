@@ -25,7 +25,7 @@ const ageFromDob = (dob) => {
 };
 
 export const normalizeReservedUsername = (username) =>
-  String(username || '').trim().toLowerCase();
+  String(username || '').trim();
 
 export const publicUser = (user) => {
   if (!user) return null;

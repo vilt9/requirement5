@@ -52,7 +52,7 @@ export const createHandoff = ({ username: requestedUsername, openingBalance, car
   const ids = validateCardIds(cardIds);
   const studio = memoryDb.getUserByUsername(operator.studioUsername);
   if (!studio) throw new HandoffError('Configured studio account does not exist', 503);
-  if (studio.username.toLowerCase() === username) {
+  if (studio.username.toLowerCase() === username.toLowerCase()) {
     throw new HandoffError('Destination username must differ from the studio account');
   }
 

@@ -58,7 +58,7 @@ describe('Private operator handoff', () => {
       username: 'Zenchilada', openingBalance: 500, cardIds: [first.id, second.id]
     });
     expect(res.status).toBe(201);
-    expect(res.body.data.user.username).toBe('zenchilada');
+    expect(res.body.data.user.username).toBe('Zenchilada');
     expect(res.body.data.balance).toBe(500);
     expect(res.body.data.transferred).toEqual([first.id, second.id]);
 

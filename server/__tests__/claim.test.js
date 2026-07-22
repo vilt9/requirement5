@@ -31,7 +31,7 @@ describe('Reserved account claim flow', () => {
   it('creates an unclaimed account with an exact balance and server claim link', async () => {
     const res = await reserve('Zenchilada', 500);
     expect(res.status).toBe(201);
-    expect(res.body.data.user.username).toBe('zenchilada');
+    expect(res.body.data.user.username).toBe('Zenchilada');
     expect(res.body.data.user.claimed_at).toBeNull();
     expect(res.body.data.balance).toBe(500);
     expect(res.body.data.claimUrl).toMatch(/^http:\/\/localhost:5173\/claim\//);
