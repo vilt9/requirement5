@@ -68,9 +68,8 @@ const ClaimAccount = () => {
         <Invitation>
           <p>You have been selected because you are a human with exceptionally powerful imagination.</p>
           <p>
-            On Umdo1, strict governments use high-frequency electromagnetic waves to destroy
-            imaginative thought, and Vilt9 is the last government fighting to protect it.
-            Requirement5cards transport imagination from Earth to sustain the resistance.
+            Requirement5cards transport imagination from Earth to sustain the resistance. We want
+            you to join R5c and create cards to prevent imagination on Umdo1 from being extinguished.
           </p>
           <p>
             To encourage you to join the resistance, Vilt9 has transformed your work into
