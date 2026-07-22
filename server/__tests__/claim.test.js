@@ -99,6 +99,7 @@ describe('Reserved account claim flow', () => {
     const res = await request(app).get(`/api/auth/claim/${claimToken}`).expect(200);
     expect(res.body.data.username).toBe('preview_artist');
     expect(res.body.data.balance).toBe(500);
+    expect(res.body.data.defaultBalance).toBe(50);
     expect(res.body.data.cards).toHaveLength(1);
     expect(res.body.data.cards[0].is_public).toBe(false);
     expect(JSON.stringify(res.body.data)).not.toContain(claimToken);

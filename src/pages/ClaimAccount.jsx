@@ -13,7 +13,7 @@ const ClaimAccount = () => {
   const navigate = useNavigate();
   const { claim, user } = useAuth();
 
-  const [info, setInfo] = useState(null);      // { username, balance, cards }
+  const [info, setInfo] = useState(null);      // { username, balance, defaultBalance, cards }
   const [loadError, setLoadError] = useState(null);
   const [password, setPassword] = useState('');
   // Claiming is a real person taking over the account, so the same 18+ gate and
@@ -65,14 +65,27 @@ const ClaimAccount = () => {
   return (
     <ClaimPage>
       <Panel>
-        You have been selected because Umdo1 needs your imagination. To encourage
-        you to join the resistance, Vilt9 has transformed your work into
-        Requirement5cards and reserved the account <b>{info.username}</b> for you.
+        <Invitation>
+          <p>You have been selected because you are a human with exceptionally powerful imagination.</p>
+          <p>
+            On Umdo1, strict governments use high-frequency electromagnetic waves to destroy
+            imaginative thought, and Vilt9 is the last government fighting to protect it.
+            Requirement5cards transport imagination from Earth to sustain the resistance.
+          </p>
+          <p>
+            To encourage you to join the resistance, Vilt9 has transformed your work into
+            Requirement5cards and reserved the account <b>{info.username}</b> for you.
+          </p>
+          <p>
+            Because of the strength of your imagination, we have given your account{' '}
+            <b>{fmtT26(info.balance)} /t26</b>, compared with the standard{' '}
+            <b>{fmtT26(info.defaultBalance)} /t26</b>.
+          </p>
+        </Invitation>
         <Divider />
         {info.cards.length > 0 ? (
           <>
-            {info.cards.length} private card{info.cards.length === 1 ? '' : 's'} waiting for you,
-            plus a balance of <b>{fmtT26(info.balance)} /t26</b>:
+            {info.cards.length} private card{info.cards.length === 1 ? '' : 's'} waiting for you:
             <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
               {info.cards.map(c => (
                 <li key={c.id}>
@@ -83,7 +96,7 @@ const ClaimAccount = () => {
             </ul>
           </>
         ) : (
-          <>Your account comes with a balance of <b>{fmtT26(info.balance)} /t26</b>.</>
+          <>No private cards are waiting for this account yet.</>
         )}
       </Panel>
 
@@ -133,6 +146,11 @@ const ClaimAccount = () => {
 
 const ClaimPage = styled(Page)`
   text-align: left;
+`;
+
+const Invitation = styled.div`
+  p { margin: 0 0 10px; }
+  p:last-child { margin-bottom: 0; }
 `;
 
 const DobField = styled.label`

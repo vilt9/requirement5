@@ -2,6 +2,7 @@ import express from 'express';
 import User, { publicUser } from '../models/User.js';
 import { signToken, requireAuth } from '../middleware/auth.js';
 import { issue } from '../services/ledger.js';
+import { ECONOMY } from '../services/economy.js';
 import { memoryDb } from '../config/database.js';
 
 const router = express.Router();
@@ -71,7 +72,15 @@ router.get('/claim/:token', (req, res) => {
       rarity_score: c.rarity_score,
       is_public: !!c.is_public
     }));
-  res.json({ success: true, data: { username: user.username, balance: user.balance, cards } });
+  res.json({
+    success: true,
+    data: {
+      username: user.username,
+      balance: user.balance,
+      defaultBalance: ECONOMY.STARTING_GRANT,
+      cards
+    }
+  });
 });
 
 // Public: the account owner redeems a claim link, sets a password, and is logged in.
