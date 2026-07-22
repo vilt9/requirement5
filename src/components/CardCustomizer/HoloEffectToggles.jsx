@@ -6,8 +6,13 @@ import ParameterControl from './ParameterControl';
 import BlendModeSelector from './BlendModeSelector';
 import ColorPaletteEditor from './ColorPaletteEditor';
 import HoloImageInput from './HoloImageInput';
-import { Dim } from '../UI';
+import { Dim, Select } from '../UI';
 import { HOLO_NAMES } from '../../utils/holoNames';
+import {
+  HOLO_REVEAL_DIRECTIONS,
+  HOLO_REVEAL_EASINGS,
+  HOLO_REVEAL_MODES
+} from '../../utils/holoReveal';
 
 const HoloEffectToggles = ({
   customCard,
@@ -161,6 +166,78 @@ const HoloEffectToggles = ({
           own character. Images now LAYER with the gradients — stack several
           systems, each with its own image, for properly weird cards.
         </Dim>
+
+        <RevealGroup>
+          <RevealHeading>Activation Reveal</RevealHeading>
+          <Dim className="reveal-copy">
+            Choreographs how the resting card becomes holographic when it moves.
+          </Dim>
+          <RevealFields>
+            <SelectField>
+              <label htmlFor="holo-reveal-mode">Style</label>
+              <Select
+                id="holo-reveal-mode"
+                data-param="effectParams.holoRevealMode"
+                value={ep.holoRevealMode || 'fade'}
+                onChange={(event) => handleParamChange('effectParams.holoRevealMode', event.target.value, false)}
+              >
+                {HOLO_REVEAL_MODES.map(option => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </Select>
+            </SelectField>
+            <SelectField>
+              <label htmlFor="holo-reveal-easing">Motion</label>
+              <Select
+                id="holo-reveal-easing"
+                data-param="effectParams.holoRevealEasing"
+                value={ep.holoRevealEasing || 'smooth'}
+                onChange={(event) => handleParamChange('effectParams.holoRevealEasing', event.target.value, false)}
+              >
+                {HOLO_REVEAL_EASINGS.map(option => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </Select>
+            </SelectField>
+            <ParameterControl
+              label="Duration"
+              param="effectParams.holoRevealDuration"
+              value={ep.holoRevealDuration ?? 0.2}
+              min={0.05}
+              max={3}
+              step={0.05}
+              onChange={handleParamChange}
+              description="Seconds from resting artwork to the complete holo state."
+            />
+            {ep.holoRevealMode === 'wipe' && (
+              <>
+                <SelectField>
+                  <label htmlFor="holo-reveal-direction">Direction</label>
+                  <Select
+                    id="holo-reveal-direction"
+                    data-param="effectParams.holoRevealDirection"
+                    value={ep.holoRevealDirection || 'right'}
+                    onChange={(event) => handleParamChange('effectParams.holoRevealDirection', event.target.value, false)}
+                  >
+                    {HOLO_REVEAL_DIRECTIONS.map(option => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </Select>
+                </SelectField>
+                <ParameterControl
+                  label="Edge Softness"
+                  param="effectParams.holoRevealSoftness"
+                  value={ep.holoRevealSoftness ?? 12}
+                  min={0}
+                  max={40}
+                  step={1}
+                  onChange={handleParamChange}
+                  description="Feathers the moving boundary between the two images."
+                />
+              </>
+            )}
+          </RevealFields>
+        </RevealGroup>
 
         {/* Veil: the standard technique — a card-wide sheen with the full
             set of restored knobs. Works with no image at all (hue-matched
@@ -688,6 +765,50 @@ const ToggleGroup = styled.div`
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 6px;
   background: rgba(0, 0, 0, 0.2);
+`;
+
+const RevealGroup = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--panel-border);
+  border-left: 3px solid var(--gold);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.2);
+
+  .reveal-copy {
+    font-size: 10px;
+    line-height: 1.45;
+  }
+`;
+
+const RevealHeading = styled.h4`
+  margin: 0;
+  color: var(--gold-bright);
+  font-size: 12px;
+  font-weight: 600;
+`;
+
+const RevealFields = styled.div`
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+
+  @media (min-width: 500px) {
+    grid-template-columns: 1fr 1fr;
+  }
+`;
+
+const SelectField = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+
+  label {
+    color: var(--amber-text);
+    font-size: 11px;
+  }
 `;
 
 const EffectControls = styled.div`

@@ -1,7 +1,10 @@
 // All help text. `r5c help` / `r5c help <topic>`. The deep reference lives in
 // cli/CLI.md; `r5c help spec` carries enough of it to write a card without
 // leaving the terminal.
-import { TIERS, BLEND_MODES, PATTERN_TYPES, HOLO_EFFECTS } from './spec.js';
+import {
+  TIERS, BLEND_MODES, PATTERN_TYPES, HOLO_EFFECTS,
+  HOLO_REVEAL_DIRECTIONS, HOLO_REVEAL_EASINGS, HOLO_REVEAL_MODES
+} from './spec.js';
 
 export const HELP = `r5c — Requirement5cards from the command line
 
@@ -115,6 +118,14 @@ but you don't have to: \`r5c preview <id>\` shows you still frames, and
                                     tilts, like a window into the scene. 0 = flat.
     customHoloBlendMode  <blend>    How the Veil overlay (holoImage) mixes with the
                                     card: color-dodge = bright shine, overlay = subtle
+    holoRevealMode       ${HOLO_REVEAL_MODES.join('|')}
+                                    How the resting card opens into its holo state
+    holoRevealDuration   0.05–3     Seconds for the activation reveal
+    holoRevealEasing     ${HOLO_REVEAL_EASINGS.join('|')}
+                                    The reveal's motion character
+    holoRevealDirection  ${HOLO_REVEAL_DIRECTIONS.join('|')}
+                                    Direction used by wipe (right = left-to-right)
+    holoRevealSoftness   0–40       Feathered wipe edge, in percent
     filterBrightness/Contrast/Saturate   Push the Nebula + Pulse filter looks
 
   imageEffects — how the artwork itself is treated:

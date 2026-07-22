@@ -1,5 +1,6 @@
 import styled, { css, keyframes } from 'styled-components';
 import MotionBar from '../MotionBar';
+import { holoRevealTransition } from './HoloReveal.styles';
 
 // Key animations for card effects
 const chromaticShift = keyframes`
@@ -442,7 +443,6 @@ export const HoloShine = styled.div`
   background-position: center;
   background-size: 100% 100%;
   opacity: 0;
-  transition: opacity 0.2s ease;
   /* Position above the card image */
   transform: translateZ(5px);
   z-index: 6; /* Just above the card image but not too aggressive */
@@ -451,11 +451,11 @@ export const HoloShine = styled.div`
   mix-blend-mode: soft-light; 
   pointer-events: none;
   display: ${({ $active }) => $active ? 'block' : 'none'};
+  ${holoRevealTransition}
   
   /* More gradual transition on moving for smoother effect */
   ${CardContainer}.moving & {
     opacity: ${({ $active }) => $active ? 0.8 : 0}; /* Increased opacity for better visibility */
-    transition: opacity 0.3s ease-in-out;
   }
   
   /* CSS variables for holographic effects */
@@ -679,7 +679,6 @@ export const HoloShine = styled.div`
     filter: brightness(calc((var(--hyp) + 0.8) * var(--rare-holo-vmax-brightness, 0.5))) contrast(var(--rare-holo-vmax-contrast, 2.0)) saturate(1.5);
     opacity: 0.8; /* Slightly higher opacity for premium effect */
     mix-blend-mode: color-dodge;
-    transition: all 0.1s ease-out;
     pointer-events: none;
   }
   
@@ -720,7 +719,6 @@ export const HoloShine = styled.div`
     /* Only show the effect on moving */
     ${CardContainer}.moving & {
       opacity: 0.4; /* Subtle visibility on moving */
-      transition: all 0.2s ease;
     }
   }
   
@@ -775,12 +773,12 @@ export const HoloBackgroundImage = styled.div`
      behaviour exactly for cards that predate the knobs: invisible at rest,
      0.8 while moving, soft-light blend, texture-darkening filter. */
   opacity: var(--holo-image-presence, 0);
-  transition: opacity 0.2s ease;
   transform: translateZ(5px);
   z-index: 6; /* Same as original HoloShine */
   overflow: hidden;
   pointer-events: none;
   display: ${({ $active }) => $active ? 'block' : 'none'};
+  ${holoRevealTransition}
 
   /* Background image from props */
   background-image: ${({ $imageUrl }) => $imageUrl ? `url("${$imageUrl}")` : 'none'};
@@ -793,7 +791,6 @@ export const HoloBackgroundImage = styled.div`
   /* Moving effect - an image with presence never dims below it */
   ${CardContainer}.moving & {
     opacity: max(var(--holo-image-presence, 0), 0.8);
-    transition: opacity 0.3s ease-in-out; /* Same timing as original */
   }
 
   /* A gentle tilt-shade that keeps the picture legible — the system's own
@@ -826,7 +823,9 @@ export const CardImage = styled.div`
     height: 100%;
     object-fit: cover;
     object-position: center;
-    transition: opacity 0.3s ease, transform 0.3s ease-out;
+    transition:
+      opacity var(--holo-reveal-duration, 0.3s) var(--holo-reveal-easing, ease),
+      transform 0.3s ease-out;
     mix-blend-mode: var(--image-blend, normal);
     /* Apply opacity, contrast and saturation via CSS variables. NOTE: no
        trailing free-form var() here — a fallback of "none" in a filter list
@@ -841,7 +840,9 @@ export const CardImage = styled.div`
   ${CardContainer}.moving & img {
     opacity: var(--image-opacity-hover, var(--image-opacity, 1));
     /* Shift the image opposite the tilt for a window-into-depth feel. */
-    transition: transform 0.12s ease-out, opacity 0.3s ease;
+    transition:
+      transform 0.12s ease-out,
+      opacity var(--holo-reveal-duration, 0.3s) var(--holo-reveal-easing, ease);
     transform: translate3d(
         calc(var(--tilt-x, 0) * var(--parallax-depth, 0) * -16px),
         calc(var(--tilt-y, 0) * var(--parallax-depth, 0) * -16px), 0)

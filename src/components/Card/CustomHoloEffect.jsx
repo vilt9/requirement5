@@ -1,5 +1,6 @@
 import styled from 'styled-components';
 import { CardContainer } from './Card.styles';
+import { holoRevealTransition } from './HoloReveal.styles';
 
 // Veil — the card-wide "standard" holographic layer. With an image it blends
 // that straight over the card; without one it falls back to a hue-matched
@@ -22,12 +23,12 @@ const CustomHoloEffect = styled.div`
   background-position: center;
   background-size: 100% 100%;
   opacity: var(--veil-presence, 0);
-  transition: opacity 0.2s ease;
   transform: translateZ(5px);
   z-index: 6;
   overflow: hidden;
   pointer-events: none;
   display: ${({ $active }) => $active ? 'block' : 'none'};
+  ${holoRevealTransition}
 
   /* The image is the veil when given; otherwise a repeating sheen built from
      the card's own hue family, angled off the live pointer angle. */

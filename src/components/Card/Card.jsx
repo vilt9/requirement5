@@ -5,6 +5,7 @@ import { getHolographicEffectClass } from '../../utils/cardGenerator';
 import { loopPhase, inShinyZone, FLAT_FRAC, beginHoverHold, endHoverHold } from '../../utils/cardMotion';
 import CustomHoloEffect from './CustomHoloEffect';
 import { cardArtworkUrl, resolveImageUrl } from '../../utils/poolCard';
+import { normalizeHoloReveal } from '../../utils/holoReveal';
 
 // Build the base-background CSS value (behind the card image) from the structured
 // model. Fade stops control how soft/spread the blend is; type picks the geometry.
@@ -162,6 +163,7 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
   };
   
   const holoShineClass = getActiveHoloClass();
+  const holoReveal = normalizeHoloReveal(effectParams);
   
   // Drive the tilt + shine math from a pointer position (real or synthetic).
   // Pure geometry — does not touch the moving/floating state, so the tour can
@@ -579,9 +581,14 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
         $isInteractive={isInteractive}
         onClick={handleCardClick}
         data-rarity={holoShineClass}
+        data-holo-reveal={holoReveal.mode}
+        data-holo-direction={holoReveal.direction}
         className={`card-container ${holoShineClass}`}
         style={{
           '--effect-intensity': isMoving ? '1' : '0',
+          '--holo-reveal-duration': `${holoReveal.duration}s`,
+          '--holo-reveal-easing': holoReveal.easingCss,
+          '--holo-reveal-softness': `${holoReveal.softness}%`,
           // Touch screens in driven mode take no direct input on the card, so
           // it must not compete for hits either: the tilted 3D face otherwise
           // beats the bar in hit-testing and swallows taps on the track.

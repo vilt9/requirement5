@@ -28,6 +28,10 @@ export const PATTERN_TYPES = [
 
 export const MASK_TYPES = ['vignette', 'horizontal-fade', 'vertical-fade', 'diagonal-fade'];
 
+export const HOLO_REVEAL_MODES = ['fade', 'iris', 'wipe', 'shutter', 'glitch'];
+export const HOLO_REVEAL_DIRECTIONS = ['right', 'left', 'down', 'up'];
+export const HOLO_REVEAL_EASINGS = ['smooth', 'snap', 'elastic', 'linear'];
+
 // 'overlay' is the Veil — the card-wide "standard" holo. It carries no *Params
 // block of its own: it reads the sheen* knobs under effectParams and, when a
 // holoImage is supplied, blends that. The four rareHolo* keys are the animated
@@ -115,7 +119,12 @@ function defaultCustomCard({ hue, rarity, tags }) {
       holoAngle: 133,
       // 0–1, same band as the customizer slider (scales the artwork's 3D shift)
       parallaxDepth: 0.4,
-      customHoloBlendMode: 'color-dodge'
+      customHoloBlendMode: 'color-dodge',
+      holoRevealMode: 'fade',
+      holoRevealDuration: 0.2,
+      holoRevealEasing: 'smooth',
+      holoRevealDirection: 'right',
+      holoRevealSoftness: 12
     },
     imageEffects: {
       maskType: 'vignette',
@@ -300,6 +309,24 @@ function validate(spec, customCard) {
       problems.push(`${field}: "${value}" is not a CSS blend mode (allowed: ${BLEND_MODES.join(', ')})`);
     }
   }
+  const reveal = customCard.effectParams || {};
+  if (!HOLO_REVEAL_MODES.includes(reveal.holoRevealMode)) {
+    problems.push(`effectParams.holoRevealMode: "${reveal.holoRevealMode}" unknown (allowed: ${HOLO_REVEAL_MODES.join(', ')})`);
+  }
+  if (!HOLO_REVEAL_DIRECTIONS.includes(reveal.holoRevealDirection)) {
+    problems.push(`effectParams.holoRevealDirection: "${reveal.holoRevealDirection}" unknown (allowed: ${HOLO_REVEAL_DIRECTIONS.join(', ')})`);
+  }
+  if (!HOLO_REVEAL_EASINGS.includes(reveal.holoRevealEasing)) {
+    problems.push(`effectParams.holoRevealEasing: "${reveal.holoRevealEasing}" unknown (allowed: ${HOLO_REVEAL_EASINGS.join(', ')})`);
+  }
+  for (const [field, value, min, max] of [
+    ['holoRevealDuration', reveal.holoRevealDuration, 0.05, 3],
+    ['holoRevealSoftness', reveal.holoRevealSoftness, 0, 40]
+  ]) {
+    if (!Number.isFinite(Number(value)) || Number(value) < min || Number(value) > max) {
+      problems.push(`effectParams.${field} must be between ${min} and ${max}`);
+    }
+  }
   if (customCard.patternInfo?.type && !PATTERN_TYPES.includes(customCard.patternInfo.type)) {
     problems.push(`patternInfo.type: "${customCard.patternInfo.type}" unknown (allowed: ${PATTERN_TYPES.join(', ')})`);
   }
@@ -390,7 +417,9 @@ const FULL_TEMPLATE = {
     patternInfo: { type: 'Constellation', opacity: 0.7, numLines: 11, lineOpacity: 0.07 },
     effectParams: {
       filterBrightness: 1.1, filterContrast: 1.3, filterSaturate: 1.4,
-      parallaxDepth: 0.5, customHoloBlendMode: 'color-dodge'
+      parallaxDepth: 0.5, customHoloBlendMode: 'color-dodge',
+      holoRevealMode: 'wipe', holoRevealDuration: 0.65,
+      holoRevealEasing: 'smooth', holoRevealDirection: 'right', holoRevealSoftness: 16
     },
     imageEffects: {
       opacity: 0.98, opacityHover: 0.9, contrast: 1.15, saturation: 1.3

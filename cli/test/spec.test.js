@@ -69,6 +69,46 @@ test('an invalid CSS blend mode is rejected', () => {
   );
 });
 
+test('holo reveal choreography survives into the card payload', () => {
+  const p = buildPublishPayload({
+    name: 'Hi',
+    card: {
+      effectParams: {
+        holoRevealMode: 'wipe',
+        holoRevealDuration: 0.8,
+        holoRevealEasing: 'elastic',
+        holoRevealDirection: 'up',
+        holoRevealSoftness: 24
+      }
+    }
+  }, '/tmp');
+  const reveal = p.stateData.customCard.effectParams;
+  assert.deepEqual({
+    holoRevealMode: reveal.holoRevealMode,
+    holoRevealDuration: reveal.holoRevealDuration,
+    holoRevealEasing: reveal.holoRevealEasing,
+    holoRevealDirection: reveal.holoRevealDirection,
+    holoRevealSoftness: reveal.holoRevealSoftness
+  }, {
+    holoRevealMode: 'wipe',
+    holoRevealDuration: 0.8,
+    holoRevealEasing: 'elastic',
+    holoRevealDirection: 'up',
+    holoRevealSoftness: 24
+  });
+});
+
+test('invalid holo reveal choreography is rejected', () => {
+  assert.throws(
+    () => buildPublishPayload({ name: 'Hi', card: { effectParams: { holoRevealMode: 'explode' } } }, '/tmp'),
+    /holoRevealMode/
+  );
+  assert.throws(
+    () => buildPublishPayload({ name: 'Hi', card: { effectParams: { holoRevealDuration: 8 } } }, '/tmp'),
+    /holoRevealDuration/
+  );
+});
+
 test('both shipped templates are valid specs', () => {
   for (const [name, tpl] of Object.entries(TEMPLATES)) {
     const spec = { ...tpl, image: IMG };

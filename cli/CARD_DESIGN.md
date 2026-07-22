@@ -194,6 +194,28 @@ the reveal should look like the artwork's own latent energy switching on, in the
 card's own palette and logic. Shocking ≠ random. A serene portrait should not
 detonate; a dead city *should* be allowed to blaze to life.
 
+### Choreograph the entrance
+
+The reveal itself is authored under `effectParams`; it applies to the Veil and
+every enabled holo system as one transition:
+
+| Field | Values | Character |
+|---|---|---|
+| `holoRevealMode` | `fade` | Neutral crossfade; the backwards-compatible default |
+|  | `iris` | Opens from the point of touch; good for portals, eyes, suns, wells |
+|  | `wipe` | Travels across the card with a feathered boundary; good for weather, water, time shifts |
+|  | `shutter` | Opens outward from the center; architectural, ceremonial, mechanical |
+|  | `glitch` | Fragmented slices lock into the holo state; signals, corruption, broken realities |
+| `holoRevealDuration` | `0.05–3` seconds | 0.2 is quick, 0.6 is readable, 1.2 is ceremonial |
+| `holoRevealEasing` | `smooth`, `snap`, `elastic`, `linear` | The movement's emotional character |
+| `holoRevealDirection` | `right`, `left`, `down`, `up` | Wipe direction (`right` means left-to-right) |
+| `holoRevealSoftness` | `0–40` | Width of the wipe's blended edge |
+
+Choose the choreography from the image's internal logic. A waterfall can wipe
+upward, a portal can iris from the pointer, a sealed monument can shutter open,
+and signal damage can glitch. Preview the beginning and middle of activation,
+not only rest and the fully active pose: the transition is part of the card.
+
 ### The technique: a feature mask, hidden then ignited
 
 1. **Derive a mask from the artwork** so the effect is registered to the picture.

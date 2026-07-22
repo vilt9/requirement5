@@ -1,7 +1,8 @@
 Help me make a holographic trading card on requirement5.com using the `r5c` CLI.
 
 1. Check whether r5c is installed (`r5c --version`); if not, install it with
-   `npm install -g r5c`.
+   `curl -fsSL https://requirement5.com/install | sh` (or
+   `npm install -g @requirement5cards/r5c`).
 2. Check whether I'm logged in (`r5c whoami`). If I'm not, stop and ask me to run
    `r5c signup --username <name> --email <addr>` (or to set `R5C_TOKEN`) — do not create an
    account for me.
@@ -23,7 +24,9 @@ Help me make a holographic trading card on requirement5.com using the `r5c` CLI.
 7. Run `r5c card create preview <id> --out shots/`, open the PNGs, and tell me
    honestly how it turned out. Refine the private draft with
    `r5c card create update <id> card.json` (free; rarity stays) until it's right —
-   nobody else can see it yet.
+   nobody else can see it yet. Design the transition as well as the endpoints:
+   choose `holoRevealMode`, duration, easing, and any wipe direction/softness
+   from `r5c help spec` so activation follows the image's own visual logic.
 8. When I say go, `r5c card create publish <id>` to release it into the pool, and
    give me the live URL.
 

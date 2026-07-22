@@ -19,7 +19,8 @@ R5C_HOME="${R5C_HOME:-$HOME/.r5c}"
 CLI_DIR="$R5C_HOME/cli"
 BIN_DIR="$R5C_HOME/bin"
 LAUNCHER="$BIN_DIR/r5c"
-REGISTRY="https://registry.npmjs.org/r5c"
+SOURCE_ROOT="https://raw.githubusercontent.com/vilt9/requirement5/main"
+SOURCE_TARBALL="https://codeload.github.com/vilt9/requirement5/tar.gz/refs/heads/main"
 
 # Preview/test override. When R5C_TARBALL_URL is set (e.g. a file:// path to a
 # locally `npm pack`ed tarball), the installer skips the npm registry lookup
@@ -50,19 +51,21 @@ else
 fi
 
 # 3. Resolve the tarball to install: an override URL when given, otherwise the
-#    latest version from the npm registry (node parses the JSON).
+#    CLI source from the same public main branch production deploys.
 if [ -n "$R5C_TARBALL_URL" ]; then
   VERSION="${R5C_VERSION:-local}"
   TARBALL_URL="$R5C_TARBALL_URL"
+  ARCHIVE_KIND="package"
   printf 'Installing r5c from %s...\n' "$R5C_TARBALL_URL"
 else
   printf 'Resolving the latest r5c version...\n'
-  VERSION=$(fetch "$REGISTRY/latest" | node -e 'let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>{try{process.stdout.write(String(JSON.parse(s).version||""))}catch(e){}})')
+  VERSION=$(fetch "$SOURCE_ROOT/cli/package.json" | node -e 'let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>{try{process.stdout.write(String(JSON.parse(s).version||""))}catch(e){}})')
   if [ -z "${VERSION:-}" ]; then
-    err "Could not resolve the latest version from the npm registry."
+    err "Could not resolve the latest version from the Requirement5cards source."
     exit 1
   fi
-  TARBALL_URL="$REGISTRY/-/r5c-$VERSION.tgz"
+  TARBALL_URL="$SOURCE_TARBALL"
+  ARCHIVE_KIND="repository"
   printf 'Installing r5c %s...\n' "$VERSION"
 fi
 
@@ -72,8 +75,20 @@ trap 'rm -rf "$TMP"' EXIT INT TERM
 
 fetch_file "$TARBALL_URL" "$TMP/r5c.tgz"
 mkdir -p "$TMP/cli"
-# npm tarballs wrap everything in a top-level package/ directory; strip it.
-tar -xzf "$TMP/r5c.tgz" -C "$TMP/cli" --strip-components=1
+if [ "$ARCHIVE_KIND" = "package" ]; then
+  # npm tarballs wrap everything in a top-level package/ directory.
+  tar -xzf "$TMP/r5c.tgz" -C "$TMP/cli" --strip-components=1
+else
+  # GitHub wraps the repository in requirement5-main/; install only cli/.
+  mkdir -p "$TMP/repository"
+  tar -xzf "$TMP/r5c.tgz" -C "$TMP/repository"
+  SOURCE_CLI="$TMP/repository/requirement5-main/cli"
+  if [ ! -d "$SOURCE_CLI" ]; then
+    err "The downloaded source did not contain the CLI directory."
+    exit 1
+  fi
+  cp -R "$SOURCE_CLI/." "$TMP/cli"
+fi
 
 # The CLI needs its launcher plus the lib/ modules it imports at runtime.
 # Checking both catches a tarball that shipped without lib/ (a files-array

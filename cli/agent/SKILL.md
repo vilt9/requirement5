@@ -12,8 +12,9 @@ customizer would produce, so you only specify what you care about.
 
 ## Setup (once)
 
-- Check it's installed: `r5c --version`. If missing: `npm install -g r5c`
-  (or `curl -fsSL https://requirement5.com/install | sh` for a no-root install).
+- Check it's installed: `r5c --version`. If missing:
+  `curl -fsSL https://requirement5.com/install | sh` (or
+  `npm install -g @requirement5cards/r5c`).
 - Auth: `r5c whoami` shows the current login. If the user isn't logged in, ask
   them to run `r5c signup --username <name> --email <addr>` / `r5c login`, or to set
   `R5C_TOKEN`. Never invent credentials or sign up on their behalf.
@@ -41,7 +42,10 @@ guided session:
    as often as you like, rarity unchanged.
 5. **`r5c card create preview <id> --out shots/`** — writes PNG stills of the
    draft (one at rest, the rest mid-orbit with the holo awake). **Open and look
-   at these** to judge it. Nobody else can see the draft.
+   at these** to judge it. Author the activation too: use `holoRevealMode`,
+   duration, easing, and (for wipes) direction/softness so the holo arrives in
+   the image's own visual logic rather than through a generic crossfade. Nobody
+   else can see the draft.
 6. **`r5c card create publish <id>`** — release the finished draft into the
    pool. Free — the create fee was already paid at confirm-start.
 
@@ -109,6 +113,9 @@ shelf, not yours.
 ## Rules
 
 - `r5c help spec` before writing fields — the spec is the source of truth.
+- Treat rest, activation, and fully active holo as three designed states. Pick
+  reveal choreography that belongs to the image; do not default every card to
+  the loudest mode.
 - Rarity comes from `card create begin` / `regenerate-rarity`, never the spec. Don't set tier.
 - Confirm the user is authed before anything that spends /t26.
 - `regenerate-rarity` and `confirm-start` both spend /t26 — confirm before each.

@@ -199,7 +199,12 @@ from `backgroundColor.baseHue`. The one-stop terminal reference is
     "patternInfo": { "type": "Constellation", "opacity": 0.7 },
     "effectParams": {
       "parallaxDepth": 0.5,
-      "customHoloBlendMode": "color-dodge"
+      "customHoloBlendMode": "color-dodge",
+      "holoRevealMode": "wipe",
+      "holoRevealDuration": 0.65,
+      "holoRevealEasing": "smooth",
+      "holoRevealDirection": "right",
+      "holoRevealSoftness": 16
     },
     "imageEffects": { "opacity": 0.98, "saturation": 1.3 },
     "borderEffects": { "thickBorderEnabled": true, "color": "rgb(255,215,0)", "opacity": 0.4 },
@@ -221,7 +226,10 @@ The systems, briefly:
 - **`effectParams`** — `parallaxDepth` (0–1, the artwork's 3D shift as the
   card tilts), `filterBrightness`/`filterContrast`/`filterSaturate` (drive the
   Nebula/Pulse filters), and `customHoloBlendMode` (how the Veil overlay
-  blends).
+  blends). Holo activation is authored here too: `holoRevealMode`
+  (`fade`, `iris`, `wipe`, `shutter`, `glitch`), `holoRevealDuration`
+  (0.05–3 seconds), `holoRevealEasing` (`smooth`, `snap`, `elastic`, `linear`),
+  and wipe-only `holoRevealDirection`/`holoRevealSoftness`.
 - **`imageEffects`** — how the artwork sits in the frame: `opacity` (and
   `opacityHover` while touched), `contrast`, `saturation`, `blendMode`.
 - **`borderEffects`** — the center panel (`thickBorderEnabled`, `color`,

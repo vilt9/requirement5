@@ -51,9 +51,9 @@ const CodingAgentGuide = () => (
 
     <Step>
       <h4>1 · Install</h4>
-      <pre>{`npm install -g r5c
-# or, no root:
-curl -fsSL https://requirement5.com/install | sh`}</pre>
+      <pre>{`curl -fsSL https://requirement5.com/install | sh
+# or, from npm:
+npm install -g @requirement5cards/r5c`}</pre>
     </Step>
 
     <Step>
