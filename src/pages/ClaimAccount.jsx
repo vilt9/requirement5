@@ -65,8 +65,9 @@ const ClaimAccount = () => {
   return (
     <ClaimPage>
       <Panel>
-        We turned your post into Requirement5cards, and set aside the
-        account <b>{info.username}</b> for you.
+        You have been selected because Umdo1 needs your imagination. To encourage
+        you to join the resistance, Vilt9 has transformed your work into
+        Requirement5cards and reserved the account <b>{info.username}</b> for you.
         <Divider />
         {info.cards.length > 0 ? (
           <>
