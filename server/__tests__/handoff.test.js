@@ -98,6 +98,25 @@ describe('Private operator handoff', () => {
     expect(memoryDb.getCardById(card.id).is_public).toBe(false);
   });
 
+  test('a repeated handoff restores exact display casing on a legacy reservation', async () => {
+    const firstCard = memoryDb.createCard({ name: 'First', creator_id: studio.id, is_public: false });
+    const first = await handoff({
+      username: 'legacy_handle', openingBalance: 250, cardIds: [firstCard.id]
+    });
+    expect(first.status).toBe(201);
+
+    const secondCard = memoryDb.createCard({ name: 'Second', creator_id: studio.id, is_public: false });
+    const second = await handoff({
+      username: 'Legacy_Handle', openingBalance: 250, cardIds: [firstCard.id, secondCard.id]
+    });
+
+    expect(second.status).toBe(200);
+    expect(second.body.data.user.username).toBe('Legacy_Handle');
+    expect(second.body.data.claimUrl).toBe(first.body.data.claimUrl);
+    expect(second.body.data.balance).toBe(250);
+    expect(memoryDb.getUserByUsername('legacy_handle').username).toBe('Legacy_Handle');
+  });
+
   test('claimed owner can edit a handed-off card before publishing it', async () => {
     const card = memoryDb.createCard({
       name: 'Original name', creator_id: studio.id, is_public: true,

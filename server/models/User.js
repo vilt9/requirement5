@@ -107,9 +107,14 @@ export default class User {
       if (existing.claimed_at || !existing.bot_created) {
         return { success: false, error: 'Username is already in use', code: 409 };
       }
+      // Reusing a legacy reservation is also an opportunity to restore the
+      // creator's exact display casing without changing identity or claim data.
+      const reservedUser = existing.username === username
+        ? existing
+        : memoryDb.updateUser(existing.id, { username });
       return {
         success: true,
-        data: { user: existing, claim_token: existing.claim_token, reused: true }
+        data: { user: reservedUser, claim_token: reservedUser.claim_token, reused: true }
       };
     }
     const claim_token = crypto.randomBytes(24).toString('base64url');
