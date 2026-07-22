@@ -48,22 +48,22 @@ const ClaimAccount = () => {
 
   if (loadError) {
     return (
-      <Page>
+      <ClaimPage>
         <Panel>
           This claim link is invalid or has already been used.
           <Divider />
           <Dim>If you already claimed your account, just <Link to="/account">log in</Link>.</Dim>
         </Panel>
-      </Page>
+      </ClaimPage>
     );
   }
 
   if (!info) {
-    return <Page><Panel><Dim>Loading…</Dim></Panel></Page>;
+    return <ClaimPage><Panel><Dim>Loading…</Dim></Panel></ClaimPage>;
   }
 
   return (
-    <Page>
+    <ClaimPage>
       <Panel>
         We turned your post into Requirement5cards, and set aside the
         account <b>{info.username}</b> for you.
@@ -126,9 +126,13 @@ const ClaimAccount = () => {
         </div>
         {user && <Dim>Note: claiming will switch you out of your current session.</Dim>}
       </Panel>
-    </Page>
+    </ClaimPage>
   );
 };
+
+const ClaimPage = styled(Page)`
+  text-align: left;
+`;
 
 const DobField = styled.label`
   display: flex;
