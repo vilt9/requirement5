@@ -7,6 +7,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'node:crypto';
+import process from 'node:process';
 import {
   connect as pgConnect,
   ping as pgPing,
@@ -158,6 +159,33 @@ const pool = {
 const dbConfig = { type: USE_PG ? 'postgres' : 'json-file', file: DB_FILE };
 
 const memoryDb = {
+  // Run a synchronous group of mutations as one in-memory unit. Persistence is
+  // debounced, so a thrown error can restore both the working data and the
+  // Postgres dirty bookkeeping before any backend flush observes partial state.
+  atomic: (work) => {
+    // The store is JSON-shaped by design; a JSON round-trip also works in the
+    // Jest/jsdom environment where the Node structuredClone global is absent.
+    const dataSnapshot = JSON.parse(JSON.stringify(db));
+    const dirtySnapshot = Object.fromEntries(
+      Object.entries(dirty).map(([table, ids]) => [table, new Set(ids)])
+    );
+    const removedSnapshot = Object.fromEntries(
+      Object.entries(removed).map(([table, ids]) => [table, new Set(ids)])
+    );
+    const truncateSnapshot = truncateRequested;
+
+    try {
+      return work();
+    } catch (error) {
+      for (const key of Object.keys(db)) db[key] = dataSnapshot[key];
+      for (const table of Object.keys(dirty)) dirty[table] = dirtySnapshot[table];
+      for (const table of Object.keys(removed)) removed[table] = removedSnapshot[table];
+      truncateRequested = truncateSnapshot;
+      persistSoon();
+      throw error;
+    }
+  },
+
   // ---------- cards ----------
   createCard: (card) => {
     const newCard = {

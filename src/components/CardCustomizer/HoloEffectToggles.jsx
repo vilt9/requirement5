@@ -396,6 +396,7 @@ const HoloEffectToggles = ({
 
               <ColorPaletteEditor
                 label="Rainbow Colors"
+                param="rareHoloParams.colors"
                 colors={rareHoloParams.colors}
                 onChange={(newColors) => {
                   const updatedParams = { ...rareHoloParams, colors: newColors };
@@ -516,6 +517,7 @@ const HoloEffectToggles = ({
 
               <ColorPaletteEditor
                 label="Nebula Colors"
+                param="rareHoloGalaxyParams.colors"
                 colors={rareHoloGalaxyParams.colors}
                 onChange={(newColors) => {
                   const updatedParams = { ...rareHoloGalaxyParams, colors: newColors };
@@ -714,4 +716,4 @@ const EffectControls = styled.div`
   }
 `;
 
-export default HoloEffectToggles; 
+export default HoloEffectToggles;

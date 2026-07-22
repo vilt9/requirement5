@@ -1,17 +1,31 @@
 import jwt from 'jsonwebtoken';
+import process from 'node:process';
 import { memoryDb } from '../config/database.js';
 
 export const JWT_SECRET = process.env.JWT_SECRET || 'r5c-dev-secret-set-JWT_SECRET-in-prod';
 const TOKEN_TTL = '30d';
 
-export const signToken = (user) => jwt.sign({ sub: user.id }, JWT_SECRET, { expiresIn: TOKEN_TTL });
+export const signToken = (user) => {
+  // Auth routes return a sanitized public user, so read the version from the
+  // canonical record. This matters immediately after claim, when the version
+  // has just been incremented to invalidate every pre-claim session.
+  const stored = memoryDb.getUserById(user.id);
+  const version = stored?.auth_version ?? user.auth_version ?? 0;
+  return jwt.sign(
+    { sub: user.id, ver: version },
+    JWT_SECRET,
+    { expiresIn: TOKEN_TTL }
+  );
+};
 
 const userFromHeader = (req) => {
   const header = req.headers.authorization || '';
   if (!header.startsWith('Bearer ')) return null;
   try {
     const payload = jwt.verify(header.slice(7), JWT_SECRET);
-    return memoryDb.getUserById(payload.sub) || null;
+    const user = memoryDb.getUserById(payload.sub) || null;
+    if (!user || (payload.ver ?? 0) !== (user.auth_version || 0)) return null;
+    return user;
   } catch {
     return null;
   }

@@ -18,6 +18,7 @@ import { applyPreset } from '../utils/presets';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth, tierForScore } from '../context/AuthContext';
 import { api } from '../utils/api';
+import { cardArtworkUrl, resolveImageUrl } from '../utils/poolCard';
 import { regenCostFor, createCostFor } from '../utils/economyRandom';
 import { Dim, Select, PillButton } from '../components/UI';
 
@@ -269,8 +270,8 @@ const CardCustomizer = () => {
   // The upload previews ARE the card's images — derived, never separately
   // stored. A fresh card starts with empty slots; a template loaded with images
   // fills them; the library is where past uploads live.
-  const mainImagePreview = customCard?.customImageUrl || null;
-  const holoImagePreview = customCard?.customHoloImageUrl || null;
+  const mainImagePreview = cardArtworkUrl(customCard);
+  const holoImagePreview = resolveImageUrl(customCard?.customHoloImageUrl) || null;
 
   const flash = (text) => {
     setFeedback(text);
@@ -460,7 +461,10 @@ const CardCustomizer = () => {
       updatedCard[parent][child] = updatedValue;
 
       // If we're turning ON a holo effect, initialize its default parameters
-      if (parent === 'holoEffects' && child === 'rareHoloGalaxy' && updatedValue === true) {
+      if (
+        parent === 'holoEffects' && child === 'rareHoloGalaxy' &&
+        updatedValue === true && !updatedCard.rareHoloGalaxyParams
+      ) {
         updatedCard.rareHoloGalaxyParams = {
           space: 4,
           brightness: 0.75,
@@ -488,7 +492,10 @@ const CardCustomizer = () => {
       }
 
       // If we're turning ON Rare Holo effect, initialize its default parameters
-      if (parent === 'holoEffects' && child === 'rareHolo' && updatedValue === true) {
+      if (
+        parent === 'holoEffects' && child === 'rareHolo' &&
+        updatedValue === true && !updatedCard.rareHoloParams
+      ) {
         updatedCard.rareHoloParams = {
           space: 1.5,
           hue: 21,
@@ -512,6 +519,30 @@ const CardCustomizer = () => {
             'rgb(255, 0, 255)',   // Magenta
             'rgb(255, 0, 127)'    // Rose
           ]
+        };
+      }
+
+      if (
+        parent === 'holoEffects' && child === 'wowaHolo' &&
+        updatedValue === true && !updatedCard.wowaHoloParams
+      ) {
+        updatedCard.wowaHoloParams = {
+          space: 4,
+          angle: 45,
+          brightness: 0.6,
+          contrast: 1.2
+        };
+      }
+
+      if (
+        parent === 'holoEffects' && child === 'rareHoloVmax' &&
+        updatedValue === true && !updatedCard.rareHoloVmaxParams
+      ) {
+        updatedCard.rareHoloVmaxParams = {
+          space: 6,
+          angle: 133,
+          brightness: 0.5,
+          contrast: 2
         };
       }
     } else {

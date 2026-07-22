@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import styled from 'styled-components';
 import { Link, Navigate, useParams, useNavigate } from 'react-router-dom';
-import { LuStar, LuArrowLeft, LuPencil } from 'react-icons/lu';
+import { LuStar, LuArrowLeft, LuPencil, LuUpload } from 'react-icons/lu';
 import Card from '../components/Card/Card';
 import MotionBar from '../components/MotionBar';
 import { useAuth } from '../context/AuthContext';
@@ -9,7 +9,7 @@ import { useCards } from '../context/CardContext';
 import { api } from '../utils/api';
 import { poolCardToCardData } from '../utils/poolCard';
 import { saveCostFor, fmtT26 } from '../utils/economyRandom';
-import { Page, Panel, PillButton, Divider, Dim, TagList } from '../components/UI';
+import { Page, Panel, PillButton, Divider, Dim, TagList, ErrorText } from '../components/UI';
 import { ensureTags } from '../utils/tags';
 import RarityStrip from '../components/Collection/RarityStrip';
 import DiscoverCollections from '../components/Collection/DiscoverCollections';
@@ -88,6 +88,8 @@ const UserCollectionView = ({ username }) => {
   const [query, setQuery] = useState('');
   const [sortKey, setSortKey] = useState('newest');
   const [page, setPage] = useState(0);
+  const [publishingId, setPublishingId] = useState(null);
+  const [publishError, setPublishError] = useState(null);
 
   const isOwn = !!user && user.username.toLowerCase() === username.toLowerCase();
 
@@ -120,6 +122,26 @@ const UserCollectionView = ({ username }) => {
       await api(`/api/cards/collection/${cardId}`, { method: 'DELETE' });
       setData(cur => (cur ? { ...cur, items: cur.items.filter(it => it.card.id !== cardId), count: cur.count - 1 } : cur));
     } catch (error) { console.error('Could not remove card:', error); }
+  };
+
+  const publishDraft = async (cardId) => {
+    setPublishingId(cardId);
+    setPublishError(null);
+    try {
+      const result = await api('/api/cards/create/publish', {
+        method: 'POST',
+        body: { id: cardId }
+      });
+      setCreations(current => current.map(item => (
+        item.card.id === cardId
+          ? { card: result.card, stats: result.stats }
+          : item
+      )));
+    } catch (error) {
+      setPublishError(error.message || 'Could not publish card.');
+    } finally {
+      setPublishingId(null);
+    }
   };
 
   const toggleStar = async () => {
@@ -200,15 +222,20 @@ const UserCollectionView = ({ username }) => {
         )}
       </Panel>
 
-      {/* DRAFTS — owner only. Cards mid-creation, not yet published; nobody
-          else can see them. Edit re-opens the draft in the customizer. */}
+      {/* DRAFTS — owner only. Cards remain private until their owner publishes
+          them, and can be edited in the customizer first. */}
       {isOwn && drafts.length > 0 && (
         <>
           <Panel className="drafts-panel">
-            Drafts: {drafts.length} <Dim>· in progress, only you can see these</Dim>
+            <div>Ready to publish: {drafts.length} <Dim>· only you can see these</Dim></div>
+            <DraftNote>
+              Publishing adds a card to the pool, the shared deck used by Generate.
+              Other people can then discover and save it.
+            </DraftNote>
+            {publishError && <ErrorText>{publishError}</ErrorText>}
           </Panel>
           <Grid>
-            {drafts.map(({ card }) => {
+            {drafts.map(({ card, stats }) => {
               const cardData = poolCardToCardData(card);
               return (
                 <Item key={card.id}>
@@ -216,12 +243,26 @@ const UserCollectionView = ({ username }) => {
                     <CardScale><Card cardData={cardData} loop /></CardScale>
                   ) : <Missing>card data unavailable</Missing>}
                   <Panel>
-                    <div>{card.name || 'Untitled draft'} <Dim>· draft</Dim></div>
-                    <div><Dim>Started {new Date(card.created_at).toISOString().slice(0, 10)}</Dim></div>
+                    <div>{card.name || 'Untitled card'} <Dim>· private</Dim></div>
+                    {stats && (
+                      <Dividend>
+                        You earn <b>{fmtT26(stats.creatorDividend)} /t26</b> each time
+                        someone saves it from the pool.
+                      </Dividend>
+                    )}
+                    <div><Dim>Created {new Date(card.created_at).toISOString().slice(0, 10)}</Dim></div>
                     <Divider />
-                    <PillButton onClick={() => navigate(`/create?draft=${card.id}`)}>
-                      <LuPencil /> Edit draft
-                    </PillButton>
+                    <DraftActions>
+                      <PillButton $secondary onClick={() => navigate(`/create?draft=${card.id}`)}>
+                        <LuPencil /> Edit
+                      </PillButton>
+                      <PillButton
+                        onClick={() => publishDraft(card.id)}
+                        disabled={publishingId === card.id}
+                      >
+                        <LuUpload /> {publishingId === card.id ? 'Publishing…' : 'Publish'}
+                      </PillButton>
+                    </DraftActions>
                   </Panel>
                 </Item>
               );
@@ -247,6 +288,11 @@ const UserCollectionView = ({ username }) => {
                     <div>{card.name}</div>
                     {tier && <div>{tier.name}</div>}
                     {stats && <div><Dim>{stats.timesSaved} saved / {stats.timesDrawn} drawn</Dim></div>}
+                    {stats && (
+                      <Dividend>
+                        You earn <b>{fmtT26(stats.creatorDividend)} /t26</b> for each pool save.
+                      </Dividend>
+                    )}
                     <Divider />
                     <Dim><Link to={`/card/${card.id}`}>View card page</Link></Dim>
                   </Panel>
@@ -436,6 +482,26 @@ const Item = styled.div`
   align-items: center;
   & > div:last-child { width: 100%; }
   button { display: inline-flex; align-items: center; gap: 5px; }
+`;
+
+const DraftNote = styled(Dim)`
+  display: block;
+  margin-top: 6px;
+  line-height: 1.5;
+`;
+
+const Dividend = styled.div`
+  margin-top: 5px;
+  color: var(--amber-dim);
+  font-size: 11px;
+  line-height: 1.45;
+  b { color: var(--gold-bright); }
+`;
+
+const DraftActions = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 `;
 
 const CardScale = styled.div`

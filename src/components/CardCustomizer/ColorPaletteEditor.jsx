@@ -4,6 +4,7 @@ import ColorPicker from './ColorPicker';
 
 const ColorPaletteEditor = ({
   label,
+  param,
   colors = ['#ffffff'], // Default to white if no colors provided
   onChange,
   tooltipContent,
@@ -48,6 +49,7 @@ const ColorPaletteEditor = ({
           <ColorItem key={index}>
             <ColorPicker
               label={`Color ${index + 1}`}
+              param={param ? `${param}.${index}` : undefined}
               value={color}
               onChange={(_, newColor) => updateColor(index, newColor)}
             />
@@ -201,4 +203,4 @@ const PreviewGradient = styled.div`
   border: 1px solid rgba(255, 255, 255, 0.2);
 `;
 
-export default ColorPaletteEditor; 
+export default ColorPaletteEditor;

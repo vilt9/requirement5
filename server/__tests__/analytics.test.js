@@ -67,12 +67,12 @@ describe('feature 1 — signup-cohort retention', () => {
     expect(c.active[K1]).toBeUndefined();
   });
 
-  test('unclaimed bot-gift accounts are excluded; claimed ones count', () => {
+  test('unclaimed reserved accounts are excluded; claimed ones count', () => {
     makeUser('gift', W1, { bot_created: true, claimed_at: null });
     makeUser('claimed', W1, { bot_created: true, claimed_at: W1 });
     makeUser('human', W1);
     const { totals } = computeAnalytics();
-    expect(totals.users).toBe(2); // gift excluded, claimed + human counted
+    expect(totals.users).toBe(2); // reservation excluded, claimed + human counted
   });
 });
 

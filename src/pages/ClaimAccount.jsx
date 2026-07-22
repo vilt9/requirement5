@@ -6,9 +6,8 @@ import { api } from '../utils/api';
 import { Page, Panel, Divider, Dim, PillButton, TextInput, ErrorText } from '../components/UI';
 import { fmtT26 } from '../utils/economyRandom';
 
-// The landing page for a "gift" account claim link (/claim/:token). We made an
-// account from someone's posts and published cards under it; this is
-// where they take it over by setting a password.
+// The landing page for a pre-created account claim link (/claim/:token). It
+// previews the username, balance, and cards before the owner activates it.
 const ClaimAccount = () => {
   const { token } = useParams();
   const navigate = useNavigate();
@@ -71,12 +70,13 @@ const ClaimAccount = () => {
         <Divider />
         {info.cards.length > 0 ? (
           <>
-            {info.cards.length} card{info.cards.length === 1 ? '' : 's'} waiting for you,
+            {info.cards.length} private card{info.cards.length === 1 ? '' : 's'} waiting for you,
             plus a balance of <b>{fmtT26(info.balance)} /t26</b>:
             <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
               {info.cards.map(c => (
                 <li key={c.id}>
-                  <Link to={`/card/${c.id}`}>{c.name || 'Untitled'}</Link> <Dim>· {c.tier}</Dim>
+                  <Link to={`/card/${c.id}`}>{c.name || 'Untitled'}</Link>{' '}
+                  <Dim>· {c.is_public ? c.tier : 'ready to edit and publish'}</Dim>
                 </li>
               ))}
             </ul>
@@ -88,7 +88,8 @@ const ClaimAccount = () => {
 
       <Panel as="form" onSubmit={submit}>
         Set a password to claim <b>{info.username}</b> — it&apos;s then yours: the
-        cards, the balance, and the ability to publish more.
+        cards, the balance, and the choice to edit each card before publishing it
+        to the pool.
         <Divider />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <TextInput

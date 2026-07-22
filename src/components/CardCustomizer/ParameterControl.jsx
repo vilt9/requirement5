@@ -33,6 +33,8 @@ const ParameterControl = ({
       <SliderContainer>
         <Slider
           type="range"
+          data-param={param}
+          aria-label={`${label} slider`}
           min={min}
           max={max}
           step={step}
@@ -41,6 +43,8 @@ const ParameterControl = ({
         />
         <SliderValue
           type="number"
+          data-param={param}
+          aria-label={`${label} value`}
           min={min}
           max={max}
           step={step}

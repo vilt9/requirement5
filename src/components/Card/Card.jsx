@@ -4,6 +4,7 @@ import PropTypes from 'prop-types';
 import { getHolographicEffectClass } from '../../utils/cardGenerator';
 import { loopPhase, inShinyZone, FLAT_FRAC, beginHoverHold, endHoverHold } from '../../utils/cardMotion';
 import CustomHoloEffect from './CustomHoloEffect';
+import { cardArtworkUrl, resolveImageUrl } from '../../utils/poolCard';
 
 // Build the base-background CSS value (behind the card image) from the structured
 // model. Fade stops control how soft/spread the blend is; type picks the geometry.
@@ -393,7 +394,9 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
         vars['card-tilt-speed'] = `${(0.1 / rare.mouseSpeed).toFixed(3)}s`;
       }
       (rare.colors || []).forEach((color, i) => { vars[`rare-holo-color-${i + 1}`] = color; });
-      if (rare.backgroundImage) vars['rare-holo-background-image'] = `url(${rare.backgroundImage})`;
+      if (rare.backgroundImage) {
+        vars['rare-holo-background-image'] = `url(${resolveImageUrl(rare.backgroundImage)})`;
+      }
     }
 
     // Galaxy parameters
@@ -413,7 +416,9 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
         }
       }
       (galaxy.colors || []).forEach((color, i) => { vars[`rare-holo-galaxy-color-${i + 1}`] = color; });
-      if (galaxy.backgroundImage) vars['rare-holo-galaxy-background-image'] = `url(${galaxy.backgroundImage})`;
+      if (galaxy.backgroundImage) {
+        vars['rare-holo-galaxy-background-image'] = `url(${resolveImageUrl(galaxy.backgroundImage)})`;
+      }
     }
 
     // Wowa parameters — the wowa shine layer reads the generic --angle / --space.
@@ -423,7 +428,9 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
       if (wowa.space !== undefined) vars['space'] = pct(wowa.space);
       if (wowa.brightness !== undefined) vars['wowa-holo-brightness'] = wowa.brightness;
       if (wowa.contrast !== undefined) vars['wowa-holo-contrast'] = wowa.contrast;
-      if (wowa.backgroundImage) vars['wowa-holo-background-image'] = `url(${wowa.backgroundImage})`;
+      if (wowa.backgroundImage) {
+        vars['wowa-holo-background-image'] = `url(${resolveImageUrl(wowa.backgroundImage)})`;
+      }
     }
 
     // Veil (sheen) parameters — the restored card-wide holo knobs. Every one
@@ -450,7 +457,9 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
       if (vmax.angle !== undefined) vars['rare-holo-vmax-angle'] = `${vmax.angle}deg`;
       if (vmax.brightness !== undefined) vars['rare-holo-vmax-brightness'] = vmax.brightness;
       if (vmax.contrast !== undefined) vars['rare-holo-vmax-contrast'] = vmax.contrast;
-      if (vmax.backgroundImage) vars['rare-holo-vmax-background-image'] = `url(${vmax.backgroundImage})`;
+      if (vmax.backgroundImage) {
+        vars['rare-holo-vmax-background-image'] = `url(${resolveImageUrl(vmax.backgroundImage)})`;
+      }
     }
 
     // The gradient's companion hues derive from the base hue, which is
@@ -532,11 +541,10 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
   // Early return if no card data
   if (!cardData) return null;
   
-  // Load image URL
-  // Handle both custom image URLs and regular image paths
-  const imageUrl = imagePath === 'custom_image'
-    ? customImageUrl || null // a custom card with no image yet renders empty
-    : `/assets/card_images/${imagePath}`;
+  // Resolve uploaded images against the API in local development while bundled
+  // card art remains on the frontend origin.
+  const imageUrl = cardArtworkUrl({ imagePath, customImageUrl });
+  const holoImageUrl = resolveImageUrl(customHoloImageUrl) || null;
 
   // Per-system image-layer presentation. Presence (how solid the image sits
   // at rest) and blend mode ride on the element itself, so several systems
@@ -667,7 +675,7 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
               <CustomHoloEffect
                 className="custom-holo-effect"
                 $active={true}
-                $imageUrl={customHoloImageUrl || null}
+                $imageUrl={holoImageUrl}
                 $blendMode={effectParams?.customHoloBlendMode || 'color-dodge'}
               />
             )}
@@ -712,7 +720,7 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
                           }}
                           className="rare-holo-background"
                           $className="rare-holo-background"
-                          $imageUrl={cardData.rareHoloParams.backgroundImage}
+                          $imageUrl={resolveImageUrl(cardData.rareHoloParams.backgroundImage)}
                           $active={true}
                           {...imageLayerProps(cardData.rareHoloParams)}
                         />
@@ -750,7 +758,7 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
                           }}
                           className="rare-holo-galaxy-background"
                           $className="rare-holo-galaxy-background"
-                          $imageUrl={cardData.rareHoloGalaxyParams.backgroundImage}
+                          $imageUrl={resolveImageUrl(cardData.rareHoloGalaxyParams.backgroundImage)}
                           $active={true}
                           {...imageLayerProps(cardData.rareHoloGalaxyParams)}
                         />
@@ -759,7 +767,7 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
                       {cardData.wowaHoloParams?.backgroundImage && holoEffects?.wowaHolo && (
                         <S.HoloBackgroundImage
                           className="wowa-holo-background"
-                          $imageUrl={cardData.wowaHoloParams.backgroundImage}
+                          $imageUrl={resolveImageUrl(cardData.wowaHoloParams.backgroundImage)}
                           $active={true}
                           {...imageLayerProps(cardData.wowaHoloParams)}
                         />
@@ -768,7 +776,7 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
                       {cardData.rareHoloVmaxParams?.backgroundImage && holoEffects?.rareHoloVmax && (
                         <S.HoloBackgroundImage
                           className="rare-holo-vmax-background"
-                          $imageUrl={cardData.rareHoloVmaxParams.backgroundImage}
+                          $imageUrl={resolveImageUrl(cardData.rareHoloVmaxParams.backgroundImage)}
                           $active={true}
                           {...imageLayerProps(cardData.rareHoloVmaxParams)}
                         />

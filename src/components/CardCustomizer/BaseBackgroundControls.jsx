@@ -45,6 +45,8 @@ const BaseBackgroundControls = ({ customCard, handleParamChange, onRandomize }) 
       <FieldRow>
         <RowLabel>Fade Shape</RowLabel>
         <Select
+          data-param="baseBackground.type"
+          aria-label="Fade Shape"
           value={bg.type}
           onChange={(e) => handleParamChange('baseBackground.type', e.target.value, false)}
         >

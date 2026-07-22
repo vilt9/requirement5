@@ -17,7 +17,13 @@ const ToggleSwitch = ({ label, param, checked, onChange, tooltipContent, descrip
         {desc && <Description>{desc}</Description>}
       </TextCol>
       <Switch>
-        <input type="checkbox" checked={checked} onChange={handleChange} />
+        <input
+          type="checkbox"
+          data-param={param}
+          aria-label={label}
+          checked={checked}
+          onChange={handleChange}
+        />
         <Slider />
       </Switch>
     </ToggleGroup>

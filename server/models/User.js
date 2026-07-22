@@ -24,16 +24,8 @@ const ageFromDob = (dob) => {
   return age;
 };
 
-// A Reddit/X handle → a matching, valid, unclaimed R5c username: lowercased,
-// non-username chars dropped, clamped to the 24-char limit. Empty/garbage handles
-// fall back to a random generic username so we never produce an invalid one.
-export const usernameForHandle = (handle) => {
-  const clean = String(handle || '').toLowerCase().replace(/[^a-z0-9_]/g, '');
-  if (clean.length >= 3) return clean.slice(0, 24);
-  const suffix = crypto.randomBytes(4).toString('hex');
-  const base = clean ? `${clean}_${suffix}` : `artist_${suffix}`;
-  return base.slice(0, 24);
-};
+export const normalizeReservedUsername = (username) =>
+  String(username || '').trim().toLowerCase();
 
 export const publicUser = (user) => {
   if (!user) return null;
@@ -41,8 +33,13 @@ export const publicUser = (user) => {
   // email, and date of birth. These are captured server-side but never sent to
   // the client. `is_admin` is derived from the (stripped) email so the frontend
   // can show the admin surface without ever seeing the address itself.
-  const { password_hash, claim_token, email, dob, ...rest } = user;
-  return { ...rest, is_admin: isAdminEmail(email) };
+  const sanitized = { ...user };
+  const email = sanitized.email;
+  for (const field of [
+    'password_hash', 'claim_token', 'email', 'dob', 'operator_managed',
+    'opening_balance', 'source', 'auth_version'
+  ]) delete sanitized[field];
+  return { ...sanitized, is_admin: isAdminEmail(email) };
 };
 
 export default class User {
@@ -90,44 +87,57 @@ export default class User {
     return { success: true, data: publicUser(memoryDb.getUserById(user.id)) };
   }
 
-  // Create an unclaimed "gift" account for an artist we found on Reddit/X. The bot
-  // holds the returned JWT to publish cards under it; the artist later takes it over
-  // with the claim_token. Idempotent per handle: an existing *unclaimed* gift account
-  // is reused (so we can add more cards to it), but a claimed one is never touched.
-  static async adopt({ handle, source }) {
-    const username = usernameForHandle(handle);
+  // Reserve an account that can only be activated through its one-time claim
+  // token. Repeating the same reservation returns the original token and never
+  // issues currency again; rotation is a separate, explicit operator action.
+  static reserve({ username: requestedUsername, openingBalance }) {
+    const username = normalizeReservedUsername(requestedUsername);
+    if (!USERNAME_RE.test(username)) {
+      return {
+        success: false,
+        error: 'Username must be 3-24 characters: letters, numbers, underscore',
+        code: 400
+      };
+    }
+    if (!screen(username).ok) {
+      return { success: false, error: 'Please choose a different username', code: 400 };
+    }
     const existing = memoryDb.getUserByUsername(username);
     if (existing) {
       if (existing.claimed_at || !existing.bot_created) {
-        return { success: false, error: 'That account already exists and is claimed', code: 409 };
+        return { success: false, error: 'Username is already in use', code: 409 };
       }
-      // Reuse the unclaimed gift account; rotate its claim token so old links die.
-      const claim_token = crypto.randomBytes(24).toString('base64url');
-      const updated = memoryDb.updateUser(existing.id, { claim_token });
-      return { success: true, data: { user: updated, claim_token, reused: true } };
+      return {
+        success: true,
+        data: { user: existing, claim_token: existing.claim_token, reused: true }
+      };
     }
     const claim_token = crypto.randomBytes(24).toString('base64url');
     const user = memoryDb.createUser({
       username,
-      // Random hash: nobody can log in until the artist claims and sets a password.
+      // No known password exists before activation.
       password_hash: bcrypt.hashSync(crypto.randomBytes(24).toString('hex'), 10),
       bot_created: true,
+      operator_managed: true,
       claimed_at: null,
       claim_token,
-      source: source || (handle ? `reddit:${handle}` : 'bot')
+      opening_balance: openingBalance,
+      auth_version: 0
     });
-    issue(user.id, 'grant', ECONOMY.STARTING_GRANT);
+    if (openingBalance > 0) {
+      issue(user.id, 'operator_grant', openingBalance, { reason: 'account_handoff' });
+    }
     return { success: true, data: { user: memoryDb.getUserById(user.id), claim_token, reused: false } };
   }
 
-  // An artist redeems a claim link: sets a real password, the token is burned, and
+  // The owner redeems a claim link: sets a real password, the token is burned, and
   // the account (with its cards + balance) is theirs. Returns the user so the caller
   // can log them straight in.
   static async claim({ token, password, dob, acceptedTerms }) {
     if (!password || password.length < 8) {
       return { success: false, error: 'Password must be at least 8 characters', code: 400 };
     }
-    // Claiming a gifted account is where a real person takes it over, so the
+    // Claiming a reserved account is where a real person takes it over, so the
     // same 18+ gate and Terms acceptance as a fresh signup apply here too.
     const age = ageFromDob(dob);
     if (age == null || age < 0 || age > 120) {
@@ -148,7 +158,9 @@ export default class User {
       dob: String(dob).trim(),
       terms_accepted_at: new Date().toISOString(),
       claim_token: null,
-      claimed_at: new Date().toISOString()
+      claimed_at: new Date().toISOString(),
+      operator_managed: false,
+      auth_version: (user.auth_version || 0) + 1
     });
     return { success: true, data: publicUser(updated) };
   }

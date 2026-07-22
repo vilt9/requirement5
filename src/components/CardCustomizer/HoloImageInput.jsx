@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import styled from 'styled-components';
+import { resolveImageUrl } from '../../utils/poolCard';
 
 // The one image selector used by every holo technique: a small slot that
 // uploads on tap, a pop-open view of the shared image library, and a clear
@@ -15,6 +16,7 @@ const HoloImageInput = ({
 }) => {
   const inputRef = useRef(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
+  const previewUrl = resolveImageUrl(value);
 
   const handleFile = (e) => {
     const file = e.target.files[0];
@@ -28,9 +30,9 @@ const HoloImageInput = ({
   return (
     <Wrap className="holo-image-input">
       <TopRow>
-        <Slot type="button" onClick={() => inputRef.current?.click()} $filled={!!value}>
+        <Slot type="button" onClick={() => inputRef.current?.click()} $filled={!!previewUrl}>
           {value
-            ? <img src={value} alt={label} />
+            ? <img src={previewUrl} alt={label} />
             : <span className="empty">+</span>}
         </Slot>
         <Meta>
@@ -55,6 +57,7 @@ const HoloImageInput = ({
         <input
           ref={inputRef}
           id={id}
+          data-image-field={id}
           type="file"
           accept="image/*"
           onChange={handleFile}

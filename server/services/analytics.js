@@ -12,9 +12,9 @@
 //   3. economy     — each cohort's balance health over time (median, % in debt)
 //   4. segments    — retention split by behaviour: creators vs collectors
 //
-// "Real" users only: an unclaimed bot-gift account (bot_created && !claimed_at)
+// "Real" users only: an unclaimed reserved account (bot_created && !claimed_at)
 // is a seeded shell with no human behind it, so it would flatline every
-// retention curve. Those are excluded from cohorts; a claimed gift account is a
+// retention curve. Those are excluded from cohorts; an activated account is a
 // real person and stays in.
 import { memoryDb } from '../config/database.js';
 import { ECONOMY } from './economy.js';

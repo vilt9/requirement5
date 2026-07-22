@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import styled from 'styled-components';
 import { SketchPicker } from 'react-color';
@@ -63,6 +63,8 @@ const ColorPicker = ({
         />
         <ColorInput
           type="text"
+          data-param={param}
+          aria-label={label}
           value={value}
           onChange={(e) => onChange(param, e.target.value, false)}
         />

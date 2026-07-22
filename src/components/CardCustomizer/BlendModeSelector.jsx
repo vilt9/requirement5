@@ -35,7 +35,7 @@ const BlendModeSelector = ({
     <SelectorGroup>
       <SelectorLabel>{label}</SelectorLabel>
       {desc && <Description>{desc}</Description>}
-      <SelectDropdown value={value} onChange={handleChange}>
+      <SelectDropdown data-param={param} aria-label={label} value={value} onChange={handleChange}>
         {blendModes.map((mode) => (
           <option key={mode} value={mode}>
             {mode.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}

@@ -10,6 +10,7 @@ import drawRoutes from './routes/draw.js';
 import analyticsRoutes from './routes/analytics.js';
 import paymentsRoutes, { webhookHandler } from './routes/payments.js';
 import adminRoutes from './routes/admin.js';
+import internalRoutes from './routes/internal.js';
 import { UPLOADS_DIR } from './storage/index.js';
 import linkTrace from './middleware/linkTrace.js';
 
@@ -48,6 +49,7 @@ app.use('/api/draw', drawRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/internal', internalRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -106,4 +108,4 @@ if (process.env.NODE_ENV !== 'test') {
   startServer();
 }
 
-export default app; 
+export default app;
