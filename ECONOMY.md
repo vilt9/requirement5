@@ -88,7 +88,7 @@ value costs you at the gamble, not at the mint.
 
 Fixed amounts:
 
-- Starting grant on signup: **50 /t26** (from the cloud).
+- Starting grant on signup: **250 /t26** (from the cloud).
 - Overdraft: you may spend into the red down to **−1000 /t26** (`DEBT_FLOOR`); at
   the floor, spending stops. A negative balance accrues **1.47%/day**, compounded
   daily (`DEBT_INTEREST_DAILY`).

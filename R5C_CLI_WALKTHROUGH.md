@@ -42,7 +42,7 @@ override every one of those knobs. Same pipeline either way.
 
 2. **Checked production.** Confirmed requirement5.com serves the app and proxies
    the API on the same domain, images go to Cloudflare R2, and new accounts get
-   50 /t26 (a publish stakes 10 — so a fresh account can publish five cards).
+   250 /t26.
 
 3. **Built the CLI** (`cli/` in the repo, zero dependencies, plain Node):
    - **Auth** — `signup`, `login`, `logout`, `whoami`; token saved to
@@ -94,7 +94,7 @@ blanks. `r5c help publish`, `r5c help login` etc. give per-command detail, and
 ```bash
 # non-interactive, no prompts:
 r5c signup --username art_scout_bot --password 'long-random-secret'
-# → Signed up and logged in as art_scout_bot. Starting balance: 50 /t26.
+# → Signed up and logged in as art_scout_bot. Starting balance: 250 /t26.
 ```
 
 The token is saved automatically and lasts 30 days. For CI or multi-account work

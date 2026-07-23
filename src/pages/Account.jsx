@@ -180,7 +180,7 @@ const Account = () => {
       <LeftPage>
         <Panel>
           Accounts hold your /t26 balance, your collection, and your published cards.
-          New accounts receive a grant of {config?.startingGrant ?? 50} /t26 from the cloud.
+          New accounts receive a grant of {config?.startingGrant ?? 250} /t26 from the cloud.
           <br /><Dim>You must be 18 or over to use Requirement5.</Dim>
         </Panel>
         <Row>

@@ -35,7 +35,7 @@ const COMMON = {
 export const TIERS = [...RARE_TIERS, COMMON];
 
 export const ECONOMY = {
-  STARTING_GRANT: 50,
+  STARTING_GRANT: 250,
   DIVIDEND_RATE: 0.7,
   // Overdraft: you can spend into the red down to this floor; at it, spending
   // stops. A negative balance accrues interest, compounded daily.

@@ -45,25 +45,25 @@ describe('issue and absorb', () => {
     const user = await makeUser();
     issue(user.id, 'dividend', 4, { card_id: 'card_9' });
     const fresh = memoryDb.getUserById(user.id);
-    expect(fresh.balance).toBe(54);
-    expect(memoryDb.getCloud().total_issued).toBe(54);
+    expect(fresh.balance).toBe(ECONOMY.STARTING_GRANT + 4);
+    expect(memoryDb.getCloud().total_issued).toBe(ECONOMY.STARTING_GRANT + 4);
   });
 
   test('absorb debits, allows overdraft to the floor, and refuses to breach it', async () => {
     const user = await makeUser();
     absorb(user.id, 'save', 20, { card_id: 'card_9' });
-    expect(memoryDb.getUserById(user.id).balance).toBe(30);
+    expect(memoryDb.getUserById(user.id).balance).toBe(ECONOMY.STARTING_GRANT - 20);
     expect(memoryDb.getCloud().total_absorbed).toBe(20);
 
     // Spending may run the balance negative — down to the debt floor (-1000).
-    absorb(user.id, 'save', 160);
+    absorb(user.id, 'save', 360);
     expect(memoryDb.getUserById(user.id).balance).toBe(-130);
-    expect(memoryDb.getCloud().total_absorbed).toBe(180);
+    expect(memoryDb.getCloud().total_absorbed).toBe(380);
 
     // A debit that would push past the floor is refused; the absorption counter
     // stays put — proof the debit never applied.
     expect(() => absorb(user.id, 'save', 900)).toThrow(InsufficientFundsError);
-    expect(memoryDb.getCloud().total_absorbed).toBe(180);
+    expect(memoryDb.getCloud().total_absorbed).toBe(380);
     expect(memoryDb.getUserById(user.id).balance).toBeCloseTo(-130, 2);
   });
 
@@ -72,7 +72,7 @@ describe('issue and absorb', () => {
     issue(user.id, 'dividend', 0.8);
     issue(user.id, 'dividend', 0.8);
     issue(user.id, 'dividend', 0.8);
-    expect(memoryDb.getUserById(user.id).balance).toBe(52.4);
+    expect(memoryDb.getUserById(user.id).balance).toBe(ECONOMY.STARTING_GRANT + 2.4);
   });
 });
 

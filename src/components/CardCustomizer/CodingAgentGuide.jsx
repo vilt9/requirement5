@@ -59,7 +59,7 @@ npm install -g @requirement5cards/r5c`}</pre>
     <Step>
       <h4>2 · Sign in</h4>
       <p className="lead">
-        New accounts start with 50 /t26; making a card costs a small create fee.
+        New accounts start with 250 /t26; making a card costs a small create fee.
         For an agent or CI, export the token so it can act headlessly.
       </p>
       <pre>{`r5c signup --username your_name --email you@example.com

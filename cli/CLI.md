@@ -43,7 +43,7 @@ draft privately, and **publish** when it's ready — only then does it go live a
 | `--password` flag | Non-interactive login | Scripts |
 | `R5C_TOKEN` env var | Bypasses the config file entirely | CI, agents, multi-account |
 
-New accounts are granted **50 /t26** (the platform currency). The **create fee**
+New accounts are granted **250 /t26** (the platform currency). The **create fee**
 (a few /t26, paid at `confirm-start`) is the cost of minting a card, so a fresh
 account can make many cards immediately. **Regenerating** the Rarity Value costs
 a climbing fee (the gambling tax). When other players save your card you earn a

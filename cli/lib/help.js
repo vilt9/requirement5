@@ -12,7 +12,7 @@ USAGE
   r5c <command> [args] [--flags]
 
 ACCOUNT
-  signup --username <name> --email <addr> [--password <pw>]   Create an account (grants 50 /t26) and log in
+  signup --username <name> --email <addr> [--password <pw>]   Create an account (grants 250 /t26) and log in
   login  --username <name|email> [--password <pw>]            Log in (token saved to ~/.r5c/config.json)
   logout                                       Forget the saved token
   whoami                                       Show current user and balance
@@ -204,7 +204,7 @@ NOTES
     the next card; \`regenerate-rarity\` draws a fresh one for a climbing /t26 fee.
     \`confirm-start\` charges the (gentle) create fee and locks the rarity onto a
     private draft.
-  - New accounts start with 50 /t26. You may spend into the red down to -1000
+  - New accounts start with 250 /t26. You may spend into the red down to -1000
     (debt accrues 1.47%/day). When others save your card you earn a dividend.
   - The published card lives at <api-url>/card/<id>.
   - A "set" groups your published cards and is namespaced to your username, so it
@@ -279,7 +279,7 @@ Creates an account and stores the session token in ~/.r5c/config.json.
 Username: 3-24 chars (letters, numbers, underscore). Email: required (kept
 private, server-side only). Password: min 8 chars — prompted interactively if
 omitted (or piped via stdin). Log in later with either the username or email.
-New accounts are granted 50 /t26; regenerating the rarity and confirm-start
+New accounts are granted 250 /t26; regenerating the rarity and confirm-start
 spend from it (you may go into the red down to -1000, which accrues 1.47%/day
 interest).`,
   login: `r5c login --username <name> [--password <pw>]
