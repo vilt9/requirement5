@@ -1,6 +1,7 @@
 import {
   capturePageUrl,
   parseIncludeUrl,
+  RENDER_REVISION,
   renderCacheKey,
   renderStorageStem,
   renderVariant
@@ -26,6 +27,12 @@ describe('render outro variants', () => {
       .not.toBe(renderCacheKey('card-1', 'mp4', null, false));
     expect(renderStorageStem('card-1', true))
       .not.toBe(renderStorageStem('card-1', false));
+  });
+
+  test('versions moving media so choreography changes bypass old renders', () => {
+    expect(RENDER_REVISION).toBe('cycle-v2');
+    expect(renderCacheKey('card-1', 'gif', null, true)).toContain(RENDER_REVISION);
+    expect(renderStorageStem('card-1', true)).toContain(RENDER_REVISION);
   });
 
   test('still-frame previews share a cache because they contain no outro', () => {

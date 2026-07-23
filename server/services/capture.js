@@ -18,13 +18,22 @@ import { capturePageUrl } from './renderVariant.js';
 const BASE_URL = process.env.CAPTURE_BASE_URL || 'http://localhost:5175';
 const FRAME = { width: 380, height: 520 };
 
-// Render defaults. The clip has a small arc: it opens on the card at rest (holo
-// dormant, flat), then the pointer crosses on — the holo wakes — and the card orbits;
-// the tail fades to black, then the R5c end card fades in and holds. The card portion
-// is ~3.1s; the outro adds ~1.4s. All at 25fps for smooth motion at a modest file size.
+// Render defaults. The clip tells a complete material-change story: flat card, holo
+// wake and orbit, active card settling flat, card-specific holo reversal, then the
+// restored base card fading to the R5c end card. A slow custom reveal makes its
+// reversal longer automatically; most clips run for roughly 5.5-6.25 seconds.
 const DEFAULTS = {
-  restFrames: 12, moveFrames: 66, fadeFrames: 18,           // card: rest → wake+orbit → fade
-  blackHoldFrames: 3, outroFadeFrames: 10, outroHoldFrames: 22, // end card: breath → fade in → hold
+  restFrames: 8,
+  moveFrames: 52,
+  wakeFrames: 10,
+  settleFrames: 8,
+  minReturnFrames: 18,
+  returnPaddingFrames: 3,
+  flatHoldFrames: 5,
+  fadeFrames: 12,
+  blackHoldFrames: 3,
+  outroFadeFrames: 10,
+  outroHoldFrames: 22,
   fps: 25, settleMs: 200
 };
 
@@ -54,14 +63,27 @@ export const closeBrowser = async () => {
 
 // Elliptical tilt path: the pointer orbits the card centre, sweeping the holo across
 // the face and tilting it through a full loop. t in [0,1).
-const poseFor = (t, box) => {
+const poseFor = (t, box, radiusScale = 1) => {
   const theta = t * Math.PI * 2;
   // Stay inside the card so the tilt never maxes out flat. 0.34 of half-extent.
-  const rx = box.width * 0.34;
-  const ry = box.height * 0.34;
+  const rx = box.width * 0.34 * radiusScale;
+  const ry = box.height * 0.34 * radiusScale;
   const cx = box.x + box.width / 2;
   const cy = box.y + box.height / 2;
   return { x: cx + Math.sin(theta) * rx, y: cy - Math.cos(theta) * ry };
+};
+
+const smoothstep = (t) => {
+  const bounded = Math.max(0, Math.min(1, t));
+  return bounded * bounded * (3 - 2 * bounded);
+};
+
+const durationSeconds = (value) => {
+  const match = String(value || '').trim().match(/^([\d.]+)(ms|s)$/);
+  if (!match) return 0;
+  const number = Number(match[1]);
+  if (!Number.isFinite(number)) return 0;
+  return match[2] === 'ms' ? number / 1000 : number;
 };
 
 const run = (cmd, args) => new Promise((resolve, reject) => {
@@ -75,7 +97,8 @@ const run = (cmd, args) => new Promise((resolve, reject) => {
 // Capture `format` ('gif' | 'mp4') for card `id`. Returns a Buffer.
 export const renderCard = async (id, { format = 'gif', includeUrl = true, ...opts } = {}) => {
   const {
-    restFrames, moveFrames, fadeFrames,
+    restFrames, moveFrames, wakeFrames, settleFrames,
+    minReturnFrames, returnPaddingFrames, flatHoldFrames, fadeFrames,
     blackHoldFrames, outroFadeFrames, outroHoldFrames,
     fps, settleMs
   } = { ...DEFAULTS, ...opts };
@@ -98,7 +121,18 @@ export const renderCard = async (id, { format = 'gif', includeUrl = true, ...opt
     const box = await scene.boundingBox();
     if (!box) throw new Error('card scene not found on capture page');
 
-    const total = restFrames + moveFrames + blackHoldFrames + outroFadeFrames + outroHoldFrames;
+    // Every visual layer uses this card-specific duration to enter and leave.
+    // Waiting for it here makes a 1.3s iris close fully instead of treating it
+    // like a default 0.2s fade. The floor covers fixed 0.3-0.4s shine effects.
+    const revealDuration = await page.locator('.card-container').evaluate(el => (
+      getComputedStyle(el).getPropertyValue('--holo-reveal-duration')
+    ));
+    const returnFrames = Math.max(
+      minReturnFrames,
+      Math.ceil(durationSeconds(revealDuration) * fps) + returnPaddingFrames
+    );
+    const total = restFrames + moveFrames + settleFrames + returnFrames +
+      flatHoldFrames + fadeFrames + blackHoldFrames + outroFadeFrames + outroHoldFrames;
     const pad = String(total).length;
     let f = 0;
     const shoot = async () => {
@@ -114,26 +148,58 @@ export const renderCard = async (id, { format = 'gif', includeUrl = true, ...opt
       await shoot();
     }
 
-    // Phase 2 — the pointer crosses onto the card (hover wakes the holo over its
-    // 0.3s bloom) and orbits; the last fadeFrames ramp the card's opacity to black
-    // while it keeps moving.
-    const fadeStart = moveFrames - fadeFrames;
+    // Phase 2 — cross onto the centre so the holo wakes on an almost-flat card,
+    // then grow smoothly into the orbit. This avoids the old first-frame jump
+    // from rest to a hard top-edge tilt.
+    let lastPose = poseFor(0, box, 0);
     for (let i = 0; i < moveFrames; i++) {
-      const { x, y } = poseFor(i / moveFrames, box);
-      await page.mouse.move(x, y); // first iteration is the rest→hover crossing
-      if (i >= fadeStart) {
-        const opacity = Math.max(0, 1 - (i - fadeStart + 1) / fadeFrames).toFixed(3);
-        await page.evaluate(o => {
-          const el = document.querySelector('.card-scene');
-          if (el) el.style.opacity = o;
-        }, opacity);
-      }
+      const radiusScale = smoothstep((i + 1) / Math.max(1, wakeFrames));
+      lastPose = poseFor(i / moveFrames, box, radiusScale);
+      await page.mouse.move(lastPose.x, lastPose.y);
       // let the holo transition catch up to the new pose before the shot
       await page.waitForTimeout(1000 / fps);
       await shoot();
     }
 
-    // Phase 3 — end card. A short black breath, then the R5c wordmark fades in and
+    // Phase 3 — settle the active card back to a flat pose before leaving it.
+    // Mouseleave resets tilt immediately, so this interpolation makes that return
+    // deliberate while keeping the holo fully active.
+    const center = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    for (let i = 0; i < settleFrames; i++) {
+      const progress = smoothstep((i + 1) / Math.max(1, settleFrames));
+      await page.mouse.move(
+        lastPose.x + (center.x - lastPose.x) * progress,
+        lastPose.y + (center.y - lastPose.y) * progress
+      );
+      await page.waitForTimeout(1000 / fps);
+      await shoot();
+    }
+
+    // Phase 4 — leave the card and record its real reverse transition. This is
+    // the missing beat that makes the holo read as a transformation of one card,
+    // rather than a second image that vanishes into the outro.
+    await page.mouse.move(2, 2);
+    for (let i = 0; i < returnFrames; i++) {
+      await page.waitForTimeout(1000 / fps);
+      await shoot();
+    }
+    for (let i = 0; i < flatHoldFrames; i++) {
+      await page.waitForTimeout(1000 / fps);
+      await shoot();
+    }
+
+    // Phase 5 — fade the now-flat base card to black.
+    for (let i = 0; i < fadeFrames; i++) {
+      const opacity = Math.max(0, 1 - (i + 1) / fadeFrames).toFixed(3);
+      await page.evaluate(o => {
+        const el = document.querySelector('.card-scene');
+        if (el) el.style.opacity = o;
+      }, opacity);
+      await page.waitForTimeout(1000 / fps);
+      await shoot();
+    }
+
+    // Phase 6 — end card. A short black breath, then the R5c wordmark fades in and
     // holds. Public-site exports include requirement5.com; operator outreach can
     // omit the URL while retaining the mark and Join the Resistance.
     const setOutro = (o) => page.evaluate(v => {
