@@ -7,7 +7,7 @@
 //   #capture-frame  — fixed-size box the screenshot is clipped to.
 //   window.__captureReady === true once the card + its image have settled.
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import Card from '../components/Card/Card';
 import { api } from '../utils/api';
 import { poolCardToCardData } from '../utils/poolCard';
@@ -15,6 +15,8 @@ import { generateCardAttributes } from '../utils/cardGenerator';
 
 const CaptureCard = () => {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const includeUrl = searchParams.get('includeUrl') !== '0';
   const [cardData, setCardData] = useState(null);
   const [error, setError] = useState(false);
 
@@ -88,6 +90,7 @@ const CaptureCard = () => {
           Centred is intentional here — this is a title/lockup, not running text. */}
       <div
         id="capture-outro"
+        data-include-url={includeUrl ? 'true' : 'false'}
         style={{
           position: 'absolute',
           inset: 0,
@@ -111,7 +114,11 @@ const CaptureCard = () => {
             height={200}
             style={{ filter: 'invert(1) contrast(1.12)', display: 'block' }}
           />
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--amber-text)', marginTop: 10 }}>requirement5.com</div>
+          {includeUrl && (
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--amber-text)', marginTop: 10 }}>
+              requirement5.com
+            </div>
+          )}
           <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 500, fontSize: 12, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'var(--gold)', marginTop: 18 }}>Join the Resistance</div>
         </div>
       </div>

@@ -12,6 +12,11 @@ import { setNameFor, setLabelOf, normalizeInfo } from '../utils/setName.js';
 import path from 'path';
 import { offloadImages, storeBuffer, UPLOADS_DIR } from '../storage/index.js';
 import { renderCard, renderStills, MIME } from '../services/capture.js';
+import {
+  parseIncludeUrl,
+  renderCacheKey,
+  renderStorageStem
+} from '../services/renderVariant.js';
 
 const router = express.Router();
 
@@ -700,17 +705,17 @@ const cardVersion = (card) => card?.updated_at || card?.updatedAt || '';
 // dedupe. Returns { payload, card } or { notFound: true }. An unclaimed
 // uuid-ish id still renders: the capture page generates the card from its
 // seed, the same way the share page shows it before anyone saves it.
-const ensureRender = async (id, format, count) => {
+const ensureRender = async (id, format, count, includeUrl) => {
   const found = await Card.findById(id);
   if (!found.success) {
     if (!/^[0-9a-f-]{10,64}$/i.test(id)) return { notFound: true, found };
-    return ensureRenderJob(id, format, count, 'seed', { name: `Draw ${id.slice(0, 8)}` });
+    return ensureRenderJob(id, format, count, 'seed', { name: `Draw ${id.slice(0, 8)}` }, includeUrl);
   }
-  return ensureRenderJob(id, format, count, cardVersion(found.data), found.data);
+  return ensureRenderJob(id, format, count, cardVersion(found.data), found.data, includeUrl);
 };
 
-const ensureRenderJob = async (id, format, count, version, card) => {
-  const key = format === 'frames' ? `${id}:frames:${count}` : `${id}:${format}`;
+const ensureRenderJob = async (id, format, count, version, card, includeUrl) => {
+  const key = renderCacheKey(id, format, count, includeUrl);
 
   const cached = renderCache.get(key);
   const fresh = cached && cached.version === version &&
@@ -729,8 +734,13 @@ const ensureRenderJob = async (id, format, count, version, card) => {
         }
         payload = { urls };
       } else {
-        const buffer = await renderCard(id, { format });
-        const { url } = await storeBuffer(buffer, MIME[format], `card_${id}`, { prefix: 'renders' });
+        const buffer = await renderCard(id, { format, includeUrl });
+        const { url } = await storeBuffer(
+          buffer,
+          MIME[format],
+          renderStorageStem(id, includeUrl),
+          { prefix: 'renders' }
+        );
         payload = { url };
       }
       renderCache.set(key, { payload, version, at: Date.now() });
@@ -746,6 +756,10 @@ const ensureRenderJob = async (id, format, count, version, card) => {
 router.get('/:id/render', async (req, res) => {
   const format = req.query.format === 'mp4' ? 'mp4'
     : req.query.format === 'frames' ? 'frames' : 'gif';
+  const includeUrl = parseIncludeUrl(req.query.includeUrl);
+  if (includeUrl === null) {
+    return res.status(400).json({ success: false, error: 'includeUrl must be true, false, 1, or 0' });
+  }
 
   try {
     // 'frames' returns a set of still PNGs (rest pose + orbit poses) instead of
@@ -753,9 +767,9 @@ router.get('/:id/render', async (req, res) => {
     const count = format === 'frames'
       ? Math.max(1, Math.min(8, parseInt(req.query.count, 10) || 4))
       : null;
-    const result = await ensureRender(req.params.id, format, count);
+    const result = await ensureRender(req.params.id, format, count, includeUrl);
     if (result.notFound) return res.status(404).json(result.found);
-    res.json({ success: true, data: { ...result.payload, format } });
+    res.json({ success: true, data: { ...result.payload, format, includeUrl } });
   } catch (error) {
     console.error('Error rendering card:', error);
     res.status(500).json({ success: false, error: 'Failed to render card' });
@@ -769,13 +783,18 @@ router.get('/:id/render', async (req, res) => {
 // which is also the only pattern mobile Safari reliably honours.
 router.get('/:id/render/download', async (req, res) => {
   const format = req.query.format === 'mp4' ? 'mp4' : 'gif';
+  const includeUrl = parseIncludeUrl(req.query.includeUrl);
+  if (includeUrl === null) {
+    return res.status(400).json({ success: false, error: 'includeUrl must be true, false, 1, or 0' });
+  }
   try {
-    const result = await ensureRender(req.params.id, format, null);
+    const result = await ensureRender(req.params.id, format, null, includeUrl);
     if (result.notFound) return res.status(404).json(result.found);
 
     const { url } = result.payload;
     const name = String(result.card.name || req.params.id).replace(/[^a-zA-Z0-9_-]+/g, '_') || 'card';
-    res.setHeader('Content-Disposition', `attachment; filename="${name}.${format}"`);
+    const suffix = includeUrl ? '' : '_no_url';
+    res.setHeader('Content-Disposition', `attachment; filename="${name}${suffix}.${format}"`);
 
     if (/^https?:/i.test(url)) {
       const upstream = await fetch(url);

@@ -13,6 +13,7 @@ import { spawn } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { capturePageUrl } from './renderVariant.js';
 
 const BASE_URL = process.env.CAPTURE_BASE_URL || 'http://localhost:5175';
 const FRAME = { width: 380, height: 520 };
@@ -72,7 +73,7 @@ const run = (cmd, args) => new Promise((resolve, reject) => {
 });
 
 // Capture `format` ('gif' | 'mp4') for card `id`. Returns a Buffer.
-export const renderCard = async (id, { format = 'gif', ...opts } = {}) => {
+export const renderCard = async (id, { format = 'gif', includeUrl = true, ...opts } = {}) => {
   const {
     restFrames, moveFrames, fadeFrames,
     blackHoldFrames, outroFadeFrames, outroHoldFrames,
@@ -89,7 +90,7 @@ export const renderCard = async (id, { format = 'gif', ...opts } = {}) => {
   try {
     // Not networkidle: the Vite dev server keeps an HMR socket open, so the network
     // never goes idle. The page's own __captureReady flag is the real signal.
-    await page.goto(`${BASE_URL}/capture/${id}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.goto(capturePageUrl(BASE_URL, id, includeUrl), { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForFunction(() => window.__captureReady === true, { timeout: 20000 });
 
     const frame = page.locator('#capture-frame');
@@ -133,7 +134,8 @@ export const renderCard = async (id, { format = 'gif', ...opts } = {}) => {
     }
 
     // Phase 3 — end card. A short black breath, then the R5c wordmark fades in and
-    // holds, so every clip closes on requirement5.com / Join the Resistance.
+    // holds. Public-site exports include requirement5.com; operator outreach can
+    // omit the URL while retaining the mark and Join the Resistance.
     const setOutro = (o) => page.evaluate(v => {
       const el = document.querySelector('#capture-outro');
       if (el) el.style.opacity = v;
