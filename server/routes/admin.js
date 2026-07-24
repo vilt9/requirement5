@@ -82,6 +82,7 @@ router.get('/cards', (req, res) => {
     .map(card => {
       const enriched = memoryDb.withCreatorAndSet(card);
       const stats = cardStats(card);
+      const creator = memoryDb.getUserById(card.creator_id);
       return {
         id: enriched.id,
         name: enriched.name,
@@ -94,7 +95,11 @@ router.get('/cards', (req, res) => {
         tier: enriched.tier,
         rarity_score: enriched.rarity_score,
         tags: enriched.tags || [],
-        founding_issue: (enriched.tags || []).includes('house-issue'),
+        founding_issue: Boolean(
+          creator?.bot_created
+          && creator?.operator_managed
+          && !creator?.claimed_at
+        ),
         times_saved: stats.timesSaved,
         signal_count: memoryDb.getSignalsForCard(card.id).length,
         created_at: enriched.created_at,
