@@ -6,7 +6,7 @@
 // 6s per run — the default 1× pace. (This used to be 12s; the baseline was
 // doubled so what read as "2×" before is now the 1× default, every dial stop
 // scaling from there.)
-const LOOP_MS = 6000;
+export const LOOP_MS = 6000;
 const PAUSE_KEY = 'r5c_motion_paused';
 const SPEED_KEY = 'r5c_motion_speed';
 

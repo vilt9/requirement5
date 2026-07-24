@@ -1,17 +1,20 @@
 // Headless capture surface. Renders ONLY the card, centred on black, with no app
 // chrome — this is the page Playwright loads (server/services/capture.js) to record
-// the holographic tilt as a GIF/MP4. The render driver dispatches synthetic mouse
-// moves onto the real .card-scene, so what we record is exactly the live effect.
+// the card-page motion cycle as a GIF/MP4. The render driver scrubs the same shared
+// clock the public card page uses, so export and browser motion cannot drift apart.
 //
 // Contract with the capture driver:
 //   #capture-frame  — fixed-size box the screenshot is clipped to.
 //   window.__captureReady === true once the card + its image have settled.
+//   window.__captureDurationMs — duration of one complete card-page motion run.
+//   window.__setCapturePhase(p) — scrub that run to p, where p is 0..1.
 import { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import Card from '../components/Card/Card';
 import { api } from '../utils/api';
 import { poolCardToCardData } from '../utils/poolCard';
 import { generateCardAttributes } from '../utils/cardGenerator';
+import { LOOP_MS, scrubTo, setMotionPaused } from '../utils/cardMotion';
 
 const CaptureCard = () => {
   const { id } = useParams();
@@ -19,6 +22,20 @@ const CaptureCard = () => {
   const includeUrl = searchParams.get('includeUrl') !== '0';
   const [cardData, setCardData] = useState(null);
   const [error, setError] = useState(false);
+
+  useEffect(() => {
+    setMotionPaused(true);
+    scrubTo(0);
+    window.__captureDurationMs = LOOP_MS;
+    window.__setCapturePhase = (phase) => {
+      const value = Number(phase);
+      scrubTo(Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0);
+    };
+    return () => {
+      delete window.__captureDurationMs;
+      delete window.__setCapturePhase;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -83,7 +100,7 @@ const CaptureCard = () => {
         overflow: 'hidden'
       }}
     >
-      {cardData && !error ? <Card cardData={cardData} /> : null}
+      {cardData && !error ? <Card cardData={cardData} loop /> : null}
 
       {/* End card. Held at opacity 0 (so its fonts preload); the capture driver
           fades it in after the card fades out, so every clip closes on the wordmark.

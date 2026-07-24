@@ -1,11 +1,11 @@
-// Card → GIF/MP4 capture. Drives the live holographic card through a deterministic
-// tilt orbit and records it, so a card can be posted as a moving image on social.
+// Card → GIF/MP4 capture. Scrubs the live card-page motion clock through one
+// deterministic run, so exported media uses the exact interaction choreography:
+// flat → holo rotation → plain rotation → flat.
 //
 // How it works: Playwright loads the chrome-free /capture/:id page (CaptureCard.jsx),
-// then for each frame dispatches a synthetic mousemove onto the real .card-scene at a
-// point on an elliptical path. The card's own handler turns that into tilt + holo, so
-// we record exactly the live effect — no animation logic is duplicated here. Frames are
-// screenshotted (clipped to #capture-frame) and stitched by ffmpeg into an MP4 and GIF.
+// then asks that page to scrub the shared card motion clock for every frame. Frames
+// are screenshotted (clipped to #capture-frame) and stitched by ffmpeg into an MP4
+// or GIF. The exporter owns encoding and the outro, while the card owns all motion.
 //
 // Requires Playwright (with chromium) and ffmpeg on the host. CAPTURE_BASE_URL points at
 // the running SPA (dev: the Vite server; prod: the deployed site).
@@ -18,17 +18,9 @@ import { capturePageUrl } from './renderVariant.js';
 const BASE_URL = process.env.CAPTURE_BASE_URL || 'http://localhost:5175';
 const FRAME = { width: 380, height: 520 };
 
-// Render defaults. The clip tells a complete material-change story: flat card, holo
-// wake and orbit, active card settling flat, card-specific holo reversal, then the
-// restored base card fading to the R5c end card. A slow custom reveal makes its
-// reversal longer automatically; most clips run for roughly 5.5-6.25 seconds.
+// The card-page clock supplies the motion duration. These defaults only choreograph
+// the handoff from its final flat pose into the R5c end card.
 const DEFAULTS = {
-  restFrames: 8,
-  moveFrames: 52,
-  wakeFrames: 10,
-  settleFrames: 8,
-  minReturnFrames: 18,
-  returnPaddingFrames: 3,
   flatHoldFrames: 5,
   fadeFrames: 12,
   blackHoldFrames: 3,
@@ -73,17 +65,9 @@ const poseFor = (t, box, radiusScale = 1) => {
   return { x: cx + Math.sin(theta) * rx, y: cy - Math.cos(theta) * ry };
 };
 
-const smoothstep = (t) => {
-  const bounded = Math.max(0, Math.min(1, t));
-  return bounded * bounded * (3 - 2 * bounded);
-};
-
-const durationSeconds = (value) => {
-  const match = String(value || '').trim().match(/^([\d.]+)(ms|s)$/);
-  if (!match) return 0;
-  const number = Number(match[1]);
-  if (!Number.isFinite(number)) return 0;
-  return match[2] === 'ms' ? number / 1000 : number;
+export const buildCapturePhases = (durationMs, fps) => {
+  const frameCount = Math.max(2, Math.round((durationMs / 1000) * fps));
+  return Array.from({ length: frameCount }, (_, index) => index / (frameCount - 1));
 };
 
 const run = (cmd, args) => new Promise((resolve, reject) => {
@@ -97,10 +81,8 @@ const run = (cmd, args) => new Promise((resolve, reject) => {
 // Capture `format` ('gif' | 'mp4') for card `id`. Returns a Buffer.
 export const renderCard = async (id, { format = 'gif', includeUrl = true, ...opts } = {}) => {
   const {
-    restFrames, moveFrames, wakeFrames, settleFrames,
-    minReturnFrames, returnPaddingFrames, flatHoldFrames, fadeFrames,
-    blackHoldFrames, outroFadeFrames, outroHoldFrames,
-    fps, settleMs
+    flatHoldFrames, fadeFrames, blackHoldFrames, outroFadeFrames,
+    outroHoldFrames, fps, settleMs
   } = { ...DEFAULTS, ...opts };
   const browser = await getBrowser();
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), `r5c-cap-${id}-`));
@@ -118,21 +100,15 @@ export const renderCard = async (id, { format = 'gif', includeUrl = true, ...opt
 
     const frame = page.locator('#capture-frame');
     const scene = page.locator('.card-scene');
-    const box = await scene.boundingBox();
-    if (!box) throw new Error('card scene not found on capture page');
+    if (await scene.count() !== 1) throw new Error('card scene not found on capture page');
 
-    // Every visual layer uses this card-specific duration to enter and leave.
-    // Waiting for it here makes a 1.3s iris close fully instead of treating it
-    // like a default 0.2s fade. The floor covers fixed 0.3-0.4s shine effects.
-    const revealDuration = await page.locator('.card-container').evaluate(el => (
-      getComputedStyle(el).getPropertyValue('--holo-reveal-duration')
-    ));
-    const returnFrames = Math.max(
-      minReturnFrames,
-      Math.ceil(durationSeconds(revealDuration) * fps) + returnPaddingFrames
-    );
-    const total = restFrames + moveFrames + settleFrames + returnFrames +
-      flatHoldFrames + fadeFrames + blackHoldFrames + outroFadeFrames + outroHoldFrames;
+    const motionDurationMs = await page.evaluate(() => window.__captureDurationMs);
+    if (!Number.isFinite(motionDurationMs) || motionDurationMs <= 0) {
+      throw new Error('capture motion clock not found on capture page');
+    }
+    const motionPhases = buildCapturePhases(motionDurationMs, fps);
+    const total = motionPhases.length + flatHoldFrames + fadeFrames +
+      blackHoldFrames + outroFadeFrames + outroHoldFrames;
     const pad = String(total).length;
     let f = 0;
     const shoot = async () => {
@@ -140,55 +116,24 @@ export const renderCard = async (id, { format = 'gif', includeUrl = true, ...opt
       f++;
     };
 
-    // Phase 1 — at rest: pointer parked off the card, holo dormant, card flat.
-    await page.mouse.move(2, 2);
+    // One complete card-page run. The shared clock already defines all four
+    // stretches and their easing: [flat][holo rotation][plain rotation][flat].
+    // Waiting one output-frame between scrubs also lets card-specific reveal
+    // transitions advance at their authored real-time duration.
     await page.waitForTimeout(settleMs);
-    for (let i = 0; i < restFrames; i++) {
+    for (const phase of motionPhases) {
+      await page.evaluate(value => window.__setCapturePhase(value), phase);
       await page.waitForTimeout(1000 / fps);
       await shoot();
     }
 
-    // Phase 2 — cross onto the centre so the holo wakes on an almost-flat card,
-    // then grow smoothly into the orbit. This avoids the old first-frame jump
-    // from rest to a hard top-edge tilt.
-    let lastPose = poseFor(0, box, 0);
-    for (let i = 0; i < moveFrames; i++) {
-      const radiusScale = smoothstep((i + 1) / Math.max(1, wakeFrames));
-      lastPose = poseFor(i / moveFrames, box, radiusScale);
-      await page.mouse.move(lastPose.x, lastPose.y);
-      // let the holo transition catch up to the new pose before the shot
-      await page.waitForTimeout(1000 / fps);
-      await shoot();
-    }
-
-    // Phase 3 — settle the active card back to a flat pose before leaving it.
-    // Mouseleave resets tilt immediately, so this interpolation makes that return
-    // deliberate while keeping the holo fully active.
-    const center = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-    for (let i = 0; i < settleFrames; i++) {
-      const progress = smoothstep((i + 1) / Math.max(1, settleFrames));
-      await page.mouse.move(
-        lastPose.x + (center.x - lastPose.x) * progress,
-        lastPose.y + (center.y - lastPose.y) * progress
-      );
-      await page.waitForTimeout(1000 / fps);
-      await shoot();
-    }
-
-    // Phase 4 — leave the card and record its real reverse transition. This is
-    // the missing beat that makes the holo read as a transformation of one card,
-    // rather than a second image that vanishes into the outro.
-    await page.mouse.move(2, 2);
-    for (let i = 0; i < returnFrames; i++) {
-      await page.waitForTimeout(1000 / fps);
-      await shoot();
-    }
+    // Let the restored flat card breathe before the outro.
     for (let i = 0; i < flatHoldFrames; i++) {
       await page.waitForTimeout(1000 / fps);
       await shoot();
     }
 
-    // Phase 5 — fade the now-flat base card to black.
+    // Fade the now-flat base card to black.
     for (let i = 0; i < fadeFrames; i++) {
       const opacity = Math.max(0, 1 - (i + 1) / fadeFrames).toFixed(3);
       await page.evaluate(o => {
@@ -199,7 +144,7 @@ export const renderCard = async (id, { format = 'gif', includeUrl = true, ...opt
       await shoot();
     }
 
-    // Phase 6 — end card. A short black breath, then the R5c wordmark fades in and
+    // End card. A short black breath, then the R5c wordmark fades in and
     // holds. Public-site exports include requirement5.com; operator outreach can
     // omit the URL while retaining the mark and Join the Resistance.
     const setOutro = (o) => page.evaluate(v => {
