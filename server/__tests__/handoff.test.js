@@ -19,6 +19,9 @@ describe('Private operator handoff', () => {
 
   const operator = (req, key = operatorKey) => req.set('x-r5ops-key', key);
   const handoff = (body) => operator(request(app).post('/api/internal/handoffs')).send(body);
+  const raiseBalance = (username, openingBalance) => operator(
+    request(app).patch(`/api/internal/handoffs/${encodeURIComponent(username)}/balance`)
+  ).send({ openingBalance });
 
   test('operator routes require the separate configured key', async () => {
     await request(app).get('/api/internal/auth/check').expect(401);
@@ -96,6 +99,48 @@ describe('Private operator handoff', () => {
     expect(second.body.data.claimUrl).toBe(first.body.data.claimUrl);
     expect(second.body.data.balance).toBe(250);
     expect(memoryDb.getCardById(card.id).is_public).toBe(false);
+  });
+
+  test('raises an unclaimed opening balance once and audits the exact difference', async () => {
+    const card = memoryDb.createCard({ name: 'Card', creator_id: studio.id, is_public: false });
+    await handoff({ username: 'funded_creator', openingBalance: 500, cardIds: [card.id] });
+
+    const raised = await raiseBalance('funded_creator', 1000);
+    expect(raised.status).toBe(200);
+    expect(raised.body.data).toMatchObject({
+      previousOpeningBalance: 500,
+      openingBalance: 1000,
+      added: 500,
+      balance: 1000
+    });
+    expect(memoryDb.getUserByUsername('funded_creator')).toMatchObject({
+      opening_balance: 1000,
+      balance: 1000
+    });
+    expect(memoryDb.getTransactionsByUser(raised.body.data.user.id)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'operator_grant',
+          amount: 500,
+          reason: 'account_handoff_balance_increase'
+        })
+      ])
+    );
+    expect(memoryDb.getAllEvents()).toContainEqual(expect.objectContaining({
+      type: 'operator_handoff_balance_increased',
+      previous_opening_balance: 500,
+      opening_balance: 1000,
+      amount: 500
+    }));
+
+    const transactionCount = memoryDb.getTransactionsByUser(raised.body.data.user.id).length;
+    const repeated = await raiseBalance('funded_creator', 1000);
+    expect(repeated.body.data.added).toBe(0);
+    expect(memoryDb.getTransactionsByUser(raised.body.data.user.id)).toHaveLength(transactionCount);
+
+    const lower = await raiseBalance('funded_creator', 900);
+    expect(lower.status).toBe(409);
+    expect(memoryDb.getUserByUsername('funded_creator').balance).toBe(1000);
   });
 
   test('a repeated handoff restores exact display casing on a legacy reservation', async () => {

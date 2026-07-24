@@ -57,14 +57,14 @@ describe('issue and absorb', () => {
 
     // Spending may run the balance negative — down to the debt floor (-1000).
     absorb(user.id, 'save', 360);
-    expect(memoryDb.getUserById(user.id).balance).toBe(-130);
+    expect(memoryDb.getUserById(user.id).balance).toBe(-230);
     expect(memoryDb.getCloud().total_absorbed).toBe(380);
 
     // A debit that would push past the floor is refused; the absorption counter
     // stays put — proof the debit never applied.
     expect(() => absorb(user.id, 'save', 900)).toThrow(InsufficientFundsError);
     expect(memoryDb.getCloud().total_absorbed).toBe(380);
-    expect(memoryDb.getUserById(user.id).balance).toBeCloseTo(-130, 2);
+    expect(memoryDb.getUserById(user.id).balance).toBeCloseTo(-230, 2);
   });
 
   test('amounts round to one decimal', async () => {

@@ -188,3 +188,59 @@ export const createHandoff = ({ username: requestedUsername, openingBalance, car
     };
   });
 };
+
+// Raise the pinned opening balance of an existing reservation. This is a
+// separate operation from createHandoff so repeating a handoff can remain
+// strictly idempotent and a mistyped balance cannot silently issue currency.
+// The account must still be unclaimed, and decreases are never permitted.
+export const raiseHandoffBalance = ({ username: requestedUsername, openingBalance }, operator) => {
+  const username = normalizeReservedUsername(requestedUsername);
+  const balance = validateOpeningBalance(openingBalance, operator.maxOpeningBalance);
+  const target = memoryDb.getUserByUsername(username);
+  if (!target) throw new HandoffError('Reserved account not found', 404);
+  if (target.claimed_at || !target.bot_created || !target.operator_managed) {
+    throw new HandoffError('Only an unclaimed operator-managed account can be adjusted', 409);
+  }
+  if (!target.claim_token) {
+    throw new HandoffError('Reserved account has no active claim link', 409);
+  }
+  if (target.opening_balance == null) {
+    throw new HandoffError('Reserved account has no pinned opening balance', 409);
+  }
+
+  const previousOpeningBalance = round6(target.opening_balance);
+  if (balance < previousOpeningBalance) {
+    throw new HandoffError(
+      `openingBalance can only increase from ${previousOpeningBalance} /t26`,
+      409
+    );
+  }
+
+  return memoryDb.atomic(() => {
+    const added = round6(balance - previousOpeningBalance);
+    if (added > 0) {
+      issue(target.id, 'operator_grant', added, {
+        reason: 'account_handoff_balance_increase',
+        previous_opening_balance: previousOpeningBalance,
+        opening_balance: balance
+      });
+      memoryDb.updateUser(target.id, { opening_balance: balance });
+      memoryDb.createEvent({
+        type: 'operator_handoff_balance_increased',
+        user_id: target.id,
+        previous_opening_balance: previousOpeningBalance,
+        opening_balance: balance,
+        amount: added
+      });
+    }
+
+    const updated = memoryDb.getUserById(target.id);
+    return {
+      user: publicUser(updated),
+      previousOpeningBalance,
+      openingBalance: updated.opening_balance,
+      added,
+      balance: updated.balance
+    };
+  });
+};
