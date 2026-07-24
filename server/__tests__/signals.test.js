@@ -72,6 +72,32 @@ describe('card signals and notifications', () => {
     expect(removed.body.data).toMatchObject({ mine: [], total: 0 });
   });
 
+  test('generated discover cards can collect reactions before they are stored', async () => {
+    const generatedId = 'a37f9943-aeb5-416d-a432-5770843977d9';
+    const guestId = '1c2f8ce3-02ad-47e3-84a9-b64a31edbfca';
+    expect(memoryDb.getCardById(generatedId)).toBeUndefined();
+
+    const signalled = await request(app)
+      .put(`/api/cards/${generatedId}/signals`)
+      .send({ signal: 'launch', guestId });
+    expect(signalled.status).toBe(200);
+    expect(signalled.body.data).toMatchObject({
+      mine: ['launch'],
+      total: 1,
+      counts: { launch: 1 }
+    });
+    expect(memoryDb.getCardById(generatedId)).toBeUndefined();
+
+    const revisited = await request(app)
+      .get(`/api/cards/${generatedId}/signals?guestId=${guestId}`);
+    expect(revisited.body.data).toMatchObject({ mine: ['launch'], total: 1 });
+
+    const invalidId = await request(app)
+      .put('/api/cards/not-a-generated-card/signals')
+      .send({ signal: 'launch', guestId });
+    expect(invalidId.status).toBe(404);
+  });
+
   test('signals validate the vocabulary and reject creator self-signals', async () => {
     expect((await request(app)
       .put(`/api/cards/${card.id}/signals`)

@@ -39,6 +39,7 @@ const SIGNAL_KEYS = [
   'bug', 'human', 'key', 'cycle'
 ];
 const SIGNAL_SET = new Set(SIGNAL_KEYS);
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 const signalView = (cardId, viewerId) => {
   const rows = memoryDb.getSignalsForCard(cardId);
@@ -55,9 +56,24 @@ const signalView = (cardId, viewerId) => {
 
 const guestSignalActor = (value) => {
   const id = String(value || '').toLowerCase();
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(id)
+  return UUID_V4.test(id)
     ? `guest:${id}`
     : null;
+};
+
+// Discover draws exist first as deterministic UUID-seeded cards in the browser.
+// They can collect reactions without creating a card row or entering the pool;
+// if a draw is later saved, the same UUID carries those reactions forward.
+const reactionTarget = (value) => {
+  const id = String(value || '').toLowerCase();
+  const card = memoryDb.getCardById(id);
+  if (card) {
+    const visible = card.is_public &&
+      card.moderation_status !== 'flagged' &&
+      card.moderation_status !== 'removed';
+    return visible ? { id: card.id, card } : null;
+  }
+  return UUID_V4.test(id) ? { id, card: null } : null;
 };
 
 // ---------- Guided card creation (mirrors the website's /create flow + wording)
@@ -439,22 +455,20 @@ router.post('/:id/report', optionalAuth, (req, res) => {
 // Card reactions: public counts, anonymous or authenticated writes, and any
 // number of different icons per person. A creator cannot react to their own card.
 router.get('/:id/signals', optionalAuth, (req, res) => {
-  const card = memoryDb.getCardById(req.params.id);
-  if (!card || !card.is_public ||
-      card.moderation_status === 'flagged' || card.moderation_status === 'removed') {
+  const target = reactionTarget(req.params.id);
+  if (!target) {
     return res.status(404).json({ success: false, error: 'Card not found' });
   }
   const viewerId = req.user?.id || guestSignalActor(req.query.guestId);
-  res.json({ success: true, data: signalView(card.id, viewerId) });
+  res.json({ success: true, data: signalView(target.id, viewerId) });
 });
 
 router.put('/:id/signals', optionalAuth, (req, res) => {
-  const card = memoryDb.getCardById(req.params.id);
-  if (!card || !card.is_public ||
-      card.moderation_status === 'flagged' || card.moderation_status === 'removed') {
+  const target = reactionTarget(req.params.id);
+  if (!target) {
     return res.status(404).json({ success: false, error: 'Card not found' });
   }
-  if (req.user && card.creator_id === req.user.id) {
+  if (req.user && target.card?.creator_id === req.user.id) {
     return res.status(400).json({ success: false, error: "You can't react to your own card" });
   }
   const actorId = req.user?.id || guestSignalActor(req.body?.guestId);
@@ -465,15 +479,15 @@ router.put('/:id/signals', optionalAuth, (req, res) => {
   if (!SIGNAL_SET.has(signal)) {
     return res.status(400).json({ success: false, error: 'Unknown signal' });
   }
-  const existing = memoryDb.getSignal(actorId, card.id, signal);
-  const row = memoryDb.upsertSignal(actorId, card.id, signal);
-  if (!existing) recordReactionAdded(row, card);
-  res.json({ success: true, data: signalView(card.id, actorId) });
+  const existing = memoryDb.getSignal(actorId, target.id, signal);
+  const row = memoryDb.upsertSignal(actorId, target.id, signal);
+  if (!existing && target.card) recordReactionAdded(row, target.card);
+  res.json({ success: true, data: signalView(target.id, actorId) });
 });
 
 router.delete('/:id/signals', optionalAuth, (req, res) => {
-  const card = memoryDb.getCardById(req.params.id);
-  if (!card) return res.status(404).json({ success: false, error: 'Card not found' });
+  const target = reactionTarget(req.params.id);
+  if (!target) return res.status(404).json({ success: false, error: 'Card not found' });
   const actorId = req.user?.id || guestSignalActor(req.body?.guestId);
   if (!actorId) {
     return res.status(400).json({ success: false, error: 'A visitor identity is required' });
@@ -482,9 +496,9 @@ router.delete('/:id/signals', optionalAuth, (req, res) => {
   if (!SIGNAL_SET.has(signal)) {
     return res.status(400).json({ success: false, error: 'Unknown reaction' });
   }
-  const deleted = memoryDb.deleteSignal(actorId, card.id, signal);
-  if (deleted) recordReactionRemoved(deleted, card);
-  res.json({ success: true, data: signalView(card.id, actorId) });
+  const deleted = memoryDb.deleteSignal(actorId, target.id, signal);
+  if (deleted && target.card) recordReactionRemoved(deleted, target.card);
+  res.json({ success: true, data: signalView(target.id, actorId) });
 });
 
 // Recipient-scoped operational reports: creator reactions/saves, daily

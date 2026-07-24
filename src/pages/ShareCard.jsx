@@ -450,7 +450,7 @@ const ShareCard = () => {
           </div>
         </FixedDock>
 
-        {!synthetic && !provisional && card.is_public && (
+        {!provisional && (synthetic || card.is_public) && (
           <Signals cardId={card.id} creatorId={card.creator_id} bloom={scrolling} />
         )}
 
