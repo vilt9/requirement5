@@ -30,7 +30,7 @@ describe('render outro variants', () => {
   });
 
   test('versions moving media so choreography changes bypass old renders', () => {
-    expect(RENDER_REVISION).toBe('page-cycle-v3');
+    expect(RENDER_REVISION).toBe('transformation-v4');
     expect(renderCacheKey('card-1', 'gif', null, true)).toContain(RENDER_REVISION);
     expect(renderStorageStem('card-1', true)).toContain(RENDER_REVISION);
   });

@@ -31,7 +31,9 @@ const buildBaseBackground = (bg) => {
 // hover states are full size (the size before any of this).
 const REST_SHRINK = 0.05;
 
-const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = false }) => {
+const Card = ({
+  cardData, isInteractive = true, onClick, scrub = false, loop = false, capture = false
+}) => {
   const [isMoving, setIsMoving] = useState(false);
   const [failedSrc, setFailedSrc] = useState(null); // hides an image that 404s, per-src, so it can't flicker
   const [loadedSrc, setLoadedSrc] = useState(null); // art fades in when its pixels arrive, instead of popping
@@ -55,7 +57,7 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
     typeof window !== 'undefined' &&
     window.matchMedia('(hover: none) and (pointer: coarse)').matches
   );
-  const directPointer = !(driven && coarse);
+  const directPointer = !capture && !(driven && coarse);
   const shinyRef = useRef(null); // last shiny state; null forces a re-apply
   
   // Set CSS variables on CardScene; every consumer lives below it and
@@ -321,10 +323,39 @@ const Card = ({ cardData, isInteractive = true, onClick, scrub = false, loop = f
   // Initialize with floating class
   useEffect(() => {
     if (cardRef.current && isInteractive) {
-      console.log('Initializing card with floating class');
-      cardRef.current.classList.add('floating');
+      if (capture) cardRef.current.classList.remove('floating');
+      else {
+        console.log('Initializing card with floating class');
+        cardRef.current.classList.add('floating');
+      }
     }
-  }, [isInteractive]);
+  }, [capture, isInteractive]);
+
+  // Headless media capture drives the same pose writer as real interaction,
+  // but controls shine independently so the card can complete one shiny orbit,
+  // return flat, and only then reveal the non-shiny base.
+  useEffect(() => {
+    const scene = cardSceneRef.current;
+    if (!capture || !scene || !cardRef.current) return undefined;
+    const applyCapturePose = (event) => {
+      const state = event.detail || {};
+      const shiny = !!state.shiny;
+      cardRef.current.classList.remove('floating');
+      cardRef.current.classList.toggle('moving', shiny);
+      shinyRef.current = shiny;
+      setIsMoving(shiny);
+      drivePose(
+        Number(state.nx) || 0,
+        Number(state.ny) || 0,
+        true,
+        Number.isFinite(Number(state.scale)) ? Number(state.scale) : 1
+      );
+    };
+    scene.addEventListener('r5c:capture-pose', applyCapturePose);
+    return () => scene.removeEventListener('r5c:capture-pose', applyCapturePose);
+    // The capture surface mounts once; pose writes use stable refs throughout it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [capture]);
   
   // Apply every parameter-derived CSS variable whenever cardData changes, so
   // customizer changes are visible immediately — not only after a mouse move.
