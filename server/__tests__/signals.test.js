@@ -88,6 +88,20 @@ describe('card signals and notifications', () => {
       .send({ signal: 'atom' })).status).toBe(400);
   });
 
+  test('expanded reaction vocabulary persists', async () => {
+    const response = await request(app)
+      .put(`/api/cards/${card.id}/signals`)
+      .set('Authorization', `Bearer ${viewer.token}`)
+      .send({ signal: 'earth' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toMatchObject({
+      mine: ['earth'],
+      total: 1,
+      counts: { earth: 1 }
+    });
+  });
+
   test('the creator receives and can read signal notifications', async () => {
     await request(app)
       .put(`/api/cards/${card.id}/signals`)

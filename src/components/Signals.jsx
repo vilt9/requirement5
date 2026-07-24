@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
-import { LuScanEye } from 'react-icons/lu';
+import { LuChevronLeft, LuChevronRight, LuScanEye } from 'react-icons/lu';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
 import { SIGNALS } from '../utils/signals';
 
 const VISITOR_KEY = 'r5c_signal_visitor';
+const PAGE_SIZE = 12;
 
 const visitorId = () => {
   let id = localStorage.getItem(VISITOR_KEY);
@@ -23,6 +24,7 @@ const Signals = ({ cardId, creatorId, bloom = false }) => {
   const guestId = useRef(visitorId());
   const [data, setData] = useState({ counts: emptyCounts(), total: 0, mine: [] });
   const [open, setOpen] = useState(false);
+  const [page, setPage] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [momentBloom, setMomentBloom] = useState(false);
@@ -92,6 +94,8 @@ const Signals = ({ cardId, creatorId, bloom = false }) => {
   }, [ownCard, busy, data.mine, cardId, replayBloom]);
 
   const active = SIGNALS.filter(signal => data.counts?.[signal.key] > 0);
+  const pageCount = Math.ceil(SIGNALS.length / PAGE_SIZE);
+  const pageSignals = SIGNALS.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   return (
     <SignalRail aria-label="Card reactions" $active={activeBloom}>
@@ -136,28 +140,45 @@ const Signals = ({ cardId, creatorId, bloom = false }) => {
         </OpenButton>
         {open && (
           <Picker
-            role="grid"
-            aria-label="Choose reactions"
             onFocus={holdOpen}
             onBlur={release}
           >
-            {SIGNALS.map(signal => (
-              <SignalButton
-                key={signal.key}
+            <SignalGrid role="grid" aria-label="Choose reactions">
+              {pageSignals.map(signal => (
+                <SignalButton
+                  key={signal.key}
+                  type="button"
+                  role="gridcell"
+                  title={signal.label}
+                  aria-label={signal.label}
+                  aria-pressed={data.mine?.includes(signal.key)}
+                  $color={signal.color}
+                  $accent={signal.accent}
+                  $selected={data.mine?.includes(signal.key)}
+                  onClick={() => choose(signal.key)}
+                  disabled={busy}
+                >
+                  <signal.Icon aria-hidden />
+                </SignalButton>
+              ))}
+            </SignalGrid>
+            <Pager aria-label="Reaction pages">
+              <PageButton
                 type="button"
-                role="gridcell"
-                title={signal.label}
-                aria-label={signal.label}
-                aria-pressed={data.mine === signal.key}
-                $color={signal.color}
-                $accent={signal.accent}
-                $selected={data.mine?.includes(signal.key)}
-                onClick={() => choose(signal.key)}
-                disabled={busy}
+                aria-label="Previous reactions"
+                onClick={() => setPage(current => (current - 1 + pageCount) % pageCount)}
               >
-                <signal.Icon aria-hidden />
-              </SignalButton>
-            ))}
+                <LuChevronLeft aria-hidden />
+              </PageButton>
+              <PageStatus aria-live="polite">{page + 1} / {pageCount}</PageStatus>
+              <PageButton
+                type="button"
+                aria-label="Next reactions"
+                onClick={() => setPage(current => (current + 1) % pageCount)}
+              >
+                <LuChevronRight aria-hidden />
+              </PageButton>
+            </Pager>
           </Picker>
         )}
       </PickerWrap>
@@ -232,7 +253,7 @@ const CountButton = styled.button`
   align-items: center;
   justify-content: center;
   gap: 4px;
-  border: 1px solid ${p => (p.$mine ? 'rgba(248, 212, 136, 0.96)' : 'rgba(232, 180, 85, 0.62)')};
+  border: 1px solid var(--panel-border);
   border-radius: 6px;
   color: var(--gold-bright);
   background: rgba(0, 0, 0, 0.08);
@@ -240,10 +261,7 @@ const CountButton = styled.button`
   cursor: pointer;
   font-size: 10px;
   font-variant-numeric: tabular-nums;
-  transition:
-    transform 140ms ease,
-    border-color 140ms ease,
-    box-shadow ${p => (p.$active ? '0s' : '3s')} ease;
+  transition: box-shadow ${p => (p.$active ? '0s' : '3s')} ease;
 
   &::before {
     content: '';
@@ -265,9 +283,7 @@ const CountButton = styled.button`
   svg { width: 14px; height: 14px; }
   &:hover:not(:disabled) {
     color: var(--gold-bright);
-    border-color: var(--gold-bright);
     box-shadow: 0 0 14px rgba(248, 212, 136, 0.44);
-    transform: translateY(-1px);
   }
   &:hover:not(:disabled)::before,
   &:focus-visible::before {
@@ -291,12 +307,12 @@ const OpenButton = styled.button`
   padding: 0;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(232, 180, 85, 0.68);
+  border: 1px solid var(--panel-border);
   border-radius: 6px;
   color: var(--gold-bright);
   background: rgba(0, 0, 0, 0.08);
   cursor: pointer;
-  transition: color 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+  transition: color 140ms ease, box-shadow 140ms ease;
 
   &::before {
     content: '';
@@ -318,7 +334,6 @@ const OpenButton = styled.button`
   svg { position: relative; z-index: 1; width: 15px; height: 15px; }
   &:hover:not(:disabled), &:focus-visible {
     color: var(--gold-bright);
-    border-color: var(--gold-bright);
     box-shadow: 0 0 13px rgba(248, 212, 136, 0.38);
   }
   &:hover:not(:disabled)::before,
@@ -336,11 +351,7 @@ const Picker = styled.div`
   bottom: calc(100% + 8px);
   width: 202px;
   padding: 11px;
-  display: grid;
-  grid-template-columns: repeat(4, 38px);
-  grid-auto-rows: 38px;
-  gap: 8px;
-  border: 1px solid rgba(232, 180, 85, 0.66);
+  border: 1px solid var(--panel-border);
   border-radius: 8px;
   background:
     linear-gradient(135deg,
@@ -358,13 +369,20 @@ const Picker = styled.div`
   }
 `;
 
+const SignalGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(4, 38px);
+  grid-auto-rows: 38px;
+  gap: 8px;
+`;
+
 const SignalButton = styled.button`
   width: 38px;
   height: 38px;
   padding: 0;
   display: grid;
   place-items: center;
-  border: 1px solid ${p => (p.$selected ? 'rgba(248, 212, 136, 0.98)' : 'rgba(232, 180, 85, 0.58)')};
+  border: 1px solid var(--panel-border);
   border-radius: 6px;
   color: var(--gold-bright);
   background:
@@ -379,16 +397,52 @@ const SignalButton = styled.button`
     : 'inset 0 0 12px rgba(255, 255, 255, 0.025)')};
   backdrop-filter: blur(8px);
   cursor: pointer;
-  transition: transform 130ms ease, color 130ms ease, border-color 130ms ease, background 130ms ease;
+  transition: color 130ms ease, background 130ms ease, box-shadow 130ms ease;
   svg { width: 19px; height: 19px; stroke-width: 1.7; }
   &:hover:not(:disabled), &:focus-visible {
     color: var(--gold-bright);
-    border-color: var(--gold-bright);
     box-shadow: 0 0 14px rgba(248, 212, 136, 0.44);
-    transform: translateY(-1px);
     outline: none;
   }
   &:disabled { cursor: wait; }
+`;
+
+const Pager = styled.div`
+  margin-top: 10px;
+  padding-top: 9px;
+  display: grid;
+  grid-template-columns: 28px 1fr 28px;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid var(--panel-border);
+`;
+
+const PageButton = styled.button`
+  width: 28px;
+  height: 24px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--panel-border);
+  border-radius: 5px;
+  color: var(--gold-bright);
+  background: rgba(0, 0, 0, 0.22);
+  cursor: pointer;
+  transition: color 130ms ease, background 130ms ease;
+
+  svg { width: 14px; height: 14px; }
+  &:hover, &:focus-visible {
+    color: #fff1bd;
+    background: rgba(248, 212, 136, 0.09);
+    outline: none;
+  }
+`;
+
+const PageStatus = styled.span`
+  color: var(--amber-dim);
+  font-size: 9px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 `;
 
 const SignalError = styled.span`

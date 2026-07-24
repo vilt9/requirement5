@@ -33,7 +33,10 @@ const router = express.Router();
 const SIGNAL_KEYS = [
   'flame', 'charge', 'launch', 'sparkle',
   'trophy', 'crown', 'rare', 'atom',
-  'brain', 'scan', 'experiment', 'growth'
+  'brain', 'scan', 'experiment', 'growth',
+  'bell', 'credit', 'shield', 'leaf',
+  'earth', 'hidden', 'fingerprint', 'remedy',
+  'bug', 'human', 'key', 'cycle'
 ];
 const SIGNAL_SET = new Set(SIGNAL_KEYS);
 
