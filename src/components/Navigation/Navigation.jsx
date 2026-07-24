@@ -5,6 +5,7 @@ import { FiGithub } from 'react-icons/fi';
 import { FaDiscord } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
 import { fmtT26 } from '../../utils/economyRandom';
+import NotificationCentre from '../NotificationCentre';
 
 const REPO_URL = 'https://github.com/vilt9/requirement5';
 const DISCORD_URL = 'https://discord.gg/ywRCSATau3';
@@ -87,6 +88,7 @@ const Navigation = () => {
               {link.label}
             </NavLink>
           ))}
+          <NotificationCentre user={user} />
           {/* Only the operator (server-set is_admin) sees the review surface. */}
           {user?.is_admin && (
             <NavLink to="/admin" className={location.pathname === '/admin' ? 'active' : ''}>
@@ -236,11 +238,15 @@ const Links = styled.div`
     flex: 0 0 100%;
     width: 100%;
     gap: 10px;
-    justify-content: space-between;
-    overflow-x: visible;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
     margin-top: 6px;
     padding-top: 6px;
+    padding-right: 12px;
     border-top: 1px solid var(--panel-border);
+    & > * { flex: 0 0 auto; }
   }
 `;
 
@@ -291,7 +297,6 @@ const Balance = styled(Link)`
   /* Phones: sit at the right end of row 1; drop the username / floor / rate. */
   @media (max-width: 640px) {
     order: 2;
-    margin-left: auto;
     .who, .floor, .rate { display: none; }
     .short { display: inline; }
   }

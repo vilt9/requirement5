@@ -17,8 +17,45 @@ import {
   renderCacheKey,
   renderStorageStem
 } from '../services/renderVariant.js';
+import {
+  getNotificationFeed,
+  markNotificationFeedRead,
+  recordCreatorPublished,
+  recordReactionAdded,
+  recordReactionRemoved,
+  recordSaveCreated
+} from '../services/notifications.js';
 
 const router = express.Router();
+
+// Reactions are deliberately finite and icon-led. The server owns the
+// vocabulary so arbitrary strings never become a second reaction system.
+const SIGNAL_KEYS = [
+  'flame', 'charge', 'launch', 'sparkle',
+  'trophy', 'crown', 'rare', 'atom',
+  'brain', 'scan', 'experiment', 'growth'
+];
+const SIGNAL_SET = new Set(SIGNAL_KEYS);
+
+const signalView = (cardId, viewerId) => {
+  const rows = memoryDb.getSignalsForCard(cardId);
+  const counts = Object.fromEntries(SIGNAL_KEYS.map(key => [key, 0]));
+  for (const row of rows) counts[row.signal] = (counts[row.signal] || 0) + 1;
+  return {
+    counts,
+    total: rows.length,
+    mine: viewerId
+      ? rows.filter(row => row.user_id === viewerId).map(row => row.signal)
+      : []
+  };
+};
+
+const guestSignalActor = (value) => {
+  const id = String(value || '').toLowerCase();
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(id)
+    ? `guest:${id}`
+    : null;
+};
 
 // ---------- Guided card creation (mirrors the website's /create flow + wording)
 // begin → regenerate-rarity → confirm-start → design → publish.
@@ -272,6 +309,7 @@ router.post('/create/publish', requireAuth, async (req, res) => {
 
     const card = memoryDb.updateCard(draft.id, patch);
     if (roll) memoryDb.deleteRoll(roll.id); // creation complete — next card starts fresh
+    recordCreatorPublished(card);
 
     res.json({
       success: true,
@@ -311,6 +349,14 @@ router.post('/:id/save', requireAuth, async (req, res) => {
     // generate→save flow is unchanged. Price tracks the card's stored rarity
     // (as a wide distribution), seeded from its id.
     const provenance = normalizeProvenance(req.body?.provenance);
+    const sourceOwner = provenance === 'linked' && req.body?.sourceUsername
+      ? memoryDb.getUserByUsername(req.body.sourceUsername)
+      : null;
+    const sourceUserId = sourceOwner &&
+      sourceOwner.id !== req.user.id &&
+      memoryDb.getSave(sourceOwner.id, card.id)
+      ? sourceOwner.id
+      : null;
     const cost = savePriceFor(card.id, provenance, card.rarity_score);
     // No creator account (cloud-claimed draws) → no dividend; the cloud
     // absorbs the whole cost.
@@ -329,10 +375,16 @@ router.post('/:id/save', requireAuth, async (req, res) => {
     // The cost is stored on the save itself — the price you paid is part of
     // your collection's story (bands can move; this is what it cost THEN).
     const save = memoryDb.createSave({
-      user_id: req.user.id, card_id: card.id, provenance, value, cost
+      user_id: req.user.id,
+      card_id: card.id,
+      provenance,
+      value,
+      cost,
+      source_user_id: sourceUserId
     });
     memoryDb.incrementCardCounter(card.id, 'times_saved');
     memoryDb.incrementCollectionCount(card.id);
+    recordSaveCreated({ save, card, dividend, sourceUserId });
 
     res.status(201).json({
       success: true,
@@ -379,6 +431,71 @@ router.post('/:id/report', optionalAuth, (req, res) => {
     memoryDb.updateCard(card.id, { moderation_status: 'flagged' });
   }
   res.status(201).json({ success: true, data: { status: 'flagged' } });
+});
+
+// Card reactions: public counts, anonymous or authenticated writes, and any
+// number of different icons per person. A creator cannot react to their own card.
+router.get('/:id/signals', optionalAuth, (req, res) => {
+  const card = memoryDb.getCardById(req.params.id);
+  if (!card || !card.is_public ||
+      card.moderation_status === 'flagged' || card.moderation_status === 'removed') {
+    return res.status(404).json({ success: false, error: 'Card not found' });
+  }
+  const viewerId = req.user?.id || guestSignalActor(req.query.guestId);
+  res.json({ success: true, data: signalView(card.id, viewerId) });
+});
+
+router.put('/:id/signals', optionalAuth, (req, res) => {
+  const card = memoryDb.getCardById(req.params.id);
+  if (!card || !card.is_public ||
+      card.moderation_status === 'flagged' || card.moderation_status === 'removed') {
+    return res.status(404).json({ success: false, error: 'Card not found' });
+  }
+  if (req.user && card.creator_id === req.user.id) {
+    return res.status(400).json({ success: false, error: "You can't react to your own card" });
+  }
+  const actorId = req.user?.id || guestSignalActor(req.body?.guestId);
+  if (!actorId) {
+    return res.status(400).json({ success: false, error: 'A visitor identity is required' });
+  }
+  const signal = String(req.body?.signal || '').toLowerCase();
+  if (!SIGNAL_SET.has(signal)) {
+    return res.status(400).json({ success: false, error: 'Unknown signal' });
+  }
+  const existing = memoryDb.getSignal(actorId, card.id, signal);
+  const row = memoryDb.upsertSignal(actorId, card.id, signal);
+  if (!existing) recordReactionAdded(row, card);
+  res.json({ success: true, data: signalView(card.id, actorId) });
+});
+
+router.delete('/:id/signals', optionalAuth, (req, res) => {
+  const card = memoryDb.getCardById(req.params.id);
+  if (!card) return res.status(404).json({ success: false, error: 'Card not found' });
+  const actorId = req.user?.id || guestSignalActor(req.body?.guestId);
+  if (!actorId) {
+    return res.status(400).json({ success: false, error: 'A visitor identity is required' });
+  }
+  const signal = String(req.body?.signal || '').toLowerCase();
+  if (!SIGNAL_SET.has(signal)) {
+    return res.status(400).json({ success: false, error: 'Unknown reaction' });
+  }
+  const deleted = memoryDb.deleteSignal(actorId, card.id, signal);
+  if (deleted) recordReactionRemoved(deleted, card);
+  res.json({ success: true, data: signalView(card.id, actorId) });
+});
+
+// Recipient-scoped operational reports: creator reactions/saves, daily
+// collection influence and reaction summaries, and limited creator releases.
+router.get('/notifications/mine', requireAuth, (req, res) => {
+  res.json({
+    success: true,
+    data: getNotificationFeed(req.user.id)
+  });
+});
+
+router.post('/notifications/read', requireAuth, (req, res) => {
+  const marked = markNotificationFeedRead(req.user.id);
+  res.json({ success: true, data: { marked } });
 });
 
 // Save a synthetic card — one generated deterministically from its uuid rather
@@ -823,6 +940,7 @@ router.post('/', requireAuth, async (req, res) => {
     if (bad) return res.status(400).json({ success: false, error: bad.message });
     const result = await Card.create({ ...req.body, creatorId: req.user.id });
     if (result.success) {
+      if (result.data.is_public) recordCreatorPublished(result.data);
       res.status(201).json(result);
     } else {
       res.status(400).json(result);

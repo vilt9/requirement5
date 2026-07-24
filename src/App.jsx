@@ -8,6 +8,7 @@ import Pool from './pages/Pool';
 import CollectionPage, { LegacyUserCollectionRedirect } from './pages/CollectionPage';
 import CardCustomizer from './pages/CardCustomizer';
 import Account from './pages/Account';
+import Notifications from './pages/Notifications';
 import ClaimAccount from './pages/ClaimAccount';
 import ShareCard from './pages/ShareCard';
 import CaptureCard from './pages/CaptureCard';
@@ -172,6 +173,7 @@ function App() {
                 <Route path="/create" element={<CardCustomizer />} />
                 <Route path="/customize" element={<Navigate to="/create" replace />} />
                 <Route path="/account" element={<Account />} />
+                <Route path="/notifications" element={<Notifications />} />
                 <Route path="/claim/:token" element={<ClaimAccount />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/analytics" element={<Analytics />} />

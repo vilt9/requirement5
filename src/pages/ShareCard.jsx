@@ -13,6 +13,7 @@ import { prefetchedCards } from '../utils/drawQueue';
 import { HOLO_NAMES } from '../utils/holoNames';
 import { useScrollBloom } from '../utils/useScrollBloom';
 import AboutR5c from '../components/AboutR5c';
+import Signals from '../components/Signals';
 import { Page, Panel, PillButton, Dim, TagList, Select, TextArea, ErrorText } from '../components/UI';
 import { ensureTags } from '../utils/tags';
 
@@ -243,7 +244,10 @@ const ShareCard = () => {
       } else {
         const result = await api(`/api/cards/${id}/save`, {
           method: 'POST',
-          body: { provenance: isDiscovered ? 'discovered' : 'linked' }
+          body: {
+            provenance: isDiscovered ? 'discovered' : 'linked',
+            sourceUsername: !isDiscovered && username ? username : undefined
+          }
         });
         setBalance(result.balance);
         setSaveResult(result);
@@ -255,7 +259,7 @@ const ShareCard = () => {
       else setSaveError(err?.message || 'Could not save this card.');
     }
     setBusy(false);
-  }, [user, id, card, discovered, navigate, location.pathname, setBalance, refreshBalance, flashSpend]);
+  }, [user, id, card, discovered, username, navigate, location.pathname, setBalance, refreshBalance, flashSpend]);
 
   // Finish a save that was interrupted by signup/login: the intent was parked
   // in sessionStorage before the redirect; the Account page sends them back.
@@ -445,6 +449,10 @@ const ShareCard = () => {
             </SaveButton>
           </div>
         </FixedDock>
+
+        {!synthetic && !provisional && card.is_public && (
+          <Signals cardId={card.id} creatorId={card.creator_id} bloom={scrolling} />
+        )}
 
         {/* Card name + creator, front and central right under the buttons.
             Collapsed by default; opening it reveals the full identity table

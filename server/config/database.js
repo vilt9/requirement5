@@ -40,6 +40,12 @@ const db = {
   // report also flips the card's moderation_status to 'flagged' (out of
   // circulation) pending admin review.
   reports: [],
+  // One current signal per user/card pair. Signals are the card-native
+  // equivalent of reactions; read_at belongs to the card creator's notification.
+  signals: [],
+  // Recipient-scoped operational notices. Unlike the underlying signals and
+  // saves, these carry independent read state and stable daily/weekly groups.
+  notifications: [],
   // In-progress rarity rolls (one active per user). Ephemeral — deliberately
   // NOT persisted: a restart just means designers re-roll. The server owns the
   // rolled rarity so neither the web nor the CLI can self-declare it.
@@ -53,8 +59,8 @@ const db = {
 // Track which rows changed since the last flush so we only upsert the deltas
 // (transactions are append-only and unbounded — a full-snapshot flush would grow
 // linearly). Counters + cloud are tiny and rewritten every flush.
-const dirty = { cards: new Set(), users: new Set(), transactions: new Set(), saves: new Set(), stars: new Set(), sets: new Set(), events: new Set(), reports: new Set() };
-const removed = { cards: new Set(), users: new Set(), saves: new Set(), stars: new Set(), sets: new Set() };
+const dirty = { cards: new Set(), users: new Set(), transactions: new Set(), saves: new Set(), stars: new Set(), sets: new Set(), events: new Set(), reports: new Set(), signals: new Set(), notifications: new Set() };
+const removed = { cards: new Set(), users: new Set(), transactions: new Set(), saves: new Set(), stars: new Set(), sets: new Set(), events: new Set(), reports: new Set(), signals: new Set(), notifications: new Set() };
 let truncateRequested = false;
 
 const markDirty = (table, id) => {
@@ -130,7 +136,7 @@ const load = () => {
   if (IS_TEST || !fs.existsSync(DB_FILE)) return;
   try {
     const loaded = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-    for (const key of ['cards', 'users', 'transactions', 'saves', 'stars', 'sets', 'events', 'reports']) {
+    for (const key of ['cards', 'users', 'transactions', 'saves', 'stars', 'sets', 'events', 'reports', 'signals', 'notifications']) {
       if (Array.isArray(loaded[key])) db[key] = loaded[key];
     }
     if (loaded.cloud) db.cloud = { ...db.cloud, ...loaded.cloud };
@@ -352,6 +358,18 @@ const memoryDb = {
     return null;
   },
 
+  deleteUser: (id) => {
+    const index = db.users.findIndex(u => u.id === id);
+    if (index !== -1) {
+      const deletedUser = db.users[index];
+      db.users.splice(index, 1);
+      markRemoved('users', id);
+      persistSoon();
+      return deletedUser;
+    }
+    return null;
+  },
+
   // ---------- transactions ----------
   createTransaction: (txn) => {
     const newTxn = {
@@ -376,6 +394,15 @@ const memoryDb = {
   getAllSaves: () => [...db.saves],
   getAllStars: () => [...db.stars],
 
+  deleteTransaction: (id) => {
+    const index = db.transactions.findIndex(t => t.id === id);
+    if (index === -1) return null;
+    const [deleted] = db.transactions.splice(index, 1);
+    markRemoved('transactions', deleted.id);
+    persistSoon();
+    return deleted;
+  },
+
   // ---------- events (usage: generate clicks) ----------
   createEvent: (event) => {
     const newEvent = {
@@ -390,6 +417,15 @@ const memoryDb = {
     return newEvent;
   },
   getAllEvents: () => [...db.events],
+
+  deleteEvent: (id) => {
+    const index = db.events.findIndex(e => e.id === id);
+    if (index === -1) return null;
+    const [deleted] = db.events.splice(index, 1);
+    markRemoved('events', deleted.id);
+    persistSoon();
+    return deleted;
+  },
 
   // ---------- reports (user flags against a card) ----------
   createReport: (report) => {
@@ -420,6 +456,121 @@ const memoryDb = {
     persistSoon();
   },
 
+  // ---------- signals (one row per user/card/reaction) ----------
+  upsertSignal: (userId, cardId, signal) => {
+    const existing = db.signals.find(
+      s => s.user_id === userId && s.card_id === cardId && s.signal === signal
+    );
+    if (existing) return existing;
+    const row = {
+      id: crypto.randomUUID(),
+      user_id: userId,
+      card_id: cardId,
+      signal,
+      read_at: null,
+      created_at: now(),
+      updated_at: now()
+    };
+    db.signals.push(row);
+    markDirty('signals', row.id);
+    persistSoon();
+    return row;
+  },
+
+  getSignal: (userId, cardId, signal) =>
+    db.signals.find(s => s.user_id === userId && s.card_id === cardId && s.signal === signal),
+
+  getSignalsForCard: (cardId) => db.signals.filter(s => s.card_id === cardId),
+
+  getSignalsForCreator: (creatorId) => db.signals
+    .filter(signal => {
+      const card = db.cards.find(c => c.id === signal.card_id);
+      return card?.creator_id === creatorId && signal.user_id !== creatorId;
+    }),
+
+  deleteSignal: (userId, cardId, signal) => {
+    const index = db.signals.findIndex(
+      s => s.user_id === userId && s.card_id === cardId && s.signal === signal
+    );
+    if (index === -1) return null;
+    const [deleted] = db.signals.splice(index, 1);
+    markRemoved('signals', deleted.id);
+    persistSoon();
+    return deleted;
+  },
+
+  markSignalsReadForCreator: (creatorId) => {
+    const readAt = now();
+    let count = 0;
+    for (const signal of db.signals) {
+      const card = db.cards.find(c => c.id === signal.card_id);
+      if (card?.creator_id === creatorId && signal.user_id !== creatorId && !signal.read_at) {
+        signal.read_at = readAt;
+        markDirty('signals', signal.id);
+        count += 1;
+      }
+    }
+    if (count) persistSoon();
+    return count;
+  },
+
+  // ---------- notifications (recipient-scoped dispatch ledger) ----------
+  createNotification: (notification) => {
+    const row = {
+      ...notification,
+      id: crypto.randomUUID(),
+      read_at: notification.read_at || null,
+      created_at: notification.created_at || now(),
+      updated_at: notification.updated_at || notification.created_at || now()
+    };
+    db.notifications.push(row);
+    markDirty('notifications', row.id);
+    persistSoon();
+    return row;
+  },
+
+  getNotificationByGroup: (recipientId, groupKey) =>
+    db.notifications.find(n => n.recipient_id === recipientId && n.group_key === groupKey),
+
+  getNotificationsByUser: (recipientId) =>
+    db.notifications.filter(n => n.recipient_id === recipientId),
+
+  getAllNotifications: () => [...db.notifications],
+
+  updateNotification: (id, updateData) => {
+    const index = db.notifications.findIndex(n => n.id === id);
+    if (index === -1) return null;
+    db.notifications[index] = { ...db.notifications[index], ...updateData };
+    markDirty('notifications', id);
+    persistSoon();
+    return db.notifications[index];
+  },
+
+  deleteNotificationByGroup: (recipientId, groupKey) => {
+    const index = db.notifications.findIndex(
+      n => n.recipient_id === recipientId && n.group_key === groupKey
+    );
+    if (index === -1) return null;
+    const [deleted] = db.notifications.splice(index, 1);
+    markRemoved('notifications', deleted.id);
+    persistSoon();
+    return deleted;
+  },
+
+  markNotificationsRead: (recipientId) => {
+    const readAt = now();
+    let count = 0;
+    for (const notification of db.notifications) {
+      if (notification.recipient_id === recipientId && !notification.read_at) {
+        notification.read_at = readAt;
+        markDirty('notifications', notification.id);
+        count += 1;
+      }
+    }
+    if (count) persistSoon();
+    return count;
+  },
+
   // ---------- saves (a user's collection of pool cards) ----------
   createSave: (save) => {
     const newSave = {
@@ -448,6 +599,15 @@ const memoryDb = {
       return deleted;
     }
     return null;
+  },
+
+  deleteSaveById: (id) => {
+    const index = db.saves.findIndex(s => s.id === id);
+    if (index === -1) return null;
+    const [deleted] = db.saves.splice(index, 1);
+    markRemoved('saves', deleted.id);
+    persistSoon();
+    return deleted;
   },
 
   // Owners of collections with more than `min` saved cards — the pool the
@@ -494,6 +654,8 @@ const memoryDb = {
   getSetsByOwner: (ownerId) =>
     db.sets.filter(s => s.owner_id === ownerId).sort((a, b) => a.id.localeCompare(b.id)),
 
+  getAllSets: () => [...db.sets],
+
   // Create-or-update by name. `info` only overwrites when a non-null value is
   // given, so publishing into an existing set without retyping its info keeps
   // the info the set already had.
@@ -520,6 +682,15 @@ const memoryDb = {
     markDirty('sets', set.id);
     persistSoon();
     return set;
+  },
+
+  deleteSet: (id) => {
+    const index = db.sets.findIndex(s => s.id === id);
+    if (index === -1) return null;
+    const [deleted] = db.sets.splice(index, 1);
+    markRemoved('sets', deleted.id);
+    persistSoon();
+    return deleted;
   },
 
   // Published cards only — a set groups what's in the pool, so a private draft
@@ -583,6 +754,8 @@ const memoryDb = {
     db.sets.length = 0;
     db.events.length = 0;
     db.reports.length = 0;
+    db.signals.length = 0;
+    db.notifications.length = 0;
     db.rolls.length = 0;
     db.cloud = { total_issued: 0, total_absorbed: 0 };
     if (USE_PG) {

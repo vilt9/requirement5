@@ -90,3 +90,31 @@ CREATE TABLE IF NOT EXISTS reports (
 );
 CREATE INDEX IF NOT EXISTS reports_card_idx   ON reports (card_id);
 CREATE INDEX IF NOT EXISTS reports_status_idx ON reports (status);
+
+-- One reaction per user/card/icon. A person may react with several different
+-- icons, but repeating the same one stays idempotent.
+CREATE TABLE IF NOT EXISTS signals (
+  id       text PRIMARY KEY,
+  data     jsonb NOT NULL,
+  user_id  text GENERATED ALWAYS AS (data ->> 'user_id') STORED,
+  card_id  text GENERATED ALWAYS AS (data ->> 'card_id') STORED,
+  signal   text GENERATED ALWAYS AS (data ->> 'signal') STORED
+);
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS signal text
+  GENERATED ALWAYS AS (data ->> 'signal') STORED;
+DROP INDEX IF EXISTS signals_user_card_idx;
+CREATE UNIQUE INDEX IF NOT EXISTS signals_user_card_signal_idx ON signals (user_id, card_id, signal);
+CREATE INDEX IF NOT EXISTS signals_card_idx ON signals (card_id);
+
+-- Recipient-scoped dispatches. group_key makes immediate events idempotent and
+-- gives daily/weekly summaries one durable row whose counts can be updated.
+CREATE TABLE IF NOT EXISTS notifications (
+  id           text PRIMARY KEY,
+  data         jsonb NOT NULL,
+  recipient_id text GENERATED ALWAYS AS (data ->> 'recipient_id') STORED,
+  type         text GENERATED ALWAYS AS (data ->> 'type') STORED,
+  group_key    text GENERATED ALWAYS AS (data ->> 'group_key') STORED
+);
+CREATE UNIQUE INDEX IF NOT EXISTS notifications_recipient_group_idx
+  ON notifications (recipient_id, group_key);
+CREATE INDEX IF NOT EXISTS notifications_recipient_idx ON notifications (recipient_id);
