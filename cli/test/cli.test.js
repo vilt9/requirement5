@@ -69,3 +69,12 @@ test('an auth-required command while logged out fails cleanly (exit 1, no crash)
   assert.equal(r.code, 1);
   assert.match(r.stderr, /Not logged in/);
 });
+
+test('private card preview sends auth and fails cleanly while logged out', () => {
+  const r = run(
+    ['card', 'create', 'preview', '00000000-0000-4000-8000-000000000000'],
+    { R5C_CONFIG_DIR: `/tmp/r5c-none-${Date.now()}`, R5C_TOKEN: '' }
+  );
+  assert.equal(r.code, 1);
+  assert.match(r.stderr, /Not logged in/);
+});

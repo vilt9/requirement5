@@ -368,7 +368,10 @@ async function cmdPreview({ positional, flags }) {
     }
   }
   if (!flags.json) out(`Capturing ${count} still frame(s) of ${id} (rest pose + orbit poses)...`);
-  const { data } = await api.get(`/api/cards/${id}/render?format=frames&count=${count}`);
+  const { data } = await api.get(
+    `/api/cards/${id}/render?format=frames&count=${count}`,
+    { auth: true }
+  );
   // Local storage hands back relative /uploads/... paths; resolve against the API.
   const urls = (data.urls || []).map((u) => new URL(u, apiUrl()).href);
 
