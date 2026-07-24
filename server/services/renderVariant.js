@@ -4,7 +4,7 @@ const FALSE_VALUES = new Set(['0', 'false']);
 // Change this whenever the moving-media choreography changes. Render objects are
 // intentionally long-lived, so a revision keeps old GIFs/MP4s from masking a new
 // capture sequence for an otherwise unchanged card.
-export const RENDER_REVISION = 'transformation-v4';
+export const RENDER_REVISION = 'holo-fade-v5';
 
 export const parseIncludeUrl = (value) => {
   if (value === undefined) return true;

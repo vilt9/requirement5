@@ -1,6 +1,6 @@
 // Card → GIF/MP4 capture. Drives the live card through one deterministic
 // transformation made for exported media:
-// flat base → shiny orbit → restored flat base → logo.
+// flat base → shiny orbit → fade to black while still moving → logo.
 //
 // How it works: Playwright loads the chrome-free /capture/:id page (CaptureCard.jsx),
 // then sends normalised pose states into the real Card component for every frame.
@@ -18,13 +18,9 @@ import { capturePageUrl } from './renderVariant.js';
 const BASE_URL = process.env.CAPTURE_BASE_URL || 'http://localhost:5175';
 const FRAME = { width: 380, height: 520 };
 
-// The orbit eases out to a genuinely flat pose while still shiny. The following
-// base hold lets the card-specific holo reveal reverse completely before the outro.
 const DEFAULTS = {
   restFrames: 8,
   orbitFrames: 75,
-  minBaseFrames: 18,
-  returnPaddingFrames: 3,
   fadeFrames: 12,
   blackHoldFrames: 3,
   outroFadeFrames: 10,
@@ -73,34 +69,28 @@ const smoothstep = (value) => {
   return bounded * bounded * (3 - 2 * bounded);
 };
 
-const durationSeconds = (value) => {
-  const match = String(value || '').trim().match(/^([\d.]+)(ms|s)$/);
-  if (!match) return 0;
-  const number = Number(match[1]);
-  if (!Number.isFinite(number)) return 0;
-  return match[2] === 'ms' ? number / 1000 : number;
+// The entry ramp brings the flat card to life. There is intentionally no exit
+// ramp: once the holo orbit is awake it keeps moving until black hides it.
+export const captureOrbitState = (progress) => {
+  const envelope = smoothstep(progress / 0.14);
+  const angle = progress * Math.PI * 2;
+  return {
+    nx: Math.sin(angle) * 0.6 * envelope,
+    ny: Math.cos(angle) * 0.45 * envelope,
+    shiny: true,
+    scale: 0.95 + envelope * 0.05
+  };
 };
 
-export const buildCaptureStates = ({ restFrames, orbitFrames, baseFrames }) => {
+export const buildCaptureStates = ({ restFrames, orbitFrames }) => {
   const rest = Array.from({ length: restFrames }, () => ({
     nx: 0, ny: 0, shiny: false, scale: 0.95
   }));
   const orbit = Array.from({ length: orbitFrames }, (_, index) => {
     const progress = orbitFrames <= 1 ? 1 : index / (orbitFrames - 1);
-    const ramp = 0.14;
-    const envelope = smoothstep(progress / ramp) * smoothstep((1 - progress) / ramp);
-    const angle = progress * Math.PI * 2;
-    return {
-      nx: Math.sin(angle) * 0.6 * envelope,
-      ny: Math.cos(angle) * 0.45 * envelope,
-      shiny: true,
-      scale: 0.95 + envelope * 0.05
-    };
+    return captureOrbitState(progress);
   });
-  const base = Array.from({ length: baseFrames }, () => ({
-    nx: 0, ny: 0, shiny: false, scale: 0.95
-  }));
-  return [...rest, ...orbit, ...base];
+  return [...rest, ...orbit];
 };
 
 const run = (cmd, args) => new Promise((resolve, reject) => {
@@ -114,9 +104,8 @@ const run = (cmd, args) => new Promise((resolve, reject) => {
 // Capture `format` ('gif' | 'mp4') for card `id`. Returns a Buffer.
 export const renderCard = async (id, { format = 'gif', includeUrl = true, ...opts } = {}) => {
   const {
-    restFrames, orbitFrames, minBaseFrames, returnPaddingFrames,
-    fadeFrames, blackHoldFrames, outroFadeFrames, outroHoldFrames,
-    fps, settleMs
+    restFrames, orbitFrames, fadeFrames, blackHoldFrames,
+    outroFadeFrames, outroHoldFrames, fps, settleMs
   } = { ...DEFAULTS, ...opts };
   const browser = await getBrowser();
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), `r5c-cap-${id}-`));
@@ -136,14 +125,7 @@ export const renderCard = async (id, { format = 'gif', includeUrl = true, ...opt
     const scene = page.locator('.card-scene');
     if (await scene.count() !== 1) throw new Error('card scene not found on capture page');
 
-    const revealDuration = await page.locator('.card-container').evaluate(el => (
-      getComputedStyle(el).getPropertyValue('--holo-reveal-duration')
-    ));
-    const baseFrames = Math.max(
-      minBaseFrames,
-      Math.ceil(durationSeconds(revealDuration) * fps) + returnPaddingFrames
-    );
-    const captureStates = buildCaptureStates({ restFrames, orbitFrames, baseFrames });
+    const captureStates = buildCaptureStates({ restFrames, orbitFrames });
     const total = captureStates.length + fadeFrames +
       blackHoldFrames + outroFadeFrames + outroHoldFrames;
     const pad = String(total).length;
@@ -153,9 +135,8 @@ export const renderCard = async (id, { format = 'gif', includeUrl = true, ...opt
       f++;
     };
 
-    // Flat base → one shiny orbit → flat base. There is deliberately no plain
-    // rotating stretch: the orbit returns to zero tilt before holo disengages.
-    // Waiting one output-frame between poses lets reveal transitions advance.
+    // Flat base → one shiny orbit. Waiting one output-frame between poses lets
+    // card-specific holo reveals advance at their authored duration.
     await page.waitForTimeout(settleMs);
     for (const state of captureStates) {
       await page.evaluate(value => window.__setCapturePose(value), state);
@@ -163,13 +144,17 @@ export const renderCard = async (id, { format = 'gif', includeUrl = true, ...opt
       await shoot();
     }
 
-    // Fade the now-flat base card to black.
+    // Keep the holo orbit alive as it disappears. Black replaces the awkward
+    // rotate-to-flat handoff and gives the wordmark a clean entrance.
+    const orbitStep = orbitFrames <= 1 ? 1 : 1 / (orbitFrames - 1);
     for (let i = 0; i < fadeFrames; i++) {
+      const state = captureOrbitState(1 + (i + 1) * orbitStep);
       const opacity = Math.max(0, 1 - (i + 1) / fadeFrames).toFixed(3);
-      await page.evaluate(o => {
+      await page.evaluate(({ pose, opacity: nextOpacity }) => {
+        window.__setCapturePose(pose);
         const el = document.querySelector('.card-scene');
-        if (el) el.style.opacity = o;
-      }, opacity);
+        if (el) el.style.opacity = nextOpacity;
+      }, { pose: state, opacity });
       await page.waitForTimeout(1000 / fps);
       await shoot();
     }

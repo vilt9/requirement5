@@ -332,8 +332,8 @@ const Card = ({
   }, [capture, isInteractive]);
 
   // Headless media capture drives the same pose writer as real interaction,
-  // but controls shine independently so the card can complete one shiny orbit,
-  // return flat, and only then reveal the non-shiny base.
+  // but controls shine independently so the card can stay in its holo orbit
+  // until the export driver has faded it completely to black.
   useEffect(() => {
     const scene = cardSceneRef.current;
     if (!capture || !scene || !cardRef.current) return undefined;
