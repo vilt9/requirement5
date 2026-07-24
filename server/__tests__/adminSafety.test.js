@@ -152,6 +152,37 @@ describe('admin review queue', () => {
     const still = await request(app).get('/api/cards/community/all');
     expect(still.body.data.some(c => c.id === card.id)).toBe(false);
   });
+
+  test('admin card inventory lists active cards and supports direct removal', async () => {
+    const creator = await signup({ username: 'inventorymaker' });
+    const card = await publishCard(creator.body.data.token);
+    const admin = await makeAdmin();
+
+    const inventory = await request(app)
+      .get('/api/admin/cards')
+      .set(auth(admin.body.data.token));
+
+    expect(inventory.status).toBe(200);
+    expect(inventory.body.data.cards).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: card.id,
+        creator_username: 'inventorymaker',
+        moderation_status: 'active',
+        is_public: true
+      })
+    ]));
+    expect(inventory.body.data.cards.find(item => item.id === card.id).state_data).toBeUndefined();
+
+    const remove = await request(app)
+      .post(`/api/admin/cards/${card.id}/remove`)
+      .set(auth(admin.body.data.token));
+    expect(remove.status).toBe(200);
+
+    const after = await request(app)
+      .get('/api/admin/cards')
+      .set(auth(admin.body.data.token));
+    expect(after.body.data.cards.find(item => item.id === card.id).moderation_status).toBe('removed');
+  });
 });
 
 describe('user bans', () => {

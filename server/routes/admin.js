@@ -74,6 +74,37 @@ router.get('/flagged', (req, res) => {
   res.json({ success: true, data: { items } });
 });
 
+// Compact inventory for the admin ledger. Keep visual state_data and storage
+// keys out of this response: the list is for scanning and moderation, while the
+// card link remains the place to inspect the full work.
+router.get('/cards', (req, res) => {
+  const cards = memoryDb.getAllCards()
+    .map(card => {
+      const enriched = memoryDb.withCreatorAndSet(card);
+      const stats = cardStats(card);
+      return {
+        id: enriched.id,
+        name: enriched.name,
+        creator_id: enriched.creator_id,
+        creator_username: enriched.creator_username,
+        set_id: enriched.set_id,
+        set: enriched.set,
+        is_public: enriched.is_public,
+        moderation_status: enriched.moderation_status || 'active',
+        tier: enriched.tier,
+        rarity_score: enriched.rarity_score,
+        tags: enriched.tags || [],
+        times_saved: stats.timesSaved,
+        signal_count: memoryDb.getSignalsForCard(card.id).length,
+        created_at: enriched.created_at,
+        updated_at: enriched.updated_at
+      };
+    })
+    .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+
+  res.json({ success: true, data: { cards } });
+});
+
 // Every report, newest first, with the reported card's name + current status —
 // a fuller audit view than the flagged queue (includes already-resolved ones).
 router.get('/reports', (req, res) => {
