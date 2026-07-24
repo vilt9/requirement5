@@ -52,18 +52,6 @@ export const closeBrowser = async () => {
   }
 };
 
-// Elliptical tilt path: the pointer orbits the card centre, sweeping the holo across
-// the face and tilting it through a full loop. t in [0,1).
-const poseFor = (t, box, radiusScale = 1) => {
-  const theta = t * Math.PI * 2;
-  // Stay inside the card so the tilt never maxes out flat. 0.34 of half-extent.
-  const rx = box.width * 0.34 * radiusScale;
-  const ry = box.height * 0.34 * radiusScale;
-  const cx = box.x + box.width / 2;
-  const cy = box.y + box.height / 2;
-  return { x: cx + Math.sin(theta) * rx, y: cy - Math.cos(theta) * ry };
-};
-
 const smoothstep = (value) => {
   const bounded = Math.max(0, Math.min(1, value));
   return bounded * bounded * (3 - 2 * bounded);
@@ -236,20 +224,21 @@ export const renderStills = async (id, { count = 4, settleMs = 250, authHeader =
 
     const frame = page.locator('#capture-frame');
     const scene = page.locator('.card-scene');
-    const box = await scene.boundingBox();
-    if (!box) throw new Error('card scene not found on capture page');
+    if (await scene.count() !== 1) throw new Error('card scene not found on capture page');
 
     const buffers = [];
-    // Still 1: at rest — pointer off the card, holo dormant.
-    await page.mouse.move(2, 2);
+    // Capture mode deliberately ignores real pointer movement. Drive the same
+    // explicit pose channel as moving exports so the stills are genuinely
+    // different: one dormant card, then authored holo angles around the orbit.
+    await page.evaluate(() => window.__setCapturePose({
+      nx: 0, ny: 0, shiny: false, scale: 0.95
+    }));
     await page.waitForTimeout(settleMs);
     buffers.push(await frame.screenshot());
 
-    // Remaining stills: poses along the orbit, holo awake. Spread over one
-    // loop, skipping t=0 so the first orbit pose differs from rest visibly.
+    // Remaining stills: poses along the orbit, holo awake.
     for (let i = 1; i < n; i++) {
-      const { x, y } = poseFor((i / n) * 0.9 + 0.05, box);
-      await page.mouse.move(x, y);
+      await page.evaluate(state => window.__setCapturePose(state), captureOrbitState(i / n));
       await page.waitForTimeout(settleMs);
       buffers.push(await frame.screenshot());
     }
