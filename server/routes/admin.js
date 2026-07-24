@@ -12,6 +12,12 @@ import { isAdminEmail } from '../config/admin.js';
 import { cardStats } from '../services/drawEngine.js';
 
 const router = express.Router();
+const FOUNDING_ISSUERS = new Set([
+  'ElgoSignalOffice',
+  'QECBITSupplyUnit',
+  'Umdo1BioSurvey',
+  'Vilt9FieldArchive'
+]);
 
 // requireAuth first (also rejects banned tokens), then the admin-email check.
 const requireAdmin = (req, res, next) => {
@@ -82,7 +88,6 @@ router.get('/cards', (req, res) => {
     .map(card => {
       const enriched = memoryDb.withCreatorAndSet(card);
       const stats = cardStats(card);
-      const creator = memoryDb.getUserById(card.creator_id);
       return {
         id: enriched.id,
         name: enriched.name,
@@ -95,11 +100,7 @@ router.get('/cards', (req, res) => {
         tier: enriched.tier,
         rarity_score: enriched.rarity_score,
         tags: enriched.tags || [],
-        founding_issue: Boolean(
-          creator?.bot_created
-          && creator?.operator_managed
-          && !creator?.claimed_at
-        ),
+        founding_issue: FOUNDING_ISSUERS.has(enriched.creator_username),
         times_saved: stats.timesSaved,
         signal_count: memoryDb.getSignalsForCard(card.id).length,
         created_at: enriched.created_at,

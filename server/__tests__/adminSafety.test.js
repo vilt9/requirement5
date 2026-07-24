@@ -156,6 +156,8 @@ describe('admin review queue', () => {
   test('admin card inventory lists active cards and supports direct removal', async () => {
     const creator = await signup({ username: 'inventorymaker' });
     const card = await publishCard(creator.body.data.token);
+    const founder = await signup({ username: 'ElgoSignalOffice', email: 'elgo@earth.test' });
+    const foundingCard = await publishCard(founder.body.data.token);
     const admin = await makeAdmin();
 
     const inventory = await request(app)
@@ -173,6 +175,7 @@ describe('admin review queue', () => {
       })
     ]));
     expect(inventory.body.data.cards.find(item => item.id === card.id).state_data).toBeUndefined();
+    expect(inventory.body.data.cards.find(item => item.id === foundingCard.id).founding_issue).toBe(true);
 
     const remove = await request(app)
       .post(`/api/admin/cards/${card.id}/remove`)
