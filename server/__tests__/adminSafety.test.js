@@ -168,7 +168,8 @@ describe('admin review queue', () => {
         id: card.id,
         creator_username: 'inventorymaker',
         moderation_status: 'active',
-        is_public: true
+        is_public: true,
+        founding_issue: false
       })
     ]));
     expect(inventory.body.data.cards.find(item => item.id === card.id).state_data).toBeUndefined();

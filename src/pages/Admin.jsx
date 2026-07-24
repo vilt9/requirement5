@@ -24,6 +24,7 @@ export default function Admin() {
   const [err, setErr] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const [confirmId, setConfirmId] = useState(null);
+  const [cardView, setCardView] = useState('founding');
 
   const load = useCallback(async () => {
     try {
@@ -75,6 +76,12 @@ export default function Admin() {
     );
   }
 
+  const visibleCards = cards.filter(card => {
+    if (cardView === 'founding') return card.founding_issue;
+    if (cardView === 'public') return card.is_public;
+    return true;
+  });
+
   return (
     <Page>
       <Panel>
@@ -89,7 +96,25 @@ export default function Admin() {
       </Panel>
 
       <Panel>
-        <h3>Cards ({cards.length})</h3>
+        <LedgerHeading>
+          <h3>Cards ({visibleCards.length})</h3>
+          <div>
+            {[
+              ['founding', 'Founding'],
+              ['public', 'Public'],
+              ['all', 'All']
+            ].map(([value, label]) => (
+              <button
+                type="button"
+                key={value}
+                className={cardView === value ? 'active' : ''}
+                onClick={() => setCardView(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </LedgerHeading>
         <Divider />
         <CardLedger>
           <div className="head">
@@ -100,7 +125,7 @@ export default function Admin() {
             <span>Date</span>
             <span />
           </div>
-          {cards.map(card => {
+          {visibleCards.map(card => {
             const removed = card.moderation_status === 'removed';
             const state = !card.is_public ? 'private' : card.moderation_status;
             return (
@@ -227,6 +252,39 @@ const Review = styled.div`
   .reasons { display: flex; flex-direction: column; gap: 2px; margin-top: 2px; }
   .reason b { color: #ff8a8a; text-transform: capitalize; }
   .buttons { display: flex; gap: 8px; margin-top: 6px; }
+`;
+
+const LedgerHeading = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  h3 {
+    margin: 0;
+  }
+
+  div {
+    display: flex;
+    gap: 2px;
+  }
+
+  button {
+    appearance: none;
+    border: 0;
+    border-bottom: 1px solid transparent;
+    background: transparent;
+    color: var(--text-dim);
+    padding: 4px 7px;
+    font: inherit;
+    font-size: 11px;
+    cursor: pointer;
+  }
+
+  button.active {
+    border-bottom-color: var(--gold-bright);
+    color: var(--gold-bright);
+  }
 `;
 
 const CardLedger = styled.div`

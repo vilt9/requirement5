@@ -94,6 +94,7 @@ router.get('/cards', (req, res) => {
         tier: enriched.tier,
         rarity_score: enriched.rarity_score,
         tags: enriched.tags || [],
+        founding_issue: (enriched.tags || []).includes('house-issue'),
         times_saved: stats.timesSaved,
         signal_count: memoryDb.getSignalsForCard(card.id).length,
         created_at: enriched.created_at,
