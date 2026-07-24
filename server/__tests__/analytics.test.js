@@ -197,7 +197,7 @@ describe('feature 5 — usage breakdown', () => {
 });
 
 describe('banner totals', () => {
-  test('sums circulating balance, cards, and per-week new/active users', () => {
+  test('sums circulating balance, public cards, and per-week new/active users', () => {
     const a = makeUser('a', W1, { balance: 30 });
     const b = makeUser('b', W2, { balance: 12.5 });
     at(memoryDb.createCard({ creator_id: a.id, is_public: true }), W1);
@@ -207,7 +207,7 @@ describe('banner totals', () => {
     const { totals, weekly } = computeAnalytics();
     expect(totals.users).toBe(2);
     expect(totals.circulating).toBe(42.5);
-    expect(totals.totalCards).toBe(2);
+    expect(totals.totalCards).toBe(1);
     expect(totals.publicCards).toBe(1);
     expect(weekly.newUsers[K1]).toBe(1);
     expect(weekly.newUsers[K2]).toBe(1);

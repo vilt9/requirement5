@@ -105,13 +105,14 @@ const run = (cmd, args) => new Promise((resolve, reject) => {
 export const renderCard = async (id, { format = 'gif', includeUrl = true, ...opts } = {}) => {
   const {
     restFrames, orbitFrames, fadeFrames, blackHoldFrames,
-    outroFadeFrames, outroHoldFrames, fps, settleMs
+    outroFadeFrames, outroHoldFrames, fps, settleMs, authHeader
   } = { ...DEFAULTS, ...opts };
   const browser = await getBrowser();
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), `r5c-cap-${id}-`));
   const context = await browser.newContext({
     viewport: { width: FRAME.width, height: FRAME.height },
-    deviceScaleFactor: 2 // crisp output
+    deviceScaleFactor: 2, // crisp output
+    ...(authHeader ? { extraHTTPHeaders: { Authorization: authHeader } } : {})
   });
   const page = await context.newPage();
 
@@ -219,12 +220,13 @@ export const renderCard = async (id, { format = 'gif', includeUrl = true, ...opt
 // same orbit the GIF uses, holo awake. Cheap relative to a full render (no
 // ffmpeg, ~a dozen frames instead of ~130) — meant for agents that want to
 // SEE a card (or a draft) without pulling a whole GIF apart.
-export const renderStills = async (id, { count = 4, settleMs = 250 } = {}) => {
+export const renderStills = async (id, { count = 4, settleMs = 250, authHeader = null } = {}) => {
   const n = Math.max(1, Math.min(8, count));
   const browser = await getBrowser();
   const context = await browser.newContext({
     viewport: { width: FRAME.width, height: FRAME.height },
-    deviceScaleFactor: 2
+    deviceScaleFactor: 2,
+    ...(authHeader ? { extraHTTPHeaders: { Authorization: authHeader } } : {})
   });
   const page = await context.newPage();
 

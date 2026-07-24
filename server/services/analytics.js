@@ -252,7 +252,9 @@ export function computeAnalytics() {
   const txns = memoryDb.getAllTransactions();
   const saves = memoryDb.getAllSaves();
   const stars = memoryDb.getAllStars();
-  const cards = memoryDb.getAllCards();
+  // Public analytics describe the public system. Draft creation remains owner/
+  // operator data and must not leak through counts, cohorts, or weekly timing.
+  const cards = memoryDb.getCommunityCards();
   const usageEvents = memoryDb.getAllEvents();
   const userIds = new Set(users.map(u => u.id));
 
@@ -299,7 +301,7 @@ export function computeAnalytics() {
 
   const cloud = memoryDb.getCloud();
   const circulating = Math.round(users.reduce((s, u) => s + (u.balance || 0), 0) * 100) / 100;
-  const publicCards = cards.filter(c => c.is_public).length;
+  const publicCards = cards.length;
 
   return {
     generated: new Date().toISOString(),

@@ -56,12 +56,13 @@ describe('card CRUD', () => {
     expect(res.body.data.creator_id).toBe(userId);
   });
 
-  test('GET / returns all cards', async () => {
+  test('GET / returns public cards without enumerating private drafts', async () => {
     await makeCard({ name: 'One' });
-    await makeCard({ name: 'Two' });
+    await makeCard({ name: 'Private', isPublic: false });
     const res = await request(app).get('/api/cards');
     expect(res.status).toBe(200);
-    expect(res.body.data).toHaveLength(2);
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0].name).toBe('One');
   });
 
   test('GET /:id returns the card or 404', async () => {
@@ -72,6 +73,41 @@ describe('card CRUD', () => {
 
     const missing = await request(app).get('/api/cards/card_999');
     expect(missing.status).toBe(404);
+  });
+
+  test('private drafts are visible only to their owner or an admin', async () => {
+    const draft = await makeCard({ name: 'Private', isPublic: false });
+    const other = await signup('creator2');
+    const admin = await request(app)
+      .post('/api/auth/signup')
+      .send({
+        username: 'admin',
+        email: 'admin@requirement5.com',
+        password: 'password123',
+        dob: '1990-01-01',
+        acceptedTerms: true
+      });
+
+    expect((await request(app).get(`/api/cards/${draft.id}`)).status).toBe(404);
+    expect((await request(app).get(`/api/cards/${draft.id}`).set('Authorization', `Bearer ${other.token}`)).status).toBe(404);
+    expect((await request(app).get(`/api/cards/${draft.id}`).set('Authorization', `Bearer ${token}`)).status).toBe(200);
+    expect((await request(app).get(`/api/cards/${draft.id}`).set('Authorization', `Bearer ${admin.body.data.token}`)).status).toBe(200);
+  });
+
+  test('private drafts cannot be rendered without owner access', async () => {
+    const draft = await makeCard({ name: 'Private render', isPublic: false });
+    expect((await request(app).get(`/api/cards/${draft.id}/render`)).status).toBe(404);
+  });
+
+  test('private cards stay out of public collection and save metadata routes', async () => {
+    const draft = await makeCard({ name: 'Private collection card', isPublic: false });
+    memoryDb.createSave({ user_id: userId, card_id: draft.id, cost: 2 });
+
+    const collection = await request(app).get('/api/cards/collections/creator1');
+    expect(collection.status).toBe(200);
+    expect(collection.body.data.items).toEqual([]);
+    expect(collection.body.data.count).toBe(0);
+    expect((await request(app).get(`/api/cards/${draft.id}/save-of/creator1`)).status).toBe(404);
   });
 
   test('owner can PUT /:id (update) and DELETE /:id (remove)', async () => {
@@ -122,6 +158,7 @@ describe('card CRUD', () => {
   test('GET /search/:property/:value searches state and fields', async () => {
     await makeCard({ name: 'Red', stateData: { backgroundColor: '#ff0000' } });
     await makeCard({ name: 'Green', stateData: { backgroundColor: '#00ff00' } });
+    await makeCard({ name: 'Private red', isPublic: false, stateData: { backgroundColor: '#ff0000' } });
     const res = await request(app).get('/api/cards/search/backgroundColor/%23ff0000');
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(1);
@@ -173,5 +210,14 @@ describe('community endpoints', () => {
     const stats = await request(app).get('/api/cards/community/stats');
     expect(stats.body.data.totalCards).toBe(1);
     expect(stats.body.data.totalCollections).toBe(2);
+  });
+
+  test('legacy collect cannot mutate a private draft', async () => {
+    const draft = await makeCard({ isPublic: false });
+    const res = await request(app)
+      .post(`/api/cards/${draft.id}/collect`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(404);
+    expect(memoryDb.getCardById(draft.id).collection_count).toBe(0);
   });
 });

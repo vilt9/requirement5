@@ -41,6 +41,28 @@ const SIGNAL_KEYS = [
 const SIGNAL_SET = new Set(SIGNAL_KEYS);
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
+const inPublicCirculation = (card) =>
+  !!card &&
+  card.is_public &&
+  card.moderation_status !== 'flagged' &&
+  card.moderation_status !== 'removed';
+
+// A saved synthetic draw is deliberately visible through its collector's public
+// collection even though it never enters the shared card pool.
+const isCollectedCloudCard = (card) =>
+  !!card &&
+  card.creator_id === 'cloud' &&
+  card.moderation_status !== 'flagged' &&
+  card.moderation_status !== 'removed' &&
+  memoryDb.getAllSaves().some(save => save.card_id === card.id);
+
+const isPublicCollectionCard = (card) =>
+  inPublicCirculation(card) || isCollectedCloudCard(card);
+
+const canViewCard = (card, user) =>
+  isPublicCollectionCard(card) ||
+  !!user && (user.id === card?.creator_id || isAdminEmail(user.email));
+
 const signalView = (cardId, viewerId) => {
   const rows = memoryDb.getSignalsForCard(cardId);
   const counts = Object.fromEntries(SIGNAL_KEYS.map(key => [key, 0]));
@@ -68,10 +90,7 @@ const reactionTarget = (value) => {
   const id = String(value || '').toLowerCase();
   const card = memoryDb.getCardById(id);
   if (card) {
-    const visible = card.is_public &&
-      card.moderation_status !== 'flagged' &&
-      card.moderation_status !== 'removed';
-    return visible ? { id: card.id, card } : null;
+    return inPublicCirculation(card) ? { id: card.id, card } : null;
   }
   return UUID_V4.test(id) ? { id, card: null } : null;
 };
@@ -436,7 +455,7 @@ router.post('/:id/save', requireAuth, async (req, res) => {
 const REPORT_REASONS = new Set(['sexual', 'nudity', 'violence', 'copyright', 'hate', 'illegal', 'spam', 'other']);
 router.post('/:id/report', optionalAuth, (req, res) => {
   const card = memoryDb.getCardById(req.params.id);
-  if (!card || !card.is_public) {
+  if (!inPublicCirculation(card)) {
     return res.status(404).json({ success: false, error: 'Card not found' });
   }
   const reason = String(req.body?.reason || 'other').toLowerCase();
@@ -592,17 +611,18 @@ router.get('/collection/mine', requireAuth, (req, res) => {
 // Public: one user's save of one card — powers the user-scoped card page
 // (/<username>/card/<id>), where a collector shows off their copy and what
 // they paid for it. 404 when that user hasn't saved that card.
-router.get('/:id/save-of/:username', (req, res) => {
+router.get('/:id/save-of/:username', optionalAuth, (req, res) => {
   const owner = memoryDb.getUserByUsername(req.params.username);
   const save = owner ? memoryDb.getSave(owner.id, req.params.id) : null;
-  if (!save) {
+  const card = save ? memoryDb.getCardById(save.card_id) : null;
+  if (!save || !canViewCard(card, req.user)) {
     return res.status(404).json({ success: false, error: 'Not in this collection' });
   }
   res.json({
     success: true,
     data: {
       username: owner.username,
-      cost: save.cost ?? saveCostFor(save.card_id, memoryDb.getCardById(save.card_id)?.rarity_score),
+      cost: save.cost ?? saveCostFor(save.card_id, card.rarity_score),
       provenance: save.provenance || null,
       saved_at: save.created_at
     }
@@ -624,7 +644,8 @@ router.delete('/collection/:cardId', requireAuth, (req, res) => {
 // rarity score is the card's own auto-generated 0..1 rating.
 const TOP_N = 3;
 const collectionStats = (userId) => {
-  const saves = memoryDb.getSavesByUser(userId);
+  const saves = memoryDb.getSavesByUser(userId)
+    .filter(save => isPublicCollectionCard(memoryDb.getCardById(save.card_id)));
   let value = 0;
   const scores = [];
   for (const s of saves) {
@@ -671,7 +692,8 @@ router.get('/collections/discover', optionalAuth, (req, res) => {
     .map(o => ({ owner: memoryDb.getUserById(o.userId), count: o.count }))
     .filter(({ owner }) => owner &&
       !exclude.has(owner.username.toLowerCase()) &&
-      (!req.user || owner.id !== req.user.id));
+      (!req.user || owner.id !== req.user.id) &&
+      collectionStats(owner.id).count >= MIN_CARDS);
 
   shuffle(pool);
   const collections = pool.slice(0, limit)
@@ -757,7 +779,7 @@ router.get('/collections/:username', optionalAuth, (req, res) => {
   const items = memoryDb.getSavesByUser(owner.id)
     .map(save => {
       const card = memoryDb.getCardById(save.card_id);
-      return card ? {
+      return isPublicCollectionCard(card) ? {
         save: { ...save, cost: save.cost ?? saveCostFor(save.card_id, card.rarity_score) },
         card,
         stats: cardStats(card)
@@ -788,10 +810,11 @@ router.get('/published/mine', requireAuth, (req, res) => {
   });
 });
 
-// Get all cards
+// Get every card currently in public circulation. Private drafts have dedicated
+// authenticated owner routes and must never be enumerable here.
 router.get('/', async (req, res) => {
   try {
-    const result = await Card.findAll();
+    const result = await Card.getCommunityCards();
     if (result.success) {
       res.json(result);
     } else {
@@ -803,17 +826,15 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get card by ID. A card taken out of circulation (flagged by a report, or
-// removed by an admin) reads as "not found" to the public — only its creator
-// and an admin can still load it (so it can be reviewed / appealed).
+// Get card by ID. Private drafts and cards taken out of circulation read as
+// "not found" to the public. Their creator and an admin can still load them for
+// editing, review, and appeal. Saved cloud draws remain publicly collectible.
 router.get('/:id', optionalAuth, async (req, res) => {
   try {
     const result = await Card.findById(req.params.id);
     if (!result.success) return res.status(404).json(result);
     const card = result.data;
-    const hidden = card.moderation_status === 'flagged' || card.moderation_status === 'removed';
-    const privileged = req.user && (req.user.id === card.creator_id || isAdminEmail(req.user.email));
-    if (hidden && !privileged) {
+    if (!canViewCard(card, req.user)) {
       return res.status(404).json({ success: false, error: 'Card not found' });
     }
     res.json(result);
@@ -839,16 +860,19 @@ const cardVersion = (card) => card?.updated_at || card?.updatedAt || '';
 // dedupe. Returns { payload, card } or { notFound: true }. An unclaimed
 // uuid-ish id still renders: the capture page generates the card from its
 // seed, the same way the share page shows it before anyone saves it.
-const ensureRender = async (id, format, count, includeUrl) => {
+const ensureRender = async (id, format, count, includeUrl, user, authHeader) => {
   const found = await Card.findById(id);
   if (!found.success) {
     if (!/^[0-9a-f-]{10,64}$/i.test(id)) return { notFound: true, found };
-    return ensureRenderJob(id, format, count, 'seed', { name: `Draw ${id.slice(0, 8)}` }, includeUrl);
+    return ensureRenderJob(id, format, count, 'seed', { name: `Draw ${id.slice(0, 8)}` }, includeUrl, null);
   }
-  return ensureRenderJob(id, format, count, cardVersion(found.data), found.data, includeUrl);
+  if (!canViewCard(found.data, user)) {
+    return { notFound: true, found: { success: false, error: 'Card not found' } };
+  }
+  return ensureRenderJob(id, format, count, cardVersion(found.data), found.data, includeUrl, authHeader);
 };
 
-const ensureRenderJob = async (id, format, count, version, card, includeUrl) => {
+const ensureRenderJob = async (id, format, count, version, card, includeUrl, authHeader) => {
   const key = renderCacheKey(id, format, count, includeUrl);
 
   const cached = renderCache.get(key);
@@ -860,7 +884,7 @@ const ensureRenderJob = async (id, format, count, version, card, includeUrl) => 
     const job = (async () => {
       let payload;
       if (format === 'frames') {
-        const buffers = await renderStills(id, { count });
+        const buffers = await renderStills(id, { count, authHeader });
         const urls = [];
         for (let i = 0; i < buffers.length; i++) {
           const { url } = await storeBuffer(buffers[i], MIME.png, `card_${id}_still${i}`, { prefix: 'renders' });
@@ -868,7 +892,7 @@ const ensureRenderJob = async (id, format, count, version, card, includeUrl) => 
         }
         payload = { urls };
       } else {
-        const buffer = await renderCard(id, { format, includeUrl });
+        const buffer = await renderCard(id, { format, includeUrl, authHeader });
         const { url } = await storeBuffer(
           buffer,
           MIME[format],
@@ -887,7 +911,7 @@ const ensureRenderJob = async (id, format, count, version, card, includeUrl) => 
   return { payload, card };
 };
 
-router.get('/:id/render', async (req, res) => {
+router.get('/:id/render', optionalAuth, async (req, res) => {
   const format = req.query.format === 'mp4' ? 'mp4'
     : req.query.format === 'frames' ? 'frames' : 'gif';
   const includeUrl = parseIncludeUrl(req.query.includeUrl);
@@ -901,7 +925,14 @@ router.get('/:id/render', async (req, res) => {
     const count = format === 'frames'
       ? Math.max(1, Math.min(8, parseInt(req.query.count, 10) || 4))
       : null;
-    const result = await ensureRender(req.params.id, format, count, includeUrl);
+    const result = await ensureRender(
+      req.params.id,
+      format,
+      count,
+      includeUrl,
+      req.user,
+      req.headers.authorization || null
+    );
     if (result.notFound) return res.status(404).json(result.found);
     res.json({ success: true, data: { ...result.payload, format, includeUrl } });
   } catch (error) {
@@ -915,14 +946,21 @@ router.get('/:id/render', async (req, res) => {
 // itself — this endpoint streams the bytes same-origin with an attachment
 // disposition. Pointing the browser here downloads without leaving the page,
 // which is also the only pattern mobile Safari reliably honours.
-router.get('/:id/render/download', async (req, res) => {
+router.get('/:id/render/download', optionalAuth, async (req, res) => {
   const format = req.query.format === 'mp4' ? 'mp4' : 'gif';
   const includeUrl = parseIncludeUrl(req.query.includeUrl);
   if (includeUrl === null) {
     return res.status(400).json({ success: false, error: 'includeUrl must be true, false, 1, or 0' });
   }
   try {
-    const result = await ensureRender(req.params.id, format, null, includeUrl);
+    const result = await ensureRender(
+      req.params.id,
+      format,
+      null,
+      includeUrl,
+      req.user,
+      req.headers.authorization || null
+    );
     if (result.notFound) return res.status(404).json(result.found);
 
     const { url } = result.payload;
@@ -1050,13 +1088,15 @@ router.delete('/:id', requireAuth, async (req, res) => {
   }
 });
 
-// Search cards by property and value
+// Public search is a discovery surface, so drafts and moderated cards are never
+// included even when their state happens to match the query.
 router.get('/search/:property/:value', async (req, res) => {
   try {
     const { property, value } = req.params;
     const result = await Card.searchByState(property, decodeURIComponent(value));
     if (result.success) {
-      res.json(result);
+      const visibleIds = new Set(memoryDb.getCommunityCards().map(card => card.id));
+      res.json({ ...result, data: result.data.filter(card => visibleIds.has(card.id)) });
     } else {
       res.status(400).json(result);
     }
@@ -1115,6 +1155,10 @@ router.get('/community/stats', async (req, res) => {
 // Increment collection count for a card
 router.post('/:id/collect', requireAuth, async (req, res) => {
   try {
+    const card = memoryDb.getCardById(req.params.id);
+    if (!inPublicCirculation(card)) {
+      return res.status(404).json({ success: false, error: 'Card not found' });
+    }
     const result = await Card.incrementCollectionCount(req.params.id);
     if (result.success) {
       res.json(result);
