@@ -1,0 +1,82 @@
+{
+  "name": "RINGSIDE SERVICE",
+  "info": "At Saturn, the antenna caught a signal requesting two slices and no explanation.",
+  "setName": "Space Adventure Toaster",
+  "setInfo": "Four transmissions from the first household appliance to leave Earth under its own unresolved power.",
+  "tags": ["space-adventure-toaster", "toaster", "saturn", "arrival", "original-art"],
+  "image": "./04-ringside-service.webp",
+  "card": {
+    "backgroundColor": {
+      "baseHue": 42
+    },
+    "baseBackground": {
+      "type": "linear",
+      "color1": "#59482f",
+      "color2": "#020201",
+      "color3": "#9c8257",
+      "useThird": true,
+      "angle": 116,
+      "fadeStart": 6,
+      "fadeEnd": 94,
+      "vignette": 0.42,
+      "grain": 0.08
+    },
+    "patternInfo": {
+      "type": "Spindles",
+      "css": "repeating-radial-gradient(ellipse at center, rgba(228,199,145,0.08) 0 1px, transparent 2px 18px)",
+      "opacity": 0.16
+    },
+    "effectParams": {
+      "imageShineIntensity": 0.38,
+      "aberrationIntensity": 0.03,
+      "parallaxDepth": 0.38,
+      "filterBrightness": 0.94,
+      "filterContrast": 1.18,
+      "filterSaturate": 0.92,
+      "holoRevealMode": "wipe",
+      "holoRevealDuration": 0.84,
+      "holoRevealEasing": "smooth",
+      "holoRevealDirection": "right",
+      "holoRevealSoftness": 18,
+      "customHoloBlendMode": "soft-light"
+    },
+    "imageEffects": {
+      "maskType": "horizontal-fade",
+      "maskOpacity": "0.06",
+      "blurAmount": "0px",
+      "glowIntensity": "0px",
+      "opacity": 1,
+      "opacityHover": 1,
+      "contrast": 1.08,
+      "saturation": 0.9,
+      "blendMode": "normal"
+    },
+    "borderEffects": {
+      "thickBorderEnabled": true,
+      "thinEdgeEnabled": true,
+      "borderImageEnabled": false,
+      "color": "rgba(190,156,96,0.28)",
+      "opacity": 0.23,
+      "colorHover": "rgba(230,198,135,0.34)",
+      "opacityHover": 0.3,
+      "transitionDuration": 0.38,
+      "edgeColor1": "rgba(235,210,164,0.62)",
+      "edgeColor2": "rgba(75,56,28,0.13)",
+      "thinEdgeColor": "rgba(226,202,158,0.7)"
+    },
+    "holoEffects": {
+      "overlay": true,
+      "rareHolo": false,
+      "rareHoloGalaxy": false,
+      "wowaHolo": true,
+      "rareHoloVmax": false
+    },
+    "wowaHoloParams": {
+      "space": 7,
+      "angle": 96,
+      "brightness": 0.54,
+      "contrast": 1.4,
+      "backgroundImage": "/assets/new_shiny_imgs/angular.png"
+    }
+  }
+}

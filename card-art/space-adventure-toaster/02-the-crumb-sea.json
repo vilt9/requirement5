@@ -1,0 +1,81 @@
+{
+  "name": "THE CRUMB SEA",
+  "info": "First flyby. Lunar dust entered both slots. Mission control classified this as breakfast.",
+  "setName": "Space Adventure Toaster",
+  "setInfo": "Four transmissions from the first household appliance to leave Earth under its own unresolved power.",
+  "tags": ["space-adventure-toaster", "toaster", "moon", "flyby", "original-art"],
+  "image": "./02-the-crumb-sea.webp",
+  "card": {
+    "backgroundColor": {
+      "baseHue": 222
+    },
+    "baseBackground": {
+      "type": "linear",
+      "color1": "#202329",
+      "color2": "#010102",
+      "color3": "#737984",
+      "useThird": true,
+      "angle": 148,
+      "fadeStart": 4,
+      "fadeEnd": 96,
+      "vignette": 0.5,
+      "grain": 0.1
+    },
+    "patternInfo": {
+      "type": "3D Grid",
+      "css": "linear-gradient(rgba(220,228,240,0.05) 1px, transparent 1px), linear-gradient(to right, rgba(220,228,240,0.05) 1px, transparent 1px) 0 0 / 34px 34px",
+      "transform": "perspective(500px) rotateX(12deg)",
+      "opacity": 0.12
+    },
+    "effectParams": {
+      "imageShineIntensity": 0.34,
+      "aberrationIntensity": 0.02,
+      "parallaxDepth": 0.34,
+      "filterBrightness": 0.9,
+      "filterContrast": 1.2,
+      "filterSaturate": 0.72,
+      "holoRevealMode": "fade",
+      "holoRevealDuration": 0.72,
+      "holoRevealEasing": "smooth",
+      "holoRevealDirection": "right",
+      "holoRevealSoftness": 7,
+      "customHoloBlendMode": "soft-light",
+      "sheenShine": 0.2,
+      "sheenBrightness": 0.66,
+      "sheenContrast": 0.78,
+      "sheenSaturate": 0.28,
+      "veilPresence": 0.015
+    },
+    "imageEffects": {
+      "maskType": "diagonal-fade",
+      "maskOpacity": "0.06",
+      "blurAmount": "0px",
+      "glowIntensity": "0px",
+      "opacity": 1,
+      "opacityHover": 1,
+      "contrast": 1.1,
+      "saturation": 0.72,
+      "blendMode": "normal"
+    },
+    "borderEffects": {
+      "thickBorderEnabled": true,
+      "thinEdgeEnabled": true,
+      "borderImageEnabled": false,
+      "color": "rgba(190,198,210,0.20)",
+      "opacity": 0.18,
+      "colorHover": "rgba(225,231,240,0.28)",
+      "opacityHover": 0.24,
+      "transitionDuration": 0.28,
+      "edgeColor1": "rgba(228,234,242,0.62)",
+      "edgeColor2": "rgba(78,84,94,0.12)",
+      "thinEdgeColor": "rgba(215,221,230,0.68)"
+    },
+    "holoEffects": {
+      "overlay": true,
+      "rareHolo": false,
+      "rareHoloGalaxy": false,
+      "wowaHolo": false,
+      "rareHoloVmax": false
+    }
+  }
+}

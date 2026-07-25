@@ -1,0 +1,77 @@
+{
+  "name": "MARS: SETTING FOUR",
+  "info": "The toaster approached Mars and briefly mistook the planet for an overdone crumpet.",
+  "setName": "Space Adventure Toaster",
+  "setInfo": "Four transmissions from the first household appliance to leave Earth under its own unresolved power.",
+  "tags": ["space-adventure-toaster", "toaster", "mars", "approach", "original-art"],
+  "image": "./03-mars-setting-four.webp",
+  "card": {
+    "backgroundColor": {
+      "baseHue": 16
+    },
+    "baseBackground": {
+      "type": "radial",
+      "color1": "#4b1b10",
+      "color2": "#030101",
+      "color3": "#9b4429",
+      "useThird": true,
+      "posX": 72,
+      "posY": 48,
+      "fadeStart": 7,
+      "fadeEnd": 92,
+      "vignette": 0.38,
+      "grain": 0.09
+    },
+    "patternInfo": {
+      "type": "Circles",
+      "css": "radial-gradient(circle, rgba(255,150,92,0.10) 1px, transparent 2px)",
+      "backgroundSize": "42px 42px",
+      "opacity": 0.14
+    },
+    "effectParams": {
+      "imageShineIntensity": 0.3,
+      "aberrationIntensity": 0.05,
+      "parallaxDepth": 0.3,
+      "filterBrightness": 0.96,
+      "filterContrast": 1.18,
+      "filterSaturate": 1.04,
+      "holoRevealMode": "iris",
+      "holoRevealDuration": 0.76,
+      "holoRevealEasing": "smooth",
+      "holoRevealDirection": "left",
+      "holoRevealSoftness": 16,
+      "customHoloBlendMode": "soft-light"
+    },
+    "imageEffects": {
+      "maskType": "vignette",
+      "maskOpacity": "0.05",
+      "blurAmount": "0px",
+      "glowIntensity": "0px",
+      "opacity": 1,
+      "opacityHover": 1,
+      "contrast": 1.08,
+      "saturation": 1.02,
+      "blendMode": "normal"
+    },
+    "borderEffects": {
+      "thickBorderEnabled": true,
+      "thinEdgeEnabled": true,
+      "borderImageEnabled": false,
+      "color": "rgba(190,84,45,0.26)",
+      "opacity": 0.22,
+      "colorHover": "rgba(235,121,73,0.34)",
+      "opacityHover": 0.28,
+      "transitionDuration": 0.32,
+      "edgeColor1": "rgba(244,153,105,0.60)",
+      "edgeColor2": "rgba(79,24,10,0.14)",
+      "thinEdgeColor": "rgba(235,168,125,0.66)"
+    },
+    "holoEffects": {
+      "overlay": true,
+      "rareHolo": false,
+      "rareHoloGalaxy": false,
+      "wowaHolo": false,
+      "rareHoloVmax": false
+    }
+  }
+}

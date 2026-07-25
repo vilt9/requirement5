@@ -1,0 +1,79 @@
+{
+  "name": "GOODBYE, KITCHEN",
+  "info": "A domestic appliance clears the atmosphere carrying no bread, no crew, and one unresolved setting.",
+  "setName": "Space Adventure Toaster",
+  "setInfo": "Four transmissions from the first household appliance to leave Earth under its own unresolved power.",
+  "tags": ["space-adventure-toaster", "toaster", "earth", "departure", "original-art"],
+  "image": "./01-goodbye-kitchen.webp",
+  "card": {
+    "backgroundColor": {
+      "baseHue": 205
+    },
+    "baseBackground": {
+      "type": "radial",
+      "color1": "#10243b",
+      "color2": "#010205",
+      "color3": "#2d5475",
+      "useThird": true,
+      "posX": 48,
+      "posY": 72,
+      "fadeStart": 5,
+      "fadeEnd": 94,
+      "vignette": 0.42,
+      "grain": 0.08
+    },
+    "patternInfo": {
+      "type": "Constellation",
+      "css": "radial-gradient(circle at center, rgba(150,210,255,0.22) 1px, transparent 2px)",
+      "backgroundSize": "52px 52px",
+      "numLines": 7,
+      "lineOpacity": 0.04,
+      "opacity": 0.18
+    },
+    "effectParams": {
+      "imageShineIntensity": 0.28,
+      "aberrationIntensity": 0.04,
+      "parallaxDepth": 0.28,
+      "filterBrightness": 0.94,
+      "filterContrast": 1.16,
+      "filterSaturate": 0.94,
+      "holoRevealMode": "wipe",
+      "holoRevealDuration": 0.72,
+      "holoRevealEasing": "smooth",
+      "holoRevealDirection": "up",
+      "holoRevealSoftness": 14,
+      "customHoloBlendMode": "soft-light"
+    },
+    "imageEffects": {
+      "maskType": "vignette",
+      "maskOpacity": "0.05",
+      "blurAmount": "0px",
+      "glowIntensity": "0px",
+      "opacity": 1,
+      "opacityHover": 1,
+      "contrast": 1.06,
+      "saturation": 0.94,
+      "blendMode": "normal"
+    },
+    "borderEffects": {
+      "thickBorderEnabled": true,
+      "thinEdgeEnabled": true,
+      "borderImageEnabled": false,
+      "color": "rgba(96,170,220,0.24)",
+      "opacity": 0.2,
+      "colorHover": "rgba(142,205,244,0.30)",
+      "opacityHover": 0.26,
+      "transitionDuration": 0.35,
+      "edgeColor1": "rgba(168,218,248,0.58)",
+      "edgeColor2": "rgba(22,64,96,0.14)",
+      "thinEdgeColor": "rgba(185,225,248,0.66)"
+    },
+    "holoEffects": {
+      "overlay": true,
+      "rareHolo": false,
+      "rareHoloGalaxy": false,
+      "wowaHolo": false,
+      "rareHoloVmax": false
+    }
+  }
+}
