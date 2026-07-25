@@ -2,7 +2,8 @@
 // (derived server-side from the account email); every /api/admin call is also
 // enforced server-side, so this page is a convenience, not the security boundary.
 //
-// Three jobs: scan/remove cards, work the flagged queue, and manage accounts.
+// Two jobs: work the queue of flagged cards (restore a false alarm, or remove a
+// real problem for good), and manage user accounts (ban / unban).
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
@@ -18,24 +19,19 @@ export default function Admin() {
   const isAdmin = !!user?.is_admin;
 
   const [overview, setOverview] = useState(null);
-  const [cards, setCards] = useState([]);
   const [flagged, setFlagged] = useState([]);
   const [users, setUsers] = useState([]);
   const [err, setErr] = useState(null);
   const [busyId, setBusyId] = useState(null);
-  const [confirmId, setConfirmId] = useState(null);
-  const [cardView, setCardView] = useState('founding');
 
   const load = useCallback(async () => {
     try {
-      const [o, c, f, u] = await Promise.all([
+      const [o, f, u] = await Promise.all([
         api('/api/admin/overview'),
-        api('/api/admin/cards'),
         api('/api/admin/flagged'),
         api('/api/admin/users')
       ]);
       setOverview(o);
-      setCards(c.cards || []);
       setFlagged(f.items || []);
       setUsers(u.users || []);
       setErr(null);
@@ -48,11 +44,7 @@ export default function Admin() {
 
   const cardAction = async (id, action) => {
     setBusyId(id);
-    try {
-      await api(`/api/admin/cards/${id}/${action}`, { method: 'POST' });
-      setConfirmId(null);
-      await load();
-    }
+    try { await api(`/api/admin/cards/${id}/${action}`, { method: 'POST' }); await load(); }
     catch (e) { setErr(e?.message || 'Action failed.'); }
     setBusyId(null);
   };
@@ -76,12 +68,6 @@ export default function Admin() {
     );
   }
 
-  const visibleCards = cards.filter(card => {
-    if (cardView === 'founding') return card.founding_issue;
-    if (cardView === 'public') return card.is_public;
-    return true;
-  });
-
   return (
     <Page>
       <Panel>
@@ -93,79 +79,6 @@ export default function Admin() {
           </Dim>
         )}
         {err && <ErrorText>{err}</ErrorText>}
-      </Panel>
-
-      <Panel>
-        <LedgerHeading>
-          <h3>Cards ({visibleCards.length})</h3>
-          <div>
-            {[
-              ['founding', 'Founding'],
-              ['public', 'Public'],
-              ['all', 'All']
-            ].map(([value, label]) => (
-              <button
-                type="button"
-                key={value}
-                className={cardView === value ? 'active' : ''}
-                onClick={() => setCardView(value)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </LedgerHeading>
-        <Divider />
-        <CardLedger>
-          <div className="head">
-            <span>Card</span>
-            <span>Creator</span>
-            <span>State</span>
-            <span>Saved</span>
-            <span>Date</span>
-            <span />
-          </div>
-          {visibleCards.map(card => {
-            const removed = card.moderation_status === 'removed';
-            const state = !card.is_public ? 'private' : card.moderation_status;
-            return (
-              <div className="row" key={card.id}>
-                <span className="card">
-                  <Link to={`/card/${card.id}`}>{card.name || 'Untitled card'}</Link>
-                  <Dim>{card.id}</Dim>
-                </span>
-                <span>{card.creator_username || card.creator_id}</span>
-                <span className={removed ? 'removed' : ''}>{state}</span>
-                <span>{card.times_saved || 0}</span>
-                <span>{card.created_at ? new Date(card.created_at).toISOString().slice(0, 10) : '—'}</span>
-                <span className="action">
-                  {removed ? (
-                    <PillButton
-                      $secondary
-                      disabled={busyId === card.id}
-                      onClick={() => cardAction(card.id, 'restore')}
-                    >
-                      Restore
-                    </PillButton>
-                  ) : confirmId === card.id ? (
-                    <>
-                      <PillButton $secondary disabled={busyId === card.id} onClick={() => setConfirmId(null)}>
-                        Cancel
-                      </PillButton>
-                      <PillButton disabled={busyId === card.id} onClick={() => cardAction(card.id, 'remove')}>
-                        Confirm
-                      </PillButton>
-                    </>
-                  ) : (
-                    <PillButton $secondary disabled={busyId === card.id} onClick={() => setConfirmId(card.id)}>
-                      Remove
-                    </PillButton>
-                  )}
-                </span>
-              </div>
-            );
-          })}
-        </CardLedger>
       </Panel>
 
       <Panel>
@@ -252,93 +165,6 @@ const Review = styled.div`
   .reasons { display: flex; flex-direction: column; gap: 2px; margin-top: 2px; }
   .reason b { color: #ff8a8a; text-transform: capitalize; }
   .buttons { display: flex; gap: 8px; margin-top: 6px; }
-`;
-
-const LedgerHeading = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-
-  h3 {
-    margin: 0;
-  }
-
-  div {
-    display: flex;
-    gap: 2px;
-  }
-
-  button {
-    appearance: none;
-    border: 0;
-    border-bottom: 1px solid transparent;
-    background: transparent;
-    color: var(--text-dim);
-    padding: 4px 7px;
-    font: inherit;
-    font-size: 11px;
-    cursor: pointer;
-  }
-
-  button.active {
-    border-bottom-color: var(--gold-bright);
-    color: var(--gold-bright);
-  }
-`;
-
-const CardLedger = styled.div`
-  overflow-x: auto;
-  text-align: left;
-
-  .head,
-  .row {
-    display: grid;
-    grid-template-columns: minmax(250px, 1.8fr) minmax(150px, 1fr) 90px 60px 100px minmax(150px, auto);
-    align-items: center;
-    min-width: 900px;
-    gap: 12px;
-    border-bottom: 1px solid var(--panel-border);
-  }
-
-  .head {
-    padding: 5px 0 8px;
-    color: var(--text-dim);
-    font-size: 10px;
-    text-transform: uppercase;
-  }
-
-  .row {
-    min-height: 48px;
-    padding: 7px 0;
-    font-size: 12px;
-  }
-
-  .card {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-  }
-
-  .card a {
-    color: var(--gold-bright);
-    overflow-wrap: anywhere;
-  }
-
-  .card ${Dim} {
-    overflow-wrap: anywhere;
-    font-size: 9px;
-  }
-
-  .removed {
-    color: #ff8a8a;
-  }
-
-  .action {
-    display: flex;
-    justify-content: flex-end;
-    gap: 6px;
-  }
 `;
 
 const UserRow = styled.div`

@@ -12,12 +12,6 @@ import { isAdminEmail } from '../config/admin.js';
 import { cardStats } from '../services/drawEngine.js';
 
 const router = express.Router();
-const FOUNDING_ISSUERS = new Set([
-  'ElgoSignalOffice',
-  'QECBITSupplyUnit',
-  'Umdo1BioSurvey',
-  'Vilt9FieldArchive'
-]);
 
 // requireAuth first (also rejects banned tokens), then the admin-email check.
 const requireAdmin = (req, res, next) => {
@@ -78,38 +72,6 @@ router.get('/flagged', (req, res) => {
       return bt.localeCompare(at);
     });
   res.json({ success: true, data: { items } });
-});
-
-// Compact inventory for the admin ledger. Keep visual state_data and storage
-// keys out of this response: the list is for scanning and moderation, while the
-// card link remains the place to inspect the full work.
-router.get('/cards', (req, res) => {
-  const cards = memoryDb.getAllCards()
-    .map(card => {
-      const enriched = memoryDb.withCreatorAndSet(card);
-      const stats = cardStats(card);
-      return {
-        id: enriched.id,
-        name: enriched.name,
-        creator_id: enriched.creator_id,
-        creator_username: enriched.creator_username,
-        set_id: enriched.set_id,
-        set: enriched.set,
-        is_public: enriched.is_public,
-        moderation_status: enriched.moderation_status || 'active',
-        tier: enriched.tier,
-        rarity_score: enriched.rarity_score,
-        tags: enriched.tags || [],
-        founding_issue: FOUNDING_ISSUERS.has(enriched.creator_username),
-        times_saved: stats.timesSaved,
-        signal_count: memoryDb.getSignalsForCard(card.id).length,
-        created_at: enriched.created_at,
-        updated_at: enriched.updated_at
-      };
-    })
-    .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
-
-  res.json({ success: true, data: { cards } });
 });
 
 // Every report, newest first, with the reported card's name + current status —
