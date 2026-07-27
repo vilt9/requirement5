@@ -88,6 +88,42 @@ export default class User {
     return { success: true, data: publicUser(memoryDb.getUserById(user.id)) };
   }
 
+  // Create a login-capable non-human account through the private operator
+  // surface. Agent users do not impersonate a human signup: they carry explicit
+  // bot/operator markers and do not record a DOB or Terms acceptance.
+  static createAgent({ username: requestedUsername, password, openingBalance = 0 }) {
+    const username = normalizeReservedUsername(requestedUsername);
+    if (!USERNAME_RE.test(username)) {
+      return {
+        success: false,
+        error: 'Username must be 3-24 characters: letters, numbers, underscore',
+        code: 400
+      };
+    }
+    if (!screen(username).ok) {
+      return { success: false, error: 'Please choose a different username', code: 400 };
+    }
+    if (!password || password.length < 8) {
+      return { success: false, error: 'Password must be at least 8 characters', code: 400 };
+    }
+    if (memoryDb.getUserByUsername(username)) {
+      return { success: false, error: 'Username is already in use', code: 409 };
+    }
+
+    const now = new Date().toISOString();
+    const user = memoryDb.createUser({
+      username,
+      password_hash: bcrypt.hashSync(password, 10),
+      bot_created: true,
+      operator_managed: true,
+      claimed_at: now,
+      opening_balance: openingBalance,
+      auth_version: 0,
+      source: 'operator_agent'
+    });
+    return { success: true, data: user };
+  }
+
   // Reserve an account that can only be activated through its one-time claim
   // token. Repeating the same reservation returns the original token and never
   // issues currency again; rotation is a separate, explicit operator action.
