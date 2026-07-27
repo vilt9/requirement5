@@ -74,6 +74,35 @@ describe('feature 1 — signup-cohort retention', () => {
     const { totals } = computeAnalytics();
     expect(totals.users).toBe(2); // reservation excluded, claimed + human counted
   });
+
+  test('seeded profiles and all of their activity are excluded', () => {
+    const human = makeUser('human', W1);
+    const seeded = makeUser('seeded', W1, {
+      bot_created: true,
+      seeded_activity: true,
+      source: 'growth_seed',
+      claimed_at: W1,
+      balance: 500
+    });
+    draw(human.id, W1);
+    draw(seeded.id, W1);
+    at(memoryDb.createSave({
+      user_id: seeded.id,
+      card_id: 'seed-card',
+      source: 'growth_seed'
+    }), W1);
+    at(memoryDb.createEvent({
+      type: 'generate',
+      user_id: seeded.id
+    }), W1);
+
+    const out = computeAnalytics();
+    expect(out.totals.users).toBe(1);
+    expect(out.totals.circulating).toBe(0);
+    expect(out.retention.cohorts[0].active[K1]).toBe(1);
+    expect(out.usage.totals.saves).toBe(0);
+    expect(out.usage.totals.generateIn).toBe(0);
+  });
 });
 
 describe('feature 2 — activity intensity', () => {
@@ -199,7 +228,11 @@ describe('feature 5 — usage breakdown', () => {
 describe('feature 6 — first-touch acquisition', () => {
   test('deduplicates sessions and connects source to activation and retention', () => {
     const user = makeUser('signal', W1, {
-      source: { source: 'reddit', campaign: 'ai-art' }
+      source: {
+        source: 'reddit',
+        campaign: 'ai-art',
+        session_id: 'session_12345678'
+      }
     });
     at(memoryDb.createEvent({
       type: 'visit',
@@ -253,6 +286,21 @@ describe('feature 6 — first-touch acquisition', () => {
     }), W1);
     const out = computeAnalytics();
     expect(out.usage.totals.generateOut).toBe(0);
+    expect(out.acquisition.sources).toEqual([]);
+  });
+
+  test('starts the source funnel at instrumentation instead of backfilling legacy events and users', () => {
+    const legacy = makeUser('legacy', W1);
+    at(memoryDb.createEvent({
+      type: 'generate',
+      source: null,
+      user_id: legacy.id
+    }), W1);
+    draw(legacy.id, W1);
+    draw(legacy.id, W2);
+
+    const out = computeAnalytics();
+    expect(out.usage.totals.generateIn).toBe(1);
     expect(out.acquisition.sources).toEqual([]);
   });
 });

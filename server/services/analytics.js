@@ -62,7 +62,14 @@ function enumerateWeeks(minDate, maxDate) {
   return weeks;
 }
 
-const isRealUser = (u) => !(u.bot_created && !u.claimed_at);
+// Seeded profiles keep the pool and discovery surfaces alive, but they are not
+// people. They must never improve acquisition, usage, retention, or economy
+// numbers. A claimed handoff is different: its source becomes an attribution
+// object at claim time and the account represents a real person.
+const isRealUser = (u) =>
+  !u.seeded_activity &&
+  u.source !== 'growth_seed' &&
+  !(u.bot_created && !u.claimed_at);
 const parseDate = (iso) => (iso ? new Date(iso) : null);
 
 function median(nums) {
@@ -273,19 +280,27 @@ function buildAcquisition(users, events, byUser) {
   };
 
   for (const event of events) {
-    const row = rowFor(event.source);
     const sessionId = event.session_id || null;
+    // The acquisition funnel starts when first-touch instrumentation ships.
+    // Legacy usage events have no session ID and stay in the historical usage
+    // chart, but cannot be assigned to a source funnel honestly.
+    if (!sessionId) continue;
+    const row = rowFor(event.source);
     if (event.type === 'visit' && sessionId) row.visitSessions.add(sessionId);
     if (event.type === 'generate') {
       row.generations += 1;
-      if (sessionId) row.generatedSessions.add(sessionId);
+      row.generatedSessions.add(sessionId);
     }
-    if (event.type === 'account_intent' && sessionId) row.accountIntentSessions.add(sessionId);
+    if (event.type === 'account_intent') row.accountIntentSessions.add(sessionId);
     if (event.type === 'signup') row.signups += 1;
     if (event.type === 'claim') row.claims += 1;
   }
 
   for (const user of users) {
+    // Existing accounts predate first-touch attribution. Do not invent a
+    // source for them or make the new funnel appear to have unattributed
+    // conversions before its first measured visit.
+    if (!user.source || typeof user.source !== 'object' || !user.source.session_id) continue;
     const row = rowFor(user.source);
     const cohortWeek = isoWeek(new Date(user.created_at));
     const activity = byUser.get(user.id);
@@ -329,17 +344,23 @@ function buildAcquisition(users, events, byUser) {
 export function computeAnalytics() {
   const allUsers = memoryDb.getAllUsers();
   const users = allUsers.filter(isRealUser);
-  const txns = memoryDb.getAllTransactions();
-  const saves = memoryDb.getAllSaves();
-  const stars = memoryDb.getAllStars();
+  const userIds = new Set(users.map(u => u.id));
+  const txns = memoryDb.getAllTransactions()
+    .filter(t => userIds.has(t.user_id) && t.source !== 'growth_seed');
+  const saves = memoryDb.getAllSaves()
+    .filter(s => userIds.has(s.user_id) && s.source !== 'growth_seed');
+  const stars = memoryDb.getAllStars()
+    .filter(s => userIds.has(s.user_id));
   // Public analytics describe the public system. Draft creation remains owner/
   // operator data and must not leak through counts, cohorts, or weekly timing.
   const cards = memoryDb.getCommunityCards();
   const usageEvents = memoryDb.getAllEvents();
   // Operator-seeded events make the pool useful but are not evidence of human
   // acquisition. Keep them out of both usage and the source funnel.
-  const humanUsageEvents = usageEvents.filter(event => event.source !== 'growth_seed');
-  const userIds = new Set(users.map(u => u.id));
+  const humanUsageEvents = usageEvents.filter(event =>
+    event.source !== 'growth_seed' &&
+    (!event.user_id || userIds.has(event.user_id)));
+  const activityCards = cards.filter(card => userIds.has(card.creator_id));
 
   // --- timeline scaffold: the contiguous week axis every triangle aligns to ---
   const dates = [];
@@ -354,7 +375,7 @@ export function computeAnalytics() {
   const weeks = enumerateWeeks(minDate, maxDate);
 
   // --- activity stream, shared by retention (1), intensity (2), segments (4) ---
-  const events = collectActivity(txns, saves, stars, cards);
+  const events = collectActivity(txns, saves, stars, activityCards);
   const byUser = activityByUser(events);
 
   // --- behaviour segments: a creator has published a card; a collector has
@@ -401,7 +422,7 @@ export function computeAnalytics() {
     },
     weekly: { newUsers, activeUsers, cards: cardsPerWeek },
     acquisition: buildAcquisition(users, humanUsageEvents, byUser),
-    usage: buildUsage(humanUsageEvents, saves, cards, weeks),
+    usage: buildUsage(humanUsageEvents, saves, activityCards, weeks),
     retention: { cohorts: buildCohorts(users, byUser) },
     economy: { cohorts: buildEconomy(users, txns, weeks) },
     segments: {
