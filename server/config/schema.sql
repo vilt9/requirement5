@@ -68,9 +68,9 @@ CREATE TABLE IF NOT EXISTS singletons (
   data  jsonb NOT NULL
 );
 
--- Lightweight usage events (generate clicks). Append-only, like transactions.
--- user_id is null for logged-out visitors — that's how the analytics roll-up
--- splits logged-in from logged-out usage.
+-- Lightweight first-party funnel and usage events. Append-only, like
+-- transactions. user_id is null for logged-out visitors. Attribution fields
+-- stay inside the JSON document; only aggregate source buckets are public.
 CREATE TABLE IF NOT EXISTS events (
   id       text PRIMARY KEY,
   data     jsonb NOT NULL,

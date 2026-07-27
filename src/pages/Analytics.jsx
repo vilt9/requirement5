@@ -88,7 +88,7 @@ const Analytics = () => {
   if (error) return <Page><Panel><ErrorText>{error}</ErrorText></Panel></Page>;
   if (!data) return <Page><Panel><Dim>Loading…</Dim></Panel></Page>;
 
-  const { weeks, totals, usage, retention, economy, segments } = data;
+  const { weeks, totals, acquisition, usage, retention, economy, segments } = data;
 
   return (
     <Page>
@@ -103,6 +103,13 @@ const Analytics = () => {
           <Stat><b>{Math.round(totals.circulating).toLocaleString()}</b><span>/t26 circulating</span></Stat>
         </Stats>
       </Panel>
+
+      <Section
+        title="Acquisition · first touch"
+        blurb="Session-scoped, first-party source signal. No names, full referrer URLs, or cross-session identifiers."
+      >
+        <AcquisitionTable acquisition={acquisition} />
+      </Section>
 
       <Section title="Usage · weekly" blurb="Actions per week.">
         <UsageTable usage={usage} weeks={weeks} />
@@ -161,6 +168,48 @@ const Analytics = () => {
         />
       </Section>
     </Page>
+  );
+};
+
+const AcquisitionTable = ({ acquisition }) => {
+  const rows = acquisition?.sources || [];
+  if (!rows.length) return <Dim>Attribution begins with the next visit.</Dim>;
+  return (
+    <Scroll>
+      <Grid>
+        <thead>
+          <tr>
+            <th className="corner">source</th>
+            <th>visits</th>
+            <th>generated</th>
+            <th>account</th>
+            <th>joined</th>
+            <th>activated</th>
+            <th>retained</th>
+            <th>visit→join</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(row => {
+            const joined = row.signups + row.claims;
+            return (
+              <tr key={row.source}>
+                <th className="row">{row.source}</th>
+                <td>{row.visits || '·'}</td>
+                <td title={`${row.generations} total generations`}>
+                  {row.generatedSessions || '·'}
+                </td>
+                <td>{row.accountIntents || '·'}</td>
+                <td>{joined || '·'}</td>
+                <td>{row.activatedUsers || '·'}</td>
+                <td>{row.retainedUsers || '·'}</td>
+                <td>{row.visits ? `${pct(joined, row.visits)}%` : '·'}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </Grid>
+    </Scroll>
   );
 };
 

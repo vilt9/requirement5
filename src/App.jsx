@@ -20,6 +20,7 @@ import Verify from './pages/Verify';
 import Legal from './pages/Legal';
 import Admin from './pages/Admin';
 import Footer from './components/Footer';
+import AnalyticsTracker from './components/AnalyticsTracker';
 import './App.css';
 
 // The design language (refreshed, after midjourney.com/medical): JetBrains Mono
@@ -156,6 +157,7 @@ function App() {
       <CardProvider>
         <Router>
           <GlobalStyle />
+          <AnalyticsTracker />
           <div className="App">
             <Navigation />
             <main className="app-main">

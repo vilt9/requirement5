@@ -4,6 +4,7 @@ import { signToken, requireAuth } from '../middleware/auth.js';
 import { issue } from '../services/ledger.js';
 import { ECONOMY } from '../services/economy.js';
 import { memoryDb } from '../config/database.js';
+import { normalizeAttribution } from '../services/attribution.js';
 
 const router = express.Router();
 
@@ -24,8 +25,14 @@ const claimStash = (userId, stash) => {
 
 router.post('/signup', async (req, res) => {
   try {
-    const result = await User.create(req.body || {});
+    const attribution = normalizeAttribution(req.body?.attribution);
+    const result = await User.create({ ...(req.body || {}), attribution });
     if (!result.success) return res.status(400).json(result);
+    memoryDb.createEvent({
+      type: 'signup',
+      user_id: result.data.id,
+      ...attribution
+    });
     const fresh = claimStash(result.data.id, req.body?.stash);
     res.status(201).json({
       success: true,
@@ -87,8 +94,14 @@ router.get('/claim/:token', (req, res) => {
 router.post('/claim', async (req, res) => {
   try {
     const { token, password, dob, acceptedTerms } = req.body || {};
-    const result = await User.claim({ token, password, dob, acceptedTerms });
+    const attribution = normalizeAttribution(req.body?.attribution);
+    const result = await User.claim({ token, password, dob, acceptedTerms, attribution });
     if (!result.success) return res.status(result.code || 400).json(result);
+    memoryDb.createEvent({
+      type: 'claim',
+      user_id: result.data.id,
+      ...attribution
+    });
     res.json({
       success: true,
       data: { user: result.data, token: signToken(result.data) }

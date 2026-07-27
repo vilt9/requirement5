@@ -16,12 +16,30 @@ const valid = (username) => ({ username, email: `${username}@earth.test`, passwo
 
 describe('POST /api/auth/signup', () => {
   test('creates a user, grants a starting balance, and returns a token', async () => {
-    const res = await signup(valid('alice'));
+    const res = await signup({
+      ...valid('alice'),
+      attribution: {
+        sessionId: 'session_12345678',
+        source: 'reddit',
+        campaign: 'ai-art'
+      }
+    });
     expect(res.status).toBe(201);
     expect(res.body.success).toBe(true);
     expect(res.body.data.user.username).toBe('alice');
     expect(res.body.data.token).toBeTruthy();
     expect(res.body.data.user.balance).toBeGreaterThan(0);
+    expect(res.body.data.user.source).toBeUndefined();
+    expect(memoryDb.getUserByUsername('alice').source).toMatchObject({
+      source: 'reddit',
+      campaign: 'ai-art'
+    });
+    expect(memoryDb.getAllEvents()).toContainEqual(expect.objectContaining({
+      type: 'signup',
+      user_id: res.body.data.user.id,
+      source: 'reddit',
+      session_id: 'session_12345678'
+    }));
   });
 
   test('a duplicate username returns a clean 400 — never a raw DB constraint', async () => {

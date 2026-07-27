@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last updated: 17 July 2026**
+**Last updated: 27 July 2026**
 
 ---
 
@@ -43,7 +43,7 @@ Requirement5 is a web app and command-line tool for making, collecting, and trad
 
 **2.6 Server logs and IP address.** Our servers automatically record technical information — including your **IP address**, request times, endpoints accessed, browser/agent information, and error diagnostics.
 
-**2.7 Analytics.** We use **first-party cohort analytics** to understand how the Service is used in aggregate. We do **not** use third-party advertising or cross-site tracking networks.
+**2.7 Analytics.** We use **first-party cohort and acquisition analytics** to understand how the Service is used in aggregate. For one browser tab/session we generate a random session identifier and record the first campaign source, campaign/medium labels where present, landing path, referring site's hostname (not the full referring URL), and events such as visit, generation, reaching the account page, signup, or claiming an account. The session identifier is not reused across unrelated browsing sessions. We do **not** use third-party advertising or cross-site tracking networks.
 
 **2.8 Local-storage authentication token.** When you log in, we store a token in your browser's local storage so you stay logged in.
 
@@ -62,7 +62,7 @@ We do **not** intentionally collect special category data. Please do not upload 
 | Process purchases and keep purchase records | **Contract** and **Legal obligation** (tax/accounting) |
 | Keep the Service secure, prevent fraud and abuse, debug (server logs, IP) | **Legitimate interests** |
 | Moderate uploaded images and published content | **Legitimate interests**; and **Legal obligation** where content law requires it |
-| Understand usage and improve the Service (first-party cohort analytics) | **Legitimate interests** |
+| Understand usage and improve the Service (first-party cohort and acquisition analytics) | **Legitimate interests** |
 | Respond to your requests and comply with legal obligations | **Legal obligation** and **Legitimate interests** |
 
 Where we rely on **legitimate interests**, we have balanced our interest against your rights. You can object — see section 10. If we ever introduce processing that needs your **consent**, we will ask for it clearly and separately.
@@ -133,7 +133,7 @@ We use a small number of carefully chosen providers to run the Service. We do **
 | Published cards, usernames, collections | See section 11 — some may persist in the public pool after account deletion |
 | Purchase records | Around **6 years** — required for **UK tax and accounting** |
 | Server logs and IP address | Short-term (typically up to ~90 days), then deleted or aggregated |
-| Analytics | Aggregate/cohort form, retained no longer than needed |
+| Analytics | Session event data is retained only as long as needed to build aggregate source/cohort measures; aggregate measures may be kept longer for trend analysis |
 
 ---
 
@@ -161,11 +161,13 @@ We use a small number of carefully chosen providers to run the Service. We do **
 
 ## 12. Cookies and local storage
 
-12.1 The main item we store is an **authentication token in your browser's local storage**, which keeps you logged in. This is **strictly necessary** for the Service to function, so it does not require consent.
+12.1 The main persistent item we store is an **authentication token in your browser's local storage**, which keeps you logged in. This is **strictly necessary** for the Service to function, so it does not require consent.
 
-12.2 We use **first-party cohort analytics** only. We do **not** use third-party advertising cookies or cross-site tracking.
+12.2 For first-party analytics we store a random attribution identifier in **session storage**. It lasts for the current browser tab/session and connects that visit with actions such as generation, account intent, signup, or claim. It is not an advertising cookie and is not used to follow you across other sites or unrelated sessions.
 
-12.3 You can clear browser storage at any time via your browser settings, but doing so will log you out.
+12.3 We use **first-party cohort and acquisition analytics** only. We do **not** use third-party advertising cookies or cross-site tracking.
+
+12.4 You can clear browser storage at any time via your browser settings. Clearing local storage will log you out; clearing session storage resets that tab's analytics session.
 
 ---
 

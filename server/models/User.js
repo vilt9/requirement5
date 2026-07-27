@@ -43,7 +43,7 @@ export const publicUser = (user) => {
 };
 
 export default class User {
-  static async create({ username, email, password, dob, acceptedTerms }) {
+  static async create({ username, email, password, dob, acceptedTerms, attribution = null }) {
     if (!USERNAME_RE.test(username || '')) {
       return { success: false, error: 'Username must be 3-24 characters: letters, numbers, underscore' };
     }
@@ -81,7 +81,8 @@ export default class User {
       email: cleanEmail,
       password_hash: bcrypt.hashSync(password, 10),
       dob: String(dob).trim(),
-      terms_accepted_at: new Date().toISOString()
+      terms_accepted_at: new Date().toISOString(),
+      source: attribution
     });
     issue(user.id, 'grant', ECONOMY.STARTING_GRANT);
     return { success: true, data: publicUser(memoryDb.getUserById(user.id)) };
@@ -138,7 +139,7 @@ export default class User {
   // The owner redeems a claim link: sets a real password, the token is burned, and
   // the account (with its cards + balance) is theirs. Returns the user so the caller
   // can log them straight in.
-  static async claim({ token, password, dob, acceptedTerms }) {
+  static async claim({ token, password, dob, acceptedTerms, attribution = null }) {
     if (!password || password.length < 8) {
       return { success: false, error: 'Password must be at least 8 characters', code: 400 };
     }
@@ -165,7 +166,8 @@ export default class User {
       claim_token: null,
       claimed_at: new Date().toISOString(),
       operator_managed: false,
-      auth_version: (user.auth_version || 0) + 1
+      auth_version: (user.auth_version || 0) + 1,
+      source: attribution
     });
     return { success: true, data: publicUser(updated) };
   }

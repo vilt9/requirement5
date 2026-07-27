@@ -34,7 +34,7 @@ const db = {
   // Named sets a creator groups their published cards into. id is the
   // namespaced name ("<username>_<label>"); cards point at one via set_id.
   sets: [],
-  // Usage events (generate clicks). Append-only; user_id null when logged out.
+  // First-party funnel events. Append-only; user_id null when logged out.
   events: [],
   // User reports against a card (nudity, copyright, hate, …). Append-only; a
   // report also flips the card's moderation_status to 'flagged' (out of
@@ -403,7 +403,7 @@ const memoryDb = {
     return deleted;
   },
 
-  // ---------- events (usage: generate clicks) ----------
+  // ---------- events (first-party funnel + usage) ----------
   createEvent: (event) => {
     const newEvent = {
       user_id: null,

@@ -14,6 +14,7 @@ describe('GET /api/analytics', () => {
     expect(res.body.success).toBe(true);
     expect(res.body.data).toHaveProperty('retention');
     expect(res.body.data).toHaveProperty('usage');
+    expect(res.body.data).toHaveProperty('acquisition');
   });
 });
 
@@ -39,5 +40,38 @@ describe('POST /api/analytics/event', () => {
   it('rejects unknown event types', async () => {
     await request(app).post('/api/analytics/event').send({ type: 'nonsense' }).expect(400);
     expect(memoryDb.getAllEvents()).toHaveLength(0);
+  });
+
+  it('records a sanitised first-touch visit without exposing arbitrary source labels', async () => {
+    await request(app)
+      .post('/api/analytics/event')
+      .send({
+        type: 'visit',
+        attribution: {
+          sessionId: 'session_12345678',
+          source: 'Reddit',
+          campaign: 'AI art / July',
+          landingPath: '/card/one?ignored=yes',
+          referrerHost: 'www.reddit.com'
+        }
+      })
+      .expect(200);
+
+    expect(memoryDb.getAllEvents()[0]).toMatchObject({
+      type: 'visit',
+      user_id: null,
+      session_id: 'session_12345678',
+      source: 'reddit',
+      campaign: 'ai-art-july',
+      landing_path: '/card/one',
+      referrer_host: 'www.reddit.com'
+    });
+  });
+
+  it('does not let the public event route forge signup conversion', async () => {
+    await request(app)
+      .post('/api/analytics/event')
+      .send({ type: 'signup' })
+      .expect(400);
   });
 });

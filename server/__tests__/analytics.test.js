@@ -196,6 +196,67 @@ describe('feature 5 — usage breakdown', () => {
   });
 });
 
+describe('feature 6 — first-touch acquisition', () => {
+  test('deduplicates sessions and connects source to activation and retention', () => {
+    const user = makeUser('signal', W1, {
+      source: { source: 'reddit', campaign: 'ai-art' }
+    });
+    at(memoryDb.createEvent({
+      type: 'visit',
+      source: 'reddit',
+      session_id: 'session_12345678'
+    }), W1);
+    at(memoryDb.createEvent({
+      type: 'visit',
+      source: 'reddit',
+      session_id: 'session_12345678'
+    }), W1);
+    at(memoryDb.createEvent({
+      type: 'generate',
+      source: 'reddit',
+      session_id: 'session_12345678'
+    }), W1);
+    at(memoryDb.createEvent({
+      type: 'account_intent',
+      source: 'reddit',
+      session_id: 'session_12345678'
+    }), W1);
+    at(memoryDb.createEvent({
+      type: 'signup',
+      source: 'reddit',
+      session_id: 'session_12345678',
+      user_id: user.id
+    }), W1);
+    draw(user.id, W1);
+    draw(user.id, W2);
+
+    const row = computeAnalytics().acquisition.sources.find(source => source.source === 'reddit');
+    expect(row).toEqual({
+      source: 'reddit',
+      visits: 1,
+      generatedSessions: 1,
+      accountIntents: 1,
+      generations: 1,
+      signups: 1,
+      claims: 0,
+      activatedUsers: 1,
+      retainedUsers: 1
+    });
+  });
+
+  test('excludes operator-seeded generation events from public usage', () => {
+    at(memoryDb.createEvent({
+      type: 'generate',
+      source: 'growth_seed',
+      seed_id: 'seed-one',
+      user_id: null
+    }), W1);
+    const out = computeAnalytics();
+    expect(out.usage.totals.generateOut).toBe(0);
+    expect(out.acquisition.sources).toEqual([]);
+  });
+});
+
 describe('banner totals', () => {
   test('sums circulating balance, public cards, and per-week new/active users', () => {
     const a = makeUser('a', W1, { balance: 30 });

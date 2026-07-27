@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback, useRef } f
 import { api, getToken, setToken } from '../utils/api';
 import { prefetchedCards } from '../utils/drawQueue';
 import { drawYieldFor } from '../utils/economyRandom';
+import { readAttribution } from '../utils/attribution';
 
 const AuthContext = createContext();
 
@@ -92,7 +93,15 @@ export function AuthProvider({ children }) {
   const signup = async (username, email, password, dob, acceptedTerms) => {
     const data = await api('/api/auth/signup', {
       method: 'POST',
-      body: { username, email, password, dob, acceptedTerms, stash: readStash() }
+      body: {
+        username,
+        email,
+        password,
+        dob,
+        acceptedTerms,
+        stash: readStash(),
+        attribution: readAttribution()
+      }
     });
     setToken(data.token);
     setUser(data.user);
@@ -117,7 +126,7 @@ export function AuthProvider({ children }) {
   const claim = async (token, password, dob, acceptedTerms) => {
     const data = await api('/api/auth/claim', {
       method: 'POST',
-      body: { token, password, dob, acceptedTerms }
+      body: { token, password, dob, acceptedTerms, attribution: readAttribution() }
     });
     setToken(data.token);
     setUser(data.user);
@@ -207,7 +216,10 @@ export function AuthProvider({ children }) {
     // Log the generate click for usage analytics — fire-and-forget, tagged
     // logged-in/out server-side by whether a token rides along. Never blocks
     // or fails the draw.
-    api('/api/analytics/event', { method: 'POST', body: { type: 'generate' } }).catch(() => {});
+    api('/api/analytics/event', {
+      method: 'POST',
+      body: { type: 'generate', attribution: readAttribution() }
+    }).catch(() => {});
     if (!user) {
       const entry = mintFresh();
       bumpStash(entry.earned); // the stash grows by the card's own seeded yield

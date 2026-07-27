@@ -18,6 +18,7 @@
 // real person and stays in.
 import { memoryDb } from '../config/database.js';
 import { ECONOMY } from './economy.js';
+import { attributionSource } from './attribution.js';
 
 const DAY_MS = 86400000;
 
@@ -246,6 +247,85 @@ function buildUsage(events, saves, cards, weeks) {
   };
 }
 
+// First-touch acquisition funnel, grouped into the attribution service's small
+// public source vocabulary. Session IDs are used only to deduplicate counts and
+// are never returned. Campaign/content fields remain private operator data.
+function buildAcquisition(users, events, byUser) {
+  const sources = new Map();
+  const rowFor = (source) => {
+    const key = attributionSource(source);
+    let row = sources.get(key);
+    if (!row) {
+      row = {
+        source: key,
+        visitSessions: new Set(),
+        generatedSessions: new Set(),
+        accountIntentSessions: new Set(),
+        generations: 0,
+        signups: 0,
+        claims: 0,
+        activatedUsers: new Set(),
+        retainedUsers: new Set()
+      };
+      sources.set(key, row);
+    }
+    return row;
+  };
+
+  for (const event of events) {
+    const row = rowFor(event.source);
+    const sessionId = event.session_id || null;
+    if (event.type === 'visit' && sessionId) row.visitSessions.add(sessionId);
+    if (event.type === 'generate') {
+      row.generations += 1;
+      if (sessionId) row.generatedSessions.add(sessionId);
+    }
+    if (event.type === 'account_intent' && sessionId) row.accountIntentSessions.add(sessionId);
+    if (event.type === 'signup') row.signups += 1;
+    if (event.type === 'claim') row.claims += 1;
+  }
+
+  for (const user of users) {
+    const row = rowFor(user.source);
+    const cohortWeek = isoWeek(new Date(user.created_at));
+    const activity = byUser.get(user.id);
+    if (!activity) continue;
+    const activeWeeks = [...activity.keys()].filter(week => week >= cohortWeek);
+    if (activeWeeks.includes(cohortWeek)) row.activatedUsers.add(user.id);
+    if (activeWeeks.some(week => week > cohortWeek)) row.retainedUsers.add(user.id);
+  }
+
+  const rows = [...sources.values()]
+    .map(row => ({
+      source: row.source,
+      visits: row.visitSessions.size,
+      generatedSessions: row.generatedSessions.size,
+      accountIntents: row.accountIntentSessions.size,
+      generations: row.generations,
+      signups: row.signups,
+      claims: row.claims,
+      activatedUsers: row.activatedUsers.size,
+      retainedUsers: row.retainedUsers.size
+    }))
+    .filter(row => Object.entries(row).some(([key, value]) => key !== 'source' && value > 0))
+    .sort((a, b) => b.visits - a.visits || b.signups + b.claims - (a.signups + a.claims) || a.source.localeCompare(b.source));
+
+  const sum = (key) => rows.reduce((total, row) => total + row[key], 0);
+  return {
+    sources: rows,
+    totals: {
+      visits: sum('visits'),
+      generatedSessions: sum('generatedSessions'),
+      accountIntents: sum('accountIntents'),
+      generations: sum('generations'),
+      signups: sum('signups'),
+      claims: sum('claims'),
+      activatedUsers: sum('activatedUsers'),
+      retainedUsers: sum('retainedUsers')
+    }
+  };
+}
+
 export function computeAnalytics() {
   const allUsers = memoryDb.getAllUsers();
   const users = allUsers.filter(isRealUser);
@@ -256,6 +336,9 @@ export function computeAnalytics() {
   // operator data and must not leak through counts, cohorts, or weekly timing.
   const cards = memoryDb.getCommunityCards();
   const usageEvents = memoryDb.getAllEvents();
+  // Operator-seeded events make the pool useful but are not evidence of human
+  // acquisition. Keep them out of both usage and the source funnel.
+  const humanUsageEvents = usageEvents.filter(event => event.source !== 'growth_seed');
   const userIds = new Set(users.map(u => u.id));
 
   // --- timeline scaffold: the contiguous week axis every triangle aligns to ---
@@ -265,7 +348,7 @@ export function computeAnalytics() {
   for (const c of cards) { const d = parseDate(c.created_at); if (d) dates.push(d); }
   for (const s of saves) { const d = parseDate(s.created_at); if (d) dates.push(d); }
   for (const s of stars) { const d = parseDate(s.created_at); if (d) dates.push(d); }
-  for (const e of usageEvents) { const d = parseDate(e.created_at); if (d) dates.push(d); }
+  for (const e of humanUsageEvents) { const d = parseDate(e.created_at); if (d) dates.push(d); }
   const minDate = dates.length ? new Date(Math.min(...dates.map(d => d.getTime()))) : null;
   const maxDate = dates.length ? new Date(Math.max(...dates.map(d => d.getTime()))) : null;
   const weeks = enumerateWeeks(minDate, maxDate);
@@ -317,7 +400,8 @@ export function computeAnalytics() {
       cloudAbsorbed: cloud.total_absorbed
     },
     weekly: { newUsers, activeUsers, cards: cardsPerWeek },
-    usage: buildUsage(usageEvents, saves, cards, weeks),
+    acquisition: buildAcquisition(users, humanUsageEvents, byUser),
+    usage: buildUsage(humanUsageEvents, saves, cards, weeks),
     retention: { cohorts: buildCohorts(users, byUser) },
     economy: { cohorts: buildEconomy(users, txns, weeks) },
     segments: {
