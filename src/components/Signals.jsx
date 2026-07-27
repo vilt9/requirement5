@@ -69,6 +69,11 @@ const Signals = ({ cardId, creatorId, bloom = false }) => {
     closeTimer.current = setTimeout(() => setOpen(false), 180);
   };
 
+  const toggleOpen = () => {
+    clearTimeout(closeTimer.current);
+    if (!ownCard) setOpen(current => !current);
+  };
+
   const choose = useCallback(async (key) => {
     if (ownCard || busy) return;
     setBusy(true);
@@ -132,9 +137,8 @@ const Signals = ({ cardId, creatorId, bloom = false }) => {
           aria-expanded={open}
           $active={activeBloom}
           disabled={ownCard}
-          onFocus={holdOpen}
           onBlur={release}
-          onClick={holdOpen}
+          onClick={toggleOpen}
         >
           <LuScanEye aria-hidden />
         </OpenButton>
@@ -155,7 +159,10 @@ const Signals = ({ cardId, creatorId, bloom = false }) => {
                   $color={signal.color}
                   $accent={signal.accent}
                   $selected={data.mine?.includes(signal.key)}
-                  onClick={() => choose(signal.key)}
+                  onClick={() => {
+                    setOpen(false);
+                    choose(signal.key);
+                  }}
                   disabled={busy}
                 >
                   <signal.Icon aria-hidden />
