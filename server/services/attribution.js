@@ -13,6 +13,14 @@ const SOURCE_ALIASES = new Map([
   ['instagram', 'instagram'],
   ['ig', 'instagram'],
   ['tiktok', 'tiktok'],
+  ['pinterest', 'pinterest'],
+  ['pin', 'pinterest'],
+  ['threads', 'threads'],
+  ['tumblr', 'tumblr'],
+  ['deviantart', 'deviantart'],
+  ['da', 'deviantart'],
+  ['facebook', 'facebook'],
+  ['fb', 'facebook'],
   ['discord', 'discord'],
   ['github', 'github'],
   ['x', 'x'],
@@ -62,6 +70,11 @@ const sourceFromHost = (host) => {
   if (host === 'reddit.com' || host.endsWith('.reddit.com') || host === 'redd.it') return 'reddit';
   if (host === 'instagram.com' || host.endsWith('.instagram.com')) return 'instagram';
   if (host === 'tiktok.com' || host.endsWith('.tiktok.com')) return 'tiktok';
+  if (host === 'pinterest.com' || host.endsWith('.pinterest.com') || host === 'pin.it') return 'pinterest';
+  if (host === 'threads.net' || host.endsWith('.threads.net')) return 'threads';
+  if (host === 'tumblr.com' || host.endsWith('.tumblr.com')) return 'tumblr';
+  if (host === 'deviantart.com' || host.endsWith('.deviantart.com')) return 'deviantart';
+  if (host === 'facebook.com' || host.endsWith('.facebook.com') || host === 'fb.com') return 'facebook';
   if (host === 'discord.com' || host.endsWith('.discord.com') || host === 'discord.gg') return 'discord';
   if (host === 'github.com' || host.endsWith('.github.com')) return 'github';
   if (host === 'x.com' || host.endsWith('.x.com') || host === 'twitter.com') return 'x';

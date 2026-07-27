@@ -28,6 +28,11 @@ describe('first-touch attribution normalisation', () => {
   test('uses a small public source vocabulary', () => {
     expect(bucketSource('mystery-network')).toBe('other');
     expect(bucketSource(null, 'github.com')).toBe('github');
+    expect(bucketSource('pin', null)).toBe('pinterest');
+    expect(bucketSource(null, 'www.threads.net')).toBe('threads');
+    expect(bucketSource(null, 'artist.tumblr.com')).toBe('tumblr');
+    expect(bucketSource('DA', null)).toBe('deviantart');
+    expect(bucketSource(null, 'facebook.com')).toBe('facebook');
     expect(bucketSource(null, null)).toBe('unattributed');
     expect(attributionSource({ source: 'bsky' })).toBe('bluesky');
   });
