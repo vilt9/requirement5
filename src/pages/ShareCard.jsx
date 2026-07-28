@@ -382,8 +382,24 @@ const ShareCard = () => {
   const myPrice = savePriceFor(id, myProvenance, rarity);
 
   const saved = saveResult && saveResult !== 'exists';
-  const mainLabel = saveResult === 'exists' ? 'In collection ✓' : saved ? 'Saved ✓' : (discovered ? 'D-Save' : 'L-Save');
-  const subLabel = saveResult ? null : `−${fmtT26(myPrice)} /t26`;
+  // "D-Save" is useful vocabulary after someone understands the economy, but
+  // it is a poor first invitation: the initial attributed funnel showed 12
+  // generated sessions and zero account intent. Give an anonymous discoverer a
+  // plain statement of the outcome; the account round-trip still preserves the
+  // exact card and completes the save automatically.
+  const anonymousPreserve = !user && discovered && !saveResult;
+  const mainLabel = saveResult === 'exists'
+    ? 'In collection ✓'
+    : saved
+      ? 'Saved ✓'
+      : anonymousPreserve
+        ? 'Keep this card'
+        : (discovered ? 'D-Save' : 'L-Save');
+  const subLabel = saveResult
+    ? null
+    : anonymousPreserve
+      ? `free account · then −${fmtT26(myPrice)} /t26`
+      : `−${fmtT26(myPrice)} /t26`;
   const totalPublished = rarities ? rarities.length : null;
   const tierPeers = rarities && tier ? rarities.filter(r => tierOf(r)?.key === tier.key).length : null;
   const poolShare = tierPeers != null && totalPublished > 0 ? tierPeers / totalPublished : null;

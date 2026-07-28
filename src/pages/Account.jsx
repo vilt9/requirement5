@@ -128,6 +128,7 @@ const Account = () => {
   const [topupNote, setTopupNote] = useState(null);
   const location = useLocation();
   const navigate = useNavigate();
+  const preservingCard = location.state?.intent === 'save';
 
   const loadTransactions = useCallback(() => {
     api('/api/economy/transactions')
@@ -178,6 +179,14 @@ const Account = () => {
   if (!user) {
     return (
       <LeftPage>
+        {preservingCard && (
+          <Panel>
+            <b>Preserve this card</b>
+            <br />
+            Create an account or log in. You will return to the card and save it
+            to your collection automatically. The /t26 you generated comes with you.
+          </Panel>
+        )}
         <Panel>
           Accounts hold your /t26 balance, your collection, and your published cards.
           New accounts receive a grant of {config?.startingGrant ?? 250} /t26 from the cloud.
