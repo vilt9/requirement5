@@ -250,6 +250,15 @@ describe('save economics', () => {
     expect(res.body.data.cost).toBe(cost);
     expect(res.body.data.dividend).toBe(dividend);
     expect(res.body.data.balance).toBeCloseTo(ECONOMY.STARTING_GRANT - cost, 6);
+    expect(res.body.data.collectionPosition.global).toMatchObject({
+      rank: 1,
+      total: 1
+    });
+    expect(res.body.data.collectionPosition.global.cards[0]).toMatchObject({
+      owned: true,
+      current: true,
+      card: { id: card.id }
+    });
 
     const creatorUser = memoryDb.getUserById(creator.user.id);
     // starting grant − publish stake + dividend
@@ -295,6 +304,13 @@ describe('save economics', () => {
     expect(savedOf.body.data.username).toBe('saver');
     expect(savedOf.body.data.cost).toBe(saveCostFor(card.id));
     expect(savedOf.body.data.saved_at).toBeTruthy();
+
+    // The normal card response carries the receipt on later signed-in visits,
+    // without a second collection request. It stays absent for public viewers.
+    const ownedCard = await request(app).get(`/api/cards/${card.id}`).set(auth(saver.token));
+    expect(ownedCard.body.data.collectionPosition.global.rank).toBe(1);
+    const publicCard = await request(app).get(`/api/cards/${card.id}`);
+    expect(publicCard.body.data.collectionPosition).toBeNull();
 
     // Someone who never saved it (or doesn't exist) → 404.
     const notSaved = await request(app).get(`/api/cards/${card.id}/save-of/creator`);
@@ -347,6 +363,12 @@ describe('save-synthetic', () => {
     expect(res.body.data.card.rarity_score).toBe(0.75); // natural rarity kept
     expect(res.body.data.card.tier).toBe('holo');       // derived, not chosen
     expect(res.body.data.balance).toBeCloseTo(ECONOMY.STARTING_GRANT - cost, 6);
+    expect(res.body.data.collectionPosition.global.cards[0]).toMatchObject({
+      owned: true,
+      current: true,
+      card: { id: claimedId }
+    });
+    expect(res.body.data.collectionPosition.source).toBeNull();
 
     // it lands in the collection but not the public pool
     const collection = await request(app).get('/api/cards/collection/mine').set(auth(token));

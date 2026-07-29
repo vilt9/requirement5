@@ -25,6 +25,7 @@ import {
   recordReactionRemoved,
   recordSaveCreated
 } from '../services/notifications.js';
+import { buildCollectionPosition } from '../services/collectionPosition.js';
 
 const router = express.Router();
 
@@ -434,7 +435,8 @@ router.post('/:id/save', requireAuth, async (req, res) => {
         provenance,
         cloudShare: round6(cost - dividend),
         balance: memoryDb.getUserById(req.user.id).balance,
-        stats: cardStats(memoryDb.getCardById(card.id))
+        stats: cardStats(memoryDb.getCardById(card.id)),
+        collectionPosition: buildCollectionPosition(card, req.user.id)
       }
     });
   } catch (error) {
@@ -579,7 +581,13 @@ router.post('/save-synthetic', requireAuth, async (req, res) => {
 
     res.status(201).json({
       success: true,
-      data: { save, card, cost, balance: memoryDb.getUserById(req.user.id).balance }
+      data: {
+        save,
+        card,
+        cost,
+        balance: memoryDb.getUserById(req.user.id).balance,
+        collectionPosition: buildCollectionPosition(card, req.user.id)
+      }
     });
   } catch (error) {
     if (error instanceof InsufficientFundsError) {
@@ -837,7 +845,13 @@ router.get('/:id', optionalAuth, async (req, res) => {
     if (!canViewCard(card, req.user)) {
       return res.status(404).json({ success: false, error: 'Card not found' });
     }
-    res.json(result);
+    const collectionPosition = req.user && memoryDb.getSave(req.user.id, card.id)
+      ? buildCollectionPosition(card, req.user.id)
+      : null;
+    res.json({
+      success: true,
+      data: { ...card, collectionPosition }
+    });
   } catch (error) {
     console.error('Error fetching card:', error);
     res.status(500).json({ success: false, error: 'Internal server error' });

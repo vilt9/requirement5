@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import styled, { createGlobalStyle } from 'styled-components';
 import { LuCircleArrowRight, LuLink, LuSearchCheck } from 'react-icons/lu';
 import Card from '../components/Card/Card';
+import CardPosition from '../components/Collection/CardPosition';
 import { useAuth } from '../context/AuthContext';
 import { api, ApiError, apiBase } from '../utils/api';
 import { poolCardToCardData } from '../utils/poolCard';
@@ -42,6 +43,8 @@ const ShareCard = () => {
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const [saveResult, setSaveResult] = useState(null); // { value, provenance } | 'exists'
+  const [collectionPosition, setCollectionPosition] = useState(null);
+  const [heroView, setHeroView] = useState('card');
   const [saveError, setSaveError] = useState(null);
   const scrolling = useScrollBloom(); // colour values bloom into their colour while scrolling
   const [rendering, setRendering] = useState(null); // 'gif' | 'mp4' while a moving image renders
@@ -134,6 +137,8 @@ const ShareCard = () => {
   useEffect(() => {
     let active = true;
     setSaveResult(null);
+    setCollectionPosition(null);
+    setHeroView('card');
     setSaveError(null);
 
     // Prefetched by the generate queue? Render with zero waiting. Consumed
@@ -161,7 +166,14 @@ const ShareCard = () => {
     }
 
     api(`/api/cards/${id}`)
-      .then(record => { if (active) { setCard(record); setProvisional(false); setStatus('ok'); } })
+      .then(record => {
+        if (active) {
+          setCard(record);
+          setCollectionPosition(record.collectionPosition || null);
+          setProvisional(false);
+          setStatus('ok');
+        }
+      })
       .catch(err => {
         if (!active) return;
         if (uuidish && err?.status === 404) {
@@ -240,6 +252,10 @@ const ShareCard = () => {
         setBalance(result.balance);
         setCard({ ...result.card, synthetic: false });
         setSaveResult(result);
+        if (result.collectionPosition) {
+          setCollectionPosition(result.collectionPosition);
+          setHeroView('position');
+        }
         flashSpend(result.cost); // deduction ticks by the nav balance, like reroll
       } else {
         const result = await api(`/api/cards/${id}/save`, {
@@ -251,6 +267,10 @@ const ShareCard = () => {
         });
         setBalance(result.balance);
         setSaveResult(result);
+        if (result.collectionPosition) {
+          setCollectionPosition(result.collectionPosition);
+          setHeroView('position');
+        }
         flashSpend(result.cost);
       }
       refreshBalance();
@@ -264,14 +284,14 @@ const ShareCard = () => {
   // Finish a save that was interrupted by signup/login: the intent was parked
   // in sessionStorage before the redirect; the Account page sends them back.
   useEffect(() => {
-    if (!user || status !== 'ok' || saveResult) return;
+    if (!user || status !== 'ok' || saveResult || collectionPosition) return;
     let pending = null;
     try { pending = JSON.parse(sessionStorage.getItem('r5c_pending_save') || 'null'); } catch { /* ignore */ }
     if (!pending || pending.id !== id) return;
     sessionStorage.removeItem('r5c_pending_save');
     save(pending.discovered);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, status, id]);
+  }, [user, status, id, collectionPosition]);
 
   // Render the card to a moving image and download it. The server records the live
   // holographic tilt (first render takes a few seconds; repeats are cached). The
@@ -382,20 +402,19 @@ const ShareCard = () => {
   const myPrice = savePriceFor(id, myProvenance, rarity);
 
   const saved = saveResult && saveResult !== 'exists';
+  const inCollection = !!collectionPosition || !!saveResult;
   // "D-Save" is useful vocabulary after someone understands the economy, but
   // it is a poor first invitation: the initial attributed funnel showed 12
   // generated sessions and zero account intent. Give an anonymous discoverer a
   // plain statement of the outcome; the account round-trip still preserves the
   // exact card and completes the save automatically.
-  const anonymousPreserve = !user && discovered && !saveResult;
-  const mainLabel = saveResult === 'exists'
-    ? 'In collection ✓'
-    : saved
-      ? 'Saved ✓'
-      : anonymousPreserve
-        ? 'Keep this card'
-        : (discovered ? 'D-Save' : 'L-Save');
-  const subLabel = saveResult
+  const anonymousPreserve = !user && discovered && !inCollection;
+  const mainLabel = inCollection
+    ? (saved ? 'Saved ✓' : 'In collection ✓')
+    : anonymousPreserve
+      ? 'Keep this card'
+      : (discovered ? 'D-Save' : 'L-Save');
+  const subLabel = inCollection
     ? null
     : anonymousPreserve
       ? `free account · then −${fmtT26(myPrice)} /t26`
@@ -418,15 +437,24 @@ const ShareCard = () => {
     <Page>
       <FooterClearance />
       <Hero>
-        {cardData
-          ? (
-            // Keyed on identity: swapping provisional→stored (or card→card)
-            // remounts with a soft fade instead of a hard cut.
-            <FadeSwap key={`${id}:${synthetic ? 'synth' : 'stored'}`}>
-              <Card cardData={cardData} scrub />
-            </FadeSwap>
-          )
-          : <Panel><Dim>This card has no renderable data.</Dim></Panel>}
+        <HeroStage>
+          <HeroPane $visible={heroView === 'card'} aria-hidden={heroView !== 'card'}>
+            {cardData
+              ? (
+                // Keyed on identity: swapping provisional→stored (or card→card)
+                // remounts with a soft fade instead of a hard cut.
+                <FadeSwap key={`${id}:${synthetic ? 'synth' : 'stored'}`}>
+                  <Card cardData={cardData} scrub />
+                </FadeSwap>
+              )
+              : <Panel><Dim>This card has no renderable data.</Dim></Panel>}
+          </HeroPane>
+          {collectionPosition && (
+            <HeroPane $visible={heroView === 'position'} aria-hidden={heroView !== 'position'}>
+              <CardPosition position={collectionPosition} />
+            </HeroPane>
+          )}
+        </HeroStage>
       </Hero>
 
       <Column>
@@ -440,11 +468,30 @@ const ShareCard = () => {
             rarity of the card you just pulled rides at the top of the dock, so
             how rare it is reads instantly without scrolling to the details. */}
         <FixedDock className="card-actions">
-          <RarityReadout style={{ '--tier': tier?.color || 'var(--amber-text)' }}>
-            <span className="label">Rarity</span>
-            <span className="val">{num(rarity, 3)}</span>
-            {tier && <span className="tier">{tier.name}</span>}
-          </RarityReadout>
+          {collectionPosition ? (
+            <HeroViewSwitch aria-label="Saved card view">
+              <button
+                type="button"
+                aria-pressed={heroView === 'card'}
+                onClick={() => setHeroView('card')}
+              >
+                card
+              </button>
+              <button
+                type="button"
+                aria-pressed={heroView === 'position'}
+                onClick={() => setHeroView('position')}
+              >
+                position
+              </button>
+            </HeroViewSwitch>
+          ) : (
+            <RarityReadout style={{ '--tier': tier?.color || 'var(--amber-text)' }}>
+              <span className="label">Rarity</span>
+              <span className="val">{num(rarity, 3)}</span>
+              {tier && <span className="tier">{tier.name}</span>}
+            </RarityReadout>
+          )}
           <div className="buttons">
             <SaveButton onClick={generate} disabled={busy}>
               <span className="main">{busy ? 'Working…' : 'Generate'} <LuCircleArrowRight aria-hidden /></span>
@@ -453,11 +500,11 @@ const ShareCard = () => {
             <SaveButton
               $secondary
               onClick={() => save()}
-              disabled={busy || provisional || saveResult === 'exists' || !!saveResult}
+              disabled={busy || provisional || inCollection}
             >
               <span className="main">
                 {mainLabel}
-                {!saveResult && (myProvenance === 'linked'
+                {!inCollection && (myProvenance === 'linked'
                   ? <LuLink aria-hidden />
                   : <LuSearchCheck aria-hidden />)}
               </span>
@@ -597,12 +644,6 @@ const ShareCard = () => {
           </ReportArea>
         )}
 
-        {saved && (
-          <Result>
-            Saved to your collection.{' '}
-            <Link to="/collection">View collection →</Link>
-          </Result>
-        )}
         {saveError && <Result $error>{saveError}</Result>}
 
         {user && user.balance < 0 && (
@@ -706,6 +747,36 @@ const Hero = styled.div`
   /* Phones: vertical space is precious — the card starts almost at the top. */
   @media (max-width: 640px) {
     padding: 4px 10px 2px;
+  }
+`;
+
+// Card and post-save position occupy the exact same fixed stage. Crossfading
+// inside it keeps the dock and every section below completely still.
+const HeroStage = styled.div`
+  position: relative;
+  width: 340px;
+  height: 460px;
+  max-width: 100%;
+
+  @media (max-width: 374px) {
+    width: 284px;
+    height: 388px;
+  }
+`;
+
+const HeroPane = styled.div`
+  position: absolute;
+  inset: 0;
+  opacity: ${p => p.$visible ? 1 : 0};
+  transform: ${p => p.$visible ? 'translateY(0) scale(1)' : 'translateY(5px) scale(.985)'};
+  pointer-events: ${p => p.$visible ? 'auto' : 'none'};
+  transition:
+    opacity 0.22s ease,
+    transform 0.26s cubic-bezier(.2, .72, .25, 1);
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: opacity 1ms linear;
+    transform: none;
   }
 `;
 
@@ -850,6 +921,47 @@ const RarityReadout = styled.div`
     font-variant-numeric: tabular-nums;
   }
   .tier { font-size: 12px; font-weight: 400; color: var(--tier); }
+
+  @media (max-width: 640px) {
+    justify-content: center;
+    padding: 0 2px 2px;
+  }
+`;
+
+// Once a card belongs to the viewer, this replaces the rarity line without
+// adding height to the action dock. The active underline is the only chrome.
+const HeroViewSwitch = styled.div`
+  min-height: 17px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 1px 4px;
+
+  button {
+    position: relative;
+    border: 0;
+    background: transparent;
+    color: var(--amber-dim);
+    padding: 0 0 4px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 400;
+    cursor: pointer;
+  }
+
+  button[aria-pressed='true'] {
+    color: var(--gold-bright);
+  }
+
+  button[aria-pressed='true']::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 1px;
+    background: var(--gold);
+  }
 
   @media (max-width: 640px) {
     justify-content: center;
