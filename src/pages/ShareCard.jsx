@@ -438,7 +438,11 @@ const ShareCard = () => {
       <FooterClearance />
       <Hero>
         <HeroStage>
-          <HeroPane $visible={heroView === 'card'} aria-hidden={heroView !== 'card'}>
+          <HeroPane
+            $view="card"
+            $visible={heroView === 'card'}
+            aria-hidden={heroView !== 'card'}
+          >
             {cardData
               ? (
                 // Keyed on identity: swapping provisional→stored (or card→card)
@@ -450,8 +454,15 @@ const ShareCard = () => {
               : <Panel><Dim>This card has no renderable data.</Dim></Panel>}
           </HeroPane>
           {collectionPosition && (
-            <HeroPane $visible={heroView === 'position'} aria-hidden={heroView !== 'position'}>
-              <CardPosition position={collectionPosition} />
+            <HeroPane
+              $view="position"
+              $visible={heroView === 'position'}
+              aria-hidden={heroView !== 'position'}
+            >
+              <CardPosition
+                position={collectionPosition}
+                active={heroView === 'position'}
+              />
             </HeroPane>
           )}
         </HeroStage>
@@ -757,6 +768,9 @@ const HeroStage = styled.div`
   width: 340px;
   height: 460px;
   max-width: 100%;
+  overflow: hidden;
+  isolation: isolate;
+  background: #000;
 
   @media (max-width: 374px) {
     width: 284px;
@@ -768,15 +782,29 @@ const HeroPane = styled.div`
   position: absolute;
   inset: 0;
   opacity: ${p => p.$visible ? 1 : 0};
-  transform: ${p => p.$visible ? 'translateY(0) scale(1)' : 'translateY(5px) scale(.985)'};
+  transform: ${p => {
+    if (p.$visible) return 'translateY(0) scale(1)';
+    return p.$view === 'card'
+      ? 'translateY(2px) scale(.94)'
+      : 'translateY(5px) scale(.985)';
+  }};
+  filter: ${p => (!p.$visible && p.$view === 'card') ? 'blur(5px)' : 'blur(0)'};
   pointer-events: ${p => p.$visible ? 'auto' : 'none'};
+  will-change: opacity, transform, filter;
   transition:
-    opacity 0.22s ease,
-    transform 0.26s cubic-bezier(.2, .72, .25, 1);
+    opacity 0.24s ease,
+    transform 0.34s cubic-bezier(.2, .72, .25, 1),
+    filter 0.28s ease;
+  transition-delay: ${p =>
+    p.$visible && p.$view === 'position'
+      ? '0.14s, 0.14s, 0.14s'
+      : '0s, 0s, 0s'};
 
   @media (prefers-reduced-motion: reduce) {
     transition: opacity 1ms linear;
+    transition-delay: 0s;
     transform: none;
+    filter: none;
   }
 `;
 

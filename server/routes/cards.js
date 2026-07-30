@@ -25,7 +25,11 @@ import {
   recordReactionRemoved,
   recordSaveCreated
 } from '../services/notifications.js';
-import { buildCollectionPosition } from '../services/collectionPosition.js';
+import {
+  buildCollectionGrid,
+  buildCollectionGridSource,
+  buildCollectionPosition
+} from '../services/collectionPosition.js';
 
 const router = express.Router();
 
@@ -815,6 +819,32 @@ router.get('/published/mine', requireAuth, (req, res) => {
   res.json({
     success: true,
     data: cards.map(card => ({ card, stats: cardStats(card) }))
+  });
+});
+
+// Personal collection map. The rarity ladder is public, but card faces are
+// revealed only for saves owned by the authenticated viewer. One batched
+// service pass supplies the full scroll; no card is fetched from inside a loop.
+router.get('/grid', optionalAuth, (req, res) => {
+  const options = {
+    cursor: req.query.cursor,
+    limit: req.query.limit
+  };
+  if (req.query.sourceType || req.query.sourceId) {
+    const source = buildCollectionGridSource(req.user?.id, {
+      ...options,
+      type: req.query.sourceType,
+      id: req.query.sourceId
+    });
+    if (!source) {
+      return res.status(404).json({ success: false, error: 'Grid source not found' });
+    }
+    return res.json({ success: true, data: source });
+  }
+
+  res.json({
+    success: true,
+    data: buildCollectionGrid(req.user?.id, options)
   });
 });
 

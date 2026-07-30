@@ -55,6 +55,12 @@ const db = {
   cloud: { total_issued: 0, total_absorbed: 0 }
 };
 
+// Monotonic invalidation key for derived card indexes (for example the global
+// rarity ordering). Saves do not touch it: ownership changes the reveal mask,
+// not the ordering itself.
+let cardsRevision = 0;
+const touchCards = () => { cardsRevision += 1; };
+
 // ---------- Postgres write-through bookkeeping ----------
 // Track which rows changed since the last flush so we only upsert the deltas
 // (transactions are append-only and unbounded — a full-snapshot flush would grow
@@ -209,6 +215,7 @@ const memoryDb = {
       tags: card.tags || []
     };
     db.cards.push(newCard);
+    touchCards();
     markDirty('cards', newCard.id);
     persistSoon();
     return newCard;
@@ -216,12 +223,15 @@ const memoryDb = {
 
   getAllCards: () => [...db.cards],
 
+  getCardsRevision: () => cardsRevision,
+
   getCardById: (id) => db.cards.find(card => card.id === id),
 
   updateCard: (id, updateData) => {
     const index = db.cards.findIndex(card => card.id === id);
     if (index !== -1) {
       db.cards[index] = { ...db.cards[index], ...updateData };
+      touchCards();
       markDirty('cards', id);
       persistSoon();
       return db.cards[index];
@@ -234,6 +244,7 @@ const memoryDb = {
     if (index !== -1) {
       const deletedCard = db.cards[index];
       db.cards.splice(index, 1);
+      touchCards();
       markRemoved('cards', id);
       persistSoon();
       return deletedCard;
@@ -649,6 +660,8 @@ const memoryDb = {
 
   // ---------- sets (named groupings of a creator's published cards) ----------
   // The id IS the namespaced name ("<username>_<label>") — see utils/setName.js.
+  getAllSets: () => [...db.sets],
+
   getSetById: (id) => db.sets.find(s => s.id === id),
 
   getSetsByOwner: (ownerId) =>
@@ -747,6 +760,7 @@ const memoryDb = {
   // ---------- admin ----------
   clearDatabase: () => {
     db.cards.length = 0;
+    touchCards();
     db.users.length = 0;
     db.transactions.length = 0;
     db.saves.length = 0;

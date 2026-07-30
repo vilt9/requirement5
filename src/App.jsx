@@ -6,6 +6,7 @@ import Navigation from './components/Navigation/Navigation';
 import GenerateGate from './pages/GenerateGate';
 import Pool from './pages/Pool';
 import CollectionPage, { LegacyUserCollectionRedirect } from './pages/CollectionPage';
+import Grid from './pages/Grid';
 import CardCustomizer from './pages/CardCustomizer';
 import Account from './pages/Account';
 import Notifications from './pages/Notifications';
@@ -164,6 +165,7 @@ function App() {
               <Routes>
                 <Route path="/" element={<GenerateGate />} />
                 <Route path="/pool" element={<Pool />} />
+                <Route path="/grid" element={<Grid />} />
                 {/* Collection lives at /<username>/collection (shareable).
                     /collection sends you to your own; /u/:username is the old
                     path, redirected. */}

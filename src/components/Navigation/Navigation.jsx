@@ -15,6 +15,7 @@ const DISCORD_URL = 'https://discord.gg/ywRCSATau3';
 // the Pool listing stays off the nav — the /pool route still answers deep links.
 const LINKS = [
   { to: '/', label: 'Discover' },
+  { to: '/grid', label: 'Grid' },
   { to: '/collection', label: 'Collections' },
   { to: '/create', label: 'Create' },
   { to: '/about', label: 'About' }
