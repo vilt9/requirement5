@@ -768,7 +768,10 @@ const HeroStage = styled.div`
   width: 340px;
   height: 460px;
   max-width: 100%;
-  overflow: hidden;
+  /* The card's MotionBar deliberately sits beyond the card scene's right
+     edge. Keep the shared stage open so that control remains visible; the
+     position pane clips its own resolving grid below. */
+  overflow: visible;
   isolation: isolate;
   background: #000;
 
@@ -781,6 +784,7 @@ const HeroStage = styled.div`
 const HeroPane = styled.div`
   position: absolute;
   inset: 0;
+  overflow: ${p => p.$view === 'position' ? 'hidden' : 'visible'};
   opacity: ${p => p.$visible ? 1 : 0};
   transform: ${p => {
     if (p.$visible) return 'translateY(0) scale(1)';
