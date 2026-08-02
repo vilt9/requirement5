@@ -145,7 +145,7 @@ All amounts are rounded to six decimal places (/t26 has a smallest unit of 0.000
 1. A fixed share of draws (`SYNTHETIC_DRAW_SHARE`) is *synthetic* by design, so
    generating stays generative however big the pool gets.
 2. Otherwise, pick a published card from the pool weighted by rarity
-   (`e^(-8·rarity)`), normalised over whatever is currently published — so a
+   (`e^(-1·rarity)`), normalised over whatever is currently published — so a
    rarer card surfaces less, and a newly published card just joins the lottery.
 3. If the pool is empty, the draw is synthetic too: the client renders a
    procedurally generated card — the game is playable from day one.

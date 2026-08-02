@@ -168,7 +168,7 @@ export const tierForScore = (score) => {
 // the next draw (no cron, no stored distribution). A fixed share of every draw
 // still mints a brand-new synthetic card, so generating stays generative however
 // big the pool grows.
-export const DRAW_RARITY_FALLOFF = 8;    // steepness: 0.3→0.9 is ~120× rarer
+export const DRAW_RARITY_FALLOFF = 1;    // gentle scarcity: 0.3→0.9 is ~1.8× rarer
 export const SYNTHETIC_DRAW_SHARE = 0.5; // fraction of draws that mint fresh
 
 export const drawWeightFor = (rarityScore) =>

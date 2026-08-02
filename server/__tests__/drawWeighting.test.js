@@ -66,13 +66,14 @@ describe('draw weighting maths', () => {
     expect(counts[2]).toBeGreaterThan(0);
   });
 
-  test('a low-rarity card wins the lottery far more than a high-rarity one', () => {
+  test('a low-rarity card is favoured without collapsing pool variety', () => {
     const weights = [drawWeightFor(0.1), drawWeightFor(0.95)];
     let low = 0;
     const N = 20000;
     for (let i = 0; i < N; i++) if (pickWeightedIndex(weights, (i + 0.5) / N) === 0) low++;
-    // 0.1 should dominate the pool picks overwhelmingly.
-    expect(low / N).toBeGreaterThan(0.98);
+    // Rarity still matters, but both cards remain genuinely discoverable.
+    expect(low / N).toBeGreaterThan(0.68);
+    expect(low / N).toBeLessThan(0.72);
   });
 });
 
