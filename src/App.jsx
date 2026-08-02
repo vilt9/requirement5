@@ -3,6 +3,7 @@ import { createGlobalStyle } from 'styled-components';
 import { CardProvider } from './context/CardContext';
 import { AuthProvider } from './context/AuthContext';
 import Navigation from './components/Navigation/Navigation';
+import MissionTransmission from './components/MissionTransmission';
 import GenerateGate from './pages/GenerateGate';
 import Pool from './pages/Pool';
 import CollectionPage, { LegacyUserCollectionRedirect } from './pages/CollectionPage';
@@ -162,6 +163,7 @@ function App() {
           <div className="App">
             <Navigation />
             <main className="app-main">
+              <MissionTransmission />
               <Routes>
                 <Route path="/" element={<GenerateGate />} />
                 <Route path="/pool" element={<Pool />} />
