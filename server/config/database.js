@@ -46,6 +46,9 @@ const db = {
   // Recipient-scoped operational notices. Unlike the underlying signals and
   // saves, these carry independent read state and stable daily/weekly groups.
   notifications: [],
+  // Bounded public pulse of saves + signed-in reactions. Rows contain only
+  // source/actor/card ids; the read service hydrates current public labels.
+  activities: [],
   // In-progress rarity rolls (one active per user). Ephemeral — deliberately
   // NOT persisted: a restart just means designers re-roll. The server owns the
   // rolled rarity so neither the web nor the CLI can self-declare it.
@@ -60,13 +63,16 @@ const db = {
 // not the ordering itself.
 let cardsRevision = 0;
 const touchCards = () => { cardsRevision += 1; };
+let communityRevision = 0;
+const touchCommunity = () => { communityRevision += 1; };
+export const MAX_COMMUNITY_ACTIVITIES = 256;
 
 // ---------- Postgres write-through bookkeeping ----------
 // Track which rows changed since the last flush so we only upsert the deltas
 // (transactions are append-only and unbounded — a full-snapshot flush would grow
 // linearly). Counters + cloud are tiny and rewritten every flush.
-const dirty = { cards: new Set(), users: new Set(), transactions: new Set(), saves: new Set(), stars: new Set(), sets: new Set(), events: new Set(), reports: new Set(), signals: new Set(), notifications: new Set() };
-const removed = { cards: new Set(), users: new Set(), transactions: new Set(), saves: new Set(), stars: new Set(), sets: new Set(), events: new Set(), reports: new Set(), signals: new Set(), notifications: new Set() };
+const dirty = { cards: new Set(), users: new Set(), transactions: new Set(), saves: new Set(), stars: new Set(), sets: new Set(), events: new Set(), reports: new Set(), signals: new Set(), notifications: new Set(), activities: new Set() };
+const removed = { cards: new Set(), users: new Set(), transactions: new Set(), saves: new Set(), stars: new Set(), sets: new Set(), events: new Set(), reports: new Set(), signals: new Set(), notifications: new Set(), activities: new Set() };
 let truncateRequested = false;
 
 const markDirty = (table, id) => {
@@ -142,7 +148,7 @@ const load = () => {
   if (IS_TEST || !fs.existsSync(DB_FILE)) return;
   try {
     const loaded = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-    for (const key of ['cards', 'users', 'transactions', 'saves', 'stars', 'sets', 'events', 'reports', 'signals', 'notifications']) {
+    for (const key of ['cards', 'users', 'transactions', 'saves', 'stars', 'sets', 'events', 'reports', 'signals', 'notifications', 'activities']) {
       if (Array.isArray(loaded[key])) db[key] = loaded[key];
     }
     if (loaded.cloud) db.cloud = { ...db.cloud, ...loaded.cloud };
@@ -216,6 +222,7 @@ const memoryDb = {
     };
     db.cards.push(newCard);
     touchCards();
+    touchCommunity();
     markDirty('cards', newCard.id);
     persistSoon();
     return newCard;
@@ -232,6 +239,7 @@ const memoryDb = {
     if (index !== -1) {
       db.cards[index] = { ...db.cards[index], ...updateData };
       touchCards();
+      touchCommunity();
       markDirty('cards', id);
       persistSoon();
       return db.cards[index];
@@ -245,6 +253,7 @@ const memoryDb = {
       const deletedCard = db.cards[index];
       db.cards.splice(index, 1);
       touchCards();
+      touchCommunity();
       markRemoved('cards', id);
       persistSoon();
       return deletedCard;
@@ -326,6 +335,7 @@ const memoryDb = {
       created_at: now()
     };
     db.users.push(newUser);
+    touchCommunity();
     markDirty('users', newUser.id);
     persistSoon();
     return newUser;
@@ -362,6 +372,7 @@ const memoryDb = {
     const index = db.users.findIndex(u => u.id === id);
     if (index !== -1) {
       db.users[index] = { ...db.users[index], ...updateData };
+      touchCommunity();
       markDirty('users', id);
       persistSoon();
       return db.users[index];
@@ -374,6 +385,7 @@ const memoryDb = {
     if (index !== -1) {
       const deletedUser = db.users[index];
       db.users.splice(index, 1);
+      touchCommunity();
       markRemoved('users', id);
       persistSoon();
       return deletedUser;
@@ -582,6 +594,53 @@ const memoryDb = {
     return count;
   },
 
+  // ---------- community activity (bounded public read-model) ----------
+  createActivity: (activity) => {
+    const existing = db.activities.find(row =>
+      row.source_type === activity.source_type && row.source_id === activity.source_id
+    );
+    if (existing) return existing;
+
+    const row = {
+      ...activity,
+      id: activity.id || crypto.randomUUID(),
+      created_at: activity.created_at || now()
+    };
+    db.activities.push(row);
+    markDirty('activities', row.id);
+
+    // Postgres hydration does not promise row order. Sort this tiny collection
+    // before trimming so retention behaves identically in every backend.
+    db.activities.sort((a, b) =>
+      String(a.created_at || '').localeCompare(String(b.created_at || ''))
+    );
+    while (db.activities.length > MAX_COMMUNITY_ACTIVITIES) {
+      const evicted = db.activities.shift();
+      markRemoved('activities', evicted.id);
+    }
+    touchCommunity();
+    persistSoon();
+    return row;
+  },
+
+  getActivities: () => db.activities
+    .slice()
+    .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))),
+
+  deleteActivityBySource: (sourceType, sourceId) => {
+    const index = db.activities.findIndex(row =>
+      row.source_type === sourceType && row.source_id === sourceId
+    );
+    if (index === -1) return null;
+    const [deleted] = db.activities.splice(index, 1);
+    markRemoved('activities', deleted.id);
+    touchCommunity();
+    persistSoon();
+    return deleted;
+  },
+
+  getCommunityRevision: () => communityRevision,
+
   // ---------- saves (a user's collection of pool cards) ----------
   createSave: (save) => {
     const newSave = {
@@ -590,6 +649,7 @@ const memoryDb = {
       created_at: now()
     };
     db.saves.push(newSave);
+    touchCommunity();
     markDirty('saves', newSave.id);
     persistSoon();
     return newSave;
@@ -605,6 +665,7 @@ const memoryDb = {
     if (index !== -1) {
       const deleted = db.saves[index];
       db.saves.splice(index, 1);
+      touchCommunity();
       markRemoved('saves', deleted.id);
       persistSoon();
       return deleted;
@@ -616,6 +677,7 @@ const memoryDb = {
     const index = db.saves.findIndex(s => s.id === id);
     if (index === -1) return null;
     const [deleted] = db.saves.splice(index, 1);
+    touchCommunity();
     markRemoved('saves', deleted.id);
     persistSoon();
     return deleted;
@@ -678,6 +740,7 @@ const memoryDb = {
       if (info != null && info !== existing.info) {
         existing.info = info;
         existing.updated_at = now();
+        touchCommunity();
         markDirty('sets', existing.id);
         persistSoon();
       }
@@ -692,6 +755,7 @@ const memoryDb = {
       updated_at: now()
     };
     db.sets.push(set);
+    touchCommunity();
     markDirty('sets', set.id);
     persistSoon();
     return set;
@@ -701,6 +765,7 @@ const memoryDb = {
     const index = db.sets.findIndex(s => s.id === id);
     if (index === -1) return null;
     const [deleted] = db.sets.splice(index, 1);
+    touchCommunity();
     markRemoved('sets', deleted.id);
     persistSoon();
     return deleted;
@@ -770,7 +835,9 @@ const memoryDb = {
     db.reports.length = 0;
     db.signals.length = 0;
     db.notifications.length = 0;
+    db.activities.length = 0;
     db.rolls.length = 0;
+    touchCommunity();
     db.cloud = { total_issued: 0, total_absorbed: 0 };
     if (USE_PG) {
       truncateRequested = true;

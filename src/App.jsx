@@ -3,6 +3,7 @@ import { createGlobalStyle } from 'styled-components';
 import { CardProvider } from './context/CardContext';
 import { AuthProvider } from './context/AuthContext';
 import Navigation from './components/Navigation/Navigation';
+import CommunityActivityBanner from './components/CommunityActivityBanner';
 import MissionTransmission from './components/MissionTransmission';
 import GenerateGate from './pages/GenerateGate';
 import Pool from './pages/Pool';
@@ -163,6 +164,7 @@ function App() {
           <div className="App">
             <Navigation />
             <main className="app-main">
+              <CommunityActivityBanner />
               <MissionTransmission />
               <Routes>
                 <Route path="/" element={<GenerateGate />} />

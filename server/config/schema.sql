@@ -118,3 +118,11 @@ CREATE TABLE IF NOT EXISTS notifications (
 CREATE UNIQUE INDEX IF NOT EXISTS notifications_recipient_group_idx
   ON notifications (recipient_id, group_key);
 CREATE INDEX IF NOT EXISTS notifications_recipient_idx ON notifications (recipient_id);
+
+-- Small, bounded public read-model for the community pulse. The application
+-- retains at most 256 rows, so this table is hydrated in full on startup and
+-- needs no query-time indexes or joins.
+CREATE TABLE IF NOT EXISTS activities (
+  id   text PRIMARY KEY,
+  data jsonb NOT NULL
+);

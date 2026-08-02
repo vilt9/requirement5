@@ -30,6 +30,13 @@ import {
   buildCollectionGridSource,
   buildCollectionPosition
 } from '../services/collectionPosition.js';
+import {
+  getCommunityActivityFeed,
+  recordCommunityReaction,
+  recordCommunitySave,
+  removeCommunityReaction,
+  removeCommunitySave
+} from '../services/communityActivity.js';
 
 const router = express.Router();
 
@@ -428,6 +435,7 @@ router.post('/:id/save', requireAuth, async (req, res) => {
     memoryDb.incrementCardCounter(card.id, 'times_saved');
     memoryDb.incrementCollectionCount(card.id);
     recordSaveCreated({ save, card, dividend, sourceUserId });
+    recordCommunitySave(save, card);
 
     res.status(201).json({
       success: true,
@@ -506,7 +514,10 @@ router.put('/:id/signals', optionalAuth, (req, res) => {
   }
   const existing = memoryDb.getSignal(actorId, target.id, signal);
   const row = memoryDb.upsertSignal(actorId, target.id, signal);
-  if (!existing && target.card) recordReactionAdded(row, target.card);
+  if (!existing && target.card) {
+    recordReactionAdded(row, target.card);
+    recordCommunityReaction(row, target.card);
+  }
   res.json({ success: true, data: signalView(target.id, actorId) });
 });
 
@@ -522,7 +533,10 @@ router.delete('/:id/signals', optionalAuth, (req, res) => {
     return res.status(400).json({ success: false, error: 'Unknown reaction' });
   }
   const deleted = memoryDb.deleteSignal(actorId, target.id, signal);
-  if (deleted && target.card) recordReactionRemoved(deleted, target.card);
+  if (deleted && target.card) {
+    recordReactionRemoved(deleted, target.card);
+    removeCommunityReaction(deleted);
+  }
   res.json({ success: true, data: signalView(target.id, actorId) });
 });
 
@@ -538,6 +552,17 @@ router.get('/notifications/mine', requireAuth, (req, res) => {
 router.post('/notifications/read', requireAuth, (req, res) => {
   const marked = markNotificationFeedRead(req.user.id);
   res.json({ success: true, data: { marked } });
+});
+
+// A small ambient public pulse. The stored read-model is bounded and the
+// hydration snapshot is revision-cached, so polling never fans out into joins.
+router.get('/community/activity', optionalAuth, (req, res) => {
+  res.vary('Authorization');
+  res.set('Cache-Control', 'private, max-age=30, must-revalidate');
+  res.json({
+    success: true,
+    data: getCommunityActivityFeed(req.user?.id || null)
+  });
 });
 
 // Save a synthetic card — one generated deterministically from its uuid rather
@@ -582,6 +607,7 @@ router.post('/save-synthetic', requireAuth, async (req, res) => {
       times_saved: 1
     });
     const save = memoryDb.createSave({ user_id: req.user.id, card_id: card.id, cost });
+    recordCommunitySave(save, card);
 
     res.status(201).json({
       success: true,
@@ -647,6 +673,7 @@ router.delete('/collection/:cardId', requireAuth, (req, res) => {
   if (!deleted) {
     return res.status(404).json({ success: false, error: 'Not in your collection' });
   }
+  removeCommunitySave(deleted);
   res.json({ success: true, data: deleted });
 });
 
