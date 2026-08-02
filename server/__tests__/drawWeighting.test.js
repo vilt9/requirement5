@@ -80,6 +80,44 @@ describe('draw weighting maths', () => {
 // ---- The batch draw (integration) -------------------------------------------
 
 describe('batch draw', () => {
+  test('anonymous and authenticated draws use the same lottery sequence', async () => {
+    const { user } = await signup('drawer_parity');
+    for (let i = 0; i < 8; i++) poolCard(0.1 * i, `parity-card-000${i}`);
+    const values = [0.12, 0.91, 0.18, 0.82, 0.37, 0.49, 0.77, 0.64, 0.23, 0.95, 0.55];
+    const sequence = () => {
+      let i = 0;
+      return () => values[(i++) % values.length];
+    };
+    const seeds = Array.from({ length: 7 }, (_, i) => `parity-seed-000${i}`);
+
+    const signedIn = drawMany(user.id, seeds.length, sequence(), seeds);
+    const anonymous = drawMany(null, seeds.length, sequence(), seeds);
+
+    const outcomes = results => results.map(result => ({
+      source: result.source,
+      cardId: result.card?.id || null,
+      yield: result.yield.full
+    }));
+    expect(outcomes(anonymous)).toEqual(outcomes(signedIn));
+    expect(anonymous.every(result => result.balance === null)).toBe(true);
+    expect(signedIn.every(result => typeof result.balance === 'number')).toBe(true);
+  });
+
+  test('anonymous POST /api/draw returns the shared batch shape without ledger entries', async () => {
+    poolCard(0.2, 'anonymous-pool-card');
+    const beforeTransactions = memoryDb.getAllTransactions().length;
+    const seeds = Array.from({ length: 5 }, () => crypto.randomUUID());
+
+    const res = await request(app).post('/api/draw').send({ seeds });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.draws).toHaveLength(5);
+    expect(res.body.data.balance).toBeNull();
+    expect(res.body.data.draws.every(result => result.balance === null)).toBe(true);
+    expect(res.body.data.draws.every(result => result.yield.credited === result.yield.full)).toBe(true);
+    expect(memoryDb.getAllTransactions()).toHaveLength(beforeTransactions);
+  });
+
   test('POST /api/draw with seeds returns one result per seed + a balance', async () => {
     const { token } = await signup('drawer_batch');
     const seeds = Array.from({ length: 5 }, () => crypto.randomUUID());

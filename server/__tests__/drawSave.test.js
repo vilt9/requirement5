@@ -218,9 +218,11 @@ describe('draw engine', () => {
     expect(result.yield.full).toBe(drawYieldFor(result.card.id));
   });
 
-  test('draw endpoint requires auth', async () => {
+  test('draw endpoint is shared with anonymous visitors', async () => {
     const res = await request(app).post('/api/draw');
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(200);
+    expect(res.body.data.source).toBe('synthetic');
+    expect(res.body.data.balance).toBeNull();
   });
 });
 

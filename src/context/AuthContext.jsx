@@ -145,14 +145,10 @@ export function AuthProvider({ children }) {
   }, []);
 
   // --- The generate queue: the next cards, drawn ahead of time -------------
-  // Tapping Generate should be instant. Logged in, the server draw (which
-  // pays the yield and can surface a published card) runs in the BACKGROUND
-  // to keep a small queue topped up; each tap pops a ready entry. Logged out
-  // there's nothing to wait for — uuids are minted locally.
+  // Tapping Generate should be instant. Every visitor uses the same server
+  // lottery and queue; authentication changes only where the yield is stored.
   const queueRef = useRef([]);
   const refillingRef = useRef(false);
-  const userRef = useRef(null);
-  userRef.current = user;
 
   // Every entry carries `earned` — the /t26 the draw paid — so the card page
   // can flash it. Yields are seeded from the card's uuid (same maths client
@@ -167,7 +163,7 @@ export function AuthProvider({ children }) {
     if (refillingRef.current) return;
     refillingRef.current = true;
     try {
-      while (userRef.current && queueRef.current.length < QUEUE_TARGET) {
+      while (queueRef.current.length < QUEUE_TARGET) {
         // Mint the synthetic uuids up front and send them as yield seeds; if a
         // draw lands on a pool card instead, the server seeds from that card's
         // id. Either way result.yield is what was actually credited. The whole
@@ -199,16 +195,15 @@ export function AuthProvider({ children }) {
     }
   }, [setBalance]);
 
-  // Fresh session or auth change: the old queue's provenance is stale.
+  // Fresh session or auth change: the old queue's yield destination is stale.
   // Keyed on the user's ID, not the object — refill updates the balance,
-  // which recreates the user object, and keying on identity would loop
-  // draw → new user object → reset → draw... until the daily cap drained.
+  // which recreates the user object, and keying on identity would loop.
   const userId = user?.id || null;
   useEffect(() => {
     queueRef.current = [];
-    if (userId) refill();
+    if (!loading) refill();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
+  }, [userId, loading]);
 
   // Pop the next card to show. Never waits: an empty queue mints a fresh
   // uuid on the spot (its card generates from the seed, no network needed).
@@ -220,14 +215,9 @@ export function AuthProvider({ children }) {
       method: 'POST',
       body: { type: 'generate', attribution: readAttribution() }
     }).catch(() => {});
-    if (!user) {
-      const entry = mintFresh();
-      bumpStash(entry.earned); // the stash grows by the card's own seeded yield
-      flashEarn(entry.earned);
-      return entry;
-    }
     const entry = queueRef.current.shift() || mintFresh();
     refill();
+    if (!user) bumpStash(entry.earned);
     flashEarn(entry.earned);
     return entry;
   }, [user, refill, bumpStash, mintFresh, flashEarn]);

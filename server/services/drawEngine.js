@@ -37,13 +37,18 @@ export const cardStats = (card) => {
   };
 };
 
-// Shape one draw's result (pool card or synthetic directive) and credit its yield.
+// Shape one draw's result (pool card or synthetic directive). Signed-in draws
+// credit the account ledger; anonymous draws return the identical yield for the
+// browser's pre-signup stash without inventing a database user or transaction.
 // `yieldSeed` is the id the amount is seeded from — the drawn card's id, or the
 // client-minted uuid for a synthetic — so the amount shown equals the amount booked.
 const buildResult = (userId, card, yieldSeed) => {
   const fullYield = drawYieldFor(yieldSeed);
-  const credited = creditDrawYield(userId, fullYield, card ? { card_id: card.id } : {});
-  const user = memoryDb.getUserById(userId);
+  const account = userId ? memoryDb.getUserById(userId) : null;
+  const credited = account
+    ? creditDrawYield(account.id, fullYield, card ? { card_id: card.id } : {})
+    : fullYield;
+  const user = account ? memoryDb.getUserById(account.id) : null;
   const tier = card ? getTier(card.tier) : null;
   return {
     source: card ? 'pool' : 'synthetic',
@@ -53,7 +58,7 @@ const buildResult = (userId, card, yieldSeed) => {
     card: card ? memoryDb.withCreatorAndSet(card) : null,
     stats: card ? cardStats(card) : null,
     yield: { full: fullYield, credited, capped: credited < fullYield },
-    balance: user.balance
+    balance: user?.balance ?? null
   };
 };
 
