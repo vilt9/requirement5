@@ -40,6 +40,13 @@ export const api = async (path, { method = 'GET', body } = {}) => {
   if (!response.ok || (payload && payload.success === false)) {
     throw new ApiError(response.status, payload?.error || `Request failed (${response.status})`);
   }
+  if (typeof window !== 'undefined' && method !== 'GET' && (
+    path.includes('/save') ||
+    path.includes('/signals') ||
+    path === '/api/auth/signup'
+  )) {
+    window.dispatchEvent(new CustomEvent('r5c:community-activity-changed'));
+  }
   return payload?.data;
 };
 

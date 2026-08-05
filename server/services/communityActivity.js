@@ -2,8 +2,18 @@ import { memoryDb } from '../config/database.js';
 import { getTier, tierForScore } from './economy.js';
 
 const FEED_LIMIT = 12;
-const SPECIAL_RARITY_KEYS = new Set(['wowa', 'ultra', 'vmax']);
-export const COMMUNITY_ACTIVITY_REFRESH_MS = 60_000;
+const SPECIAL_RARITY_KEYS = new Set(['galaxy', 'wowa', 'ultra', 'vmax']);
+export const COMMUNITY_ACTIVITY_REFRESH_MS = 15_000;
+
+const ordinal = (n) => {
+  const value = Number(n) || 0;
+  const mod100 = value % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${value}th`;
+  if (value % 10 === 1) return `${value}st`;
+  if (value % 10 === 2) return `${value}nd`;
+  if (value % 10 === 3) return `${value}rd`;
+  return `${value}th`;
+};
 
 let cachedRevision = -1;
 let cachedSnapshot = [];
@@ -68,8 +78,21 @@ const rebuildSnapshot = () => {
   cachedSnapshot = memoryDb.getActivities()
     .map(activity => {
       const actor = users.get(activity.actor_id);
+      if (!actor || actor.banned) return null;
+      if (activity.type === 'signup') {
+        return {
+          id: activity.id,
+          type: activity.type,
+          createdAt: activity.created_at,
+          actorId: actor.id,
+          actor: {
+            username: actor.username,
+            collectionPath: `/${actor.username}/collection`
+          }
+        };
+      }
       const card = cards.get(activity.card_id);
-      if (!actor || actor.banned || !isPublicCollectionCard(card, savedCardIds)) return null;
+      if (!isPublicCollectionCard(card, savedCardIds)) return null;
       let completedSet = null;
       if (activity.type === 'set_complete') {
         const set = sets.get(activity.set_id);
@@ -87,6 +110,8 @@ const rebuildSnapshot = () => {
         id: activity.id,
         type: activity.type,
         signal: activity.signal || null,
+        saveCount: activity.save_count || null,
+        saveOrdinal: activity.save_count ? ordinal(activity.save_count) : null,
         createdAt: activity.created_at,
         actorId: actor.id,
         actor: {
@@ -117,7 +142,7 @@ const ensureSnapshot = () => {
   return cachedSnapshot;
 };
 
-const record = ({ sourceType, sourceId, actorId, card, type, signal, setId, createdAt }) => {
+const record = ({ sourceType, sourceId, actorId, card, type, signal, setId, saveCount, createdAt }) => {
   if (!sourceId || !actorId || !card) return null;
   const actor = memoryDb.getUserById(actorId);
   if (!actor || actor.banned) return null;
@@ -135,6 +160,7 @@ const record = ({ sourceType, sourceId, actorId, card, type, signal, setId, crea
     type,
     signal: signal || null,
     set_id: setId || null,
+    save_count: saveCount || null,
     created_at: createdAt
   });
 };
@@ -161,6 +187,7 @@ export const recordCommunitySave = (save, card) => {
     card,
     type: completedSet ? 'set_complete' : 'save',
     setId: completedSet?.id,
+    saveCount: card?.times_saved && card.times_saved <= 3 ? card.times_saved : null,
     createdAt: save?.created_at
   });
 };
@@ -181,22 +208,35 @@ export const removeCommunitySave = (save) =>
 export const removeCommunityReaction = (reaction) =>
   reaction?.id ? memoryDb.deleteActivityBySource('signal', reaction.id) : null;
 
+export const recordCommunitySignup = (user) => {
+  if (!user?.id || user.banned) return null;
+  return memoryDb.createActivity({
+    source_type: 'signup',
+    source_id: user.id,
+    actor_id: user.id,
+    card_id: null,
+    type: 'signup',
+    created_at: user.created_at
+  });
+};
+
 export const getCommunityActivityFeed = (viewerId = null) => {
   const snapshot = ensureSnapshot();
   const savedByViewer = cachedSavedCardsByUser.get(viewerId) || new Set();
 
   const activities = snapshot
-    .filter(activity => activity.actorId !== viewerId)
     .map(activity => {
-      const relevance = viewerId && activity.card.creatorId === viewerId
+      const relevance = viewerId && activity.actorId === viewerId
+        ? 'you'
+        : viewerId && activity.card?.creatorId === viewerId
         ? 'created'
-        : viewerId && savedByViewer.has(activity.card.id)
+        : viewerId && savedByViewer.has(activity.card?.id)
           ? 'collected'
           : null;
       return { ...activity, relevance };
     })
     .sort((a, b) => {
-      const relevanceRank = { created: 2, collected: 1 };
+      const relevanceRank = { you: 3, created: 2, collected: 1 };
       const priority = (relevanceRank[b.relevance] || 0) - (relevanceRank[a.relevance] || 0);
       return priority || String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
     })
@@ -204,8 +244,10 @@ export const getCommunityActivityFeed = (viewerId = null) => {
     .map(activity => {
       const publicActivity = { ...activity };
       delete publicActivity.actorId;
-      publicActivity.card = { ...publicActivity.card };
-      delete publicActivity.card.creatorId;
+      if (publicActivity.card) {
+        publicActivity.card = { ...publicActivity.card };
+        delete publicActivity.card.creatorId;
+      }
       return publicActivity;
     });
 

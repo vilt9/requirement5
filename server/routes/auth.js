@@ -5,6 +5,7 @@ import { issue } from '../services/ledger.js';
 import { ECONOMY } from '../services/economy.js';
 import { memoryDb } from '../config/database.js';
 import { normalizeAttribution } from '../services/attribution.js';
+import { recordCommunitySignup } from '../services/communityActivity.js';
 
 const router = express.Router();
 
@@ -34,6 +35,7 @@ router.post('/signup', async (req, res) => {
       ...attribution
     });
     const fresh = claimStash(result.data.id, req.body?.stash);
+    recordCommunitySignup(fresh);
     res.status(201).json({
       success: true,
       data: { user: publicUser(fresh), token: signToken(result.data) }

@@ -1,4 +1,7 @@
 export const communityActivityPath = (activity) => {
+  if (activity?.type === 'signup' && activity?.actor?.collectionPath) {
+    return activity.actor.collectionPath;
+  }
   const cardId = encodeURIComponent(activity?.card?.id || '');
   if (activity?.type === 'set_complete' && activity?.actor?.collectionPath) {
     return activity.actor.collectionPath;

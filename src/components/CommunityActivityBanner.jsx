@@ -20,6 +20,9 @@ const RARITY_SIGNAL = {
 };
 
 const presentationFor = (activity) => {
+  if (activity.type === 'signup') {
+    return { special: true, icon: 'human', ...signalByKey.human };
+  }
   if (activity.type === 'set_complete') {
     return { special: true, icon: 'trophy', ...signalByKey.trophy };
   }
@@ -85,11 +88,13 @@ const CommunityActivityBanner = () => {
     };
 
     document.addEventListener('visibilitychange', visibilityChanged);
+    window.addEventListener('r5c:community-activity-changed', load);
     load();
     return () => {
       stopped = true;
       clearTimeout(timer);
       document.removeEventListener('visibilitychange', visibilityChanged);
+      window.removeEventListener('r5c:community-activity-changed', load);
     };
   }, [captureRoute, user?.id]);
 
@@ -102,50 +107,68 @@ const CommunityActivityBanner = () => {
           const signal = signalByKey[activity.signal];
           const presentation = presentationFor(activity);
           const artwork = cardArtworkUrl(activity.card?.preview) || '/r5c_card_back.png';
-          const action = activity.type === 'set_complete'
+          const rareSave = activity.type === 'save' && activity.card?.rarity?.special;
+          const action = activity.type === 'signup'
+            ? 'joined'
+            : activity.type === 'set_complete'
             ? 'completed'
-            : activity.type === 'save' && activity.card?.rarity?.special
+            : rareSave
               ? `saved a ${activity.card.rarity.name} card`
               : activity.type === 'save'
                 ? 'saved'
                 : `sent ${signal?.label || 'a reaction'} to`;
-          const subject = activity.type === 'set_complete'
+          const subject = activity.type === 'signup'
+            ? 'Requirement5'
+            : activity.type === 'set_complete'
             ? `${activity.set?.label || 'card'} set`
             : activity.card.name;
-          const tickerSubject = activity.type === 'set_complete'
+          const tickerSubject = activity.type === 'signup'
+            ? 'joined the society'
+            : activity.type === 'set_complete'
             ? activity.set?.label || 'card set'
-            : activity.type === 'save' && activity.card?.rarity?.special
+            : rareSave
               ? `${activity.card.rarity.name} · ${activity.card.name}`
+              : activity.saveOrdinal
+                ? `${activity.saveOrdinal} save · ${activity.card.name}`
               : activity.card.name;
           const tickerMark = activity.type === 'set_complete'
             ? '✓'
             : activity.type === 'save'
-              ? '+'
+              ? (activity.saveOrdinal || '+')
+              : activity.type === 'signup'
+                ? '+'
               : null;
           const relevance = activity.relevance === 'created'
             ? 'your card'
             : activity.relevance === 'collected'
               ? 'also in your collection'
+              : activity.relevance === 'you'
+                ? 'you'
               : null;
+          const presentationKind = activity.type === 'signup'
+            ? 'signup'
+            : activity.type === 'set_complete'
+              ? 'milestone'
+              : activity.type === 'reaction'
+                ? 'reaction'
+                : rareSave
+                  ? 'rare'
+                  : activity.saveOrdinal
+                    ? 'save-milestone'
+                    : 'standard';
 
           return (
             <ActivityItem key={activity.id} role="listitem">
               <ActivityLink
                 to={communityActivityPath(activity)}
                 aria-label={`${activity.actor.username} ${action} ${subject}`}
-                data-presentation={activity.type === 'set_complete'
-                  ? 'milestone'
-                  : activity.type === 'reaction'
-                    ? 'reaction'
-                    : activity.card?.rarity?.special
-                      ? 'rare'
-                      : 'standard'}
+                data-presentation={presentationKind}
                 $special={presentation.special}
                 $colour={presentation.color}
                 $accent={presentation.accent}
               >
                 <Preview
-                  $background={activity.card.preview?.backgroundColor}
+                  $background={activity.card?.preview?.backgroundColor}
                   $special={presentation.special}
                   $colour={presentation.color}
                 >
@@ -191,6 +214,10 @@ const CommunityActivityBanner = () => {
 const arrive = keyframes`
   from { opacity: 0; transform: translateY(-3px); }
   to { opacity: 1; transform: translateY(0); }
+`;
+
+const dashDrift = keyframes`
+  to { background-position: 26px 0; }
 `;
 
 const Banner = styled.section`
@@ -247,6 +274,34 @@ const ActivityLink = styled(Link)`
   color: var(--amber-text);
   transition: border-color 150ms ease, background 150ms ease;
 
+  &[data-presentation='rare'] {
+    border-color: color-mix(in srgb, ${props => props.$colour || '#58d4ff'} 72%, #ffffff);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, ${props => props.$colour || '#58d4ff'} 34%, transparent);
+  }
+
+  &[data-presentation='milestone'] {
+    border-color: rgba(255, 255, 255, 0.76);
+    border-style: dashed;
+    background:
+      repeating-linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.13) 0 8px,
+        transparent 8px 16px
+      ),
+      rgba(255, 255, 255, 0.035);
+    animation: ${dashDrift} 1.4s linear infinite;
+  }
+
+  &[data-presentation='save-milestone'] {
+    border-color: rgba(232, 180, 85, 0.44);
+    background: rgba(232, 180, 85, 0.055);
+  }
+
+  &[data-presentation='signup'] {
+    border-color: rgba(237, 170, 101, 0.5);
+    background: rgba(237, 170, 101, 0.06);
+  }
+
   &::before {
     content: '';
     position: absolute;
@@ -278,7 +333,10 @@ const ActivityLink = styled(Link)`
     outline-offset: 1px;
   }
 
-  @media (prefers-reduced-motion: reduce) { transition: none; }
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+    &[data-presentation='milestone'] { animation: none; }
+  }
 `;
 
 const Preview = styled.span`

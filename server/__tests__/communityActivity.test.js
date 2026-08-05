@@ -31,7 +31,7 @@ const makeCard = async (owner, name) => {
 describe('community activity feed', () => {
   beforeEach(() => memoryDb.clearDatabase());
 
-  test('a save appears publicly but not in the saver\'s own feed', async () => {
+  test('a save appears publicly and immediately in the saver\'s own feed', async () => {
     const alice = await signup('activityalice');
     const bob = await signup('activitybob');
     const made = await request(app)
@@ -55,7 +55,7 @@ describe('community activity feed', () => {
     const publicFeed = await request(app).get('/api/cards/community/activity');
     expect(publicFeed.status).toBe(200);
     expect(publicFeed.headers.vary).toContain('Authorization');
-    expect(publicFeed.body.data.activities).toEqual([
+    expect(publicFeed.body.data.activities).toEqual(expect.arrayContaining([
       expect.objectContaining({
         type: 'save',
         actor: {
@@ -72,15 +72,40 @@ describe('community activity feed', () => {
           }
         })
       })
-    ]);
-    expect(publicFeed.body.data.activities[0]).not.toHaveProperty('actorId');
-    expect(publicFeed.body.data.activities[0].card).not.toHaveProperty('creatorId');
+    ]));
+    const publicSave = publicFeed.body.data.activities.find(activity => activity.type === 'save');
+    expect(publicSave).not.toHaveProperty('actorId');
+    expect(publicSave.card).not.toHaveProperty('creatorId');
 
     const bobFeed = await request(app)
       .get('/api/cards/community/activity')
       .set(auth(bob.token));
     expect(bobFeed.status).toBe(200);
-    expect(bobFeed.body.data.activities).toEqual([]);
+    expect(bobFeed.body.data.activities[0]).toMatchObject({
+      type: 'save',
+      relevance: 'you',
+      saveCount: 1,
+      saveOrdinal: '1st',
+      card: { id: made.body.data.id }
+    });
+  });
+
+  test('signup enters the ticker without needing a card', async () => {
+    const newcomer = await signup('tickerjoiner');
+
+    const feed = await request(app)
+      .get('/api/cards/community/activity')
+      .set(auth(newcomer.token));
+
+    expect(feed.body.data.activities[0]).toMatchObject({
+      type: 'signup',
+      relevance: 'you',
+      actor: {
+        username: 'tickerjoiner',
+        collectionPath: '/tickerjoiner/collection'
+      }
+    });
+    expect(feed.body.data.activities[0]).not.toHaveProperty('card');
   });
 
   test('only signed-in reactions to stored cards enter the feed, once', async () => {
@@ -103,8 +128,8 @@ describe('community activity feed', () => {
       .send({ signal: 'launch', guestId: '7d5d5e2b-df20-4c6f-a508-f5254d7a4ac1' });
 
     const feed = await request(app).get('/api/cards/community/activity');
-    expect(feed.body.data.activities).toHaveLength(1);
-    expect(feed.body.data.activities[0]).toMatchObject({
+    const reaction = feed.body.data.activities.find(activity => activity.type === 'reaction');
+    expect(reaction).toMatchObject({
       type: 'reaction',
       signal: 'flame',
       actor: { username: 'reactionbob' },
@@ -131,7 +156,8 @@ describe('community activity feed', () => {
     await request(app).post(`/api/cards/${made.body.data.id}/save`).set(auth(bob.token));
 
     const feed = await request(app).get('/api/cards/community/activity');
-    expect(feed.body.data.activities[0].card.preview).toEqual({
+    const saveActivity = feed.body.data.activities.find(activity => activity.type === 'save');
+    expect(saveActivity.card.preview).toEqual({
       imagePath: null,
       customImageUrl: null,
       backgroundColor: null
@@ -157,7 +183,9 @@ describe('community activity feed', () => {
     const feed = await request(app)
       .get('/api/cards/community/activity')
       .set(auth(viewer.token));
-    expect(feed.body.data.activities.map(item => [item.card.name, item.relevance])).toEqual([
+    const cardActivities = feed.body.data.activities.filter(activity => activity.card);
+    expect(cardActivities.map(item => [item.card.name, item.relevance]).slice(0, 4)).toEqual([
+      ['Shared Favourite', 'you'],
       ['Viewer Original', 'created'],
       ['Shared Favourite', 'collected'],
       ['Passing Signal', null]
@@ -173,7 +201,8 @@ describe('community activity feed', () => {
     await request(app).post(`/api/cards/${card.id}/save`).set(auth(collector.token));
     const feed = await request(app).get('/api/cards/community/activity');
 
-    expect(feed.body.data.activities[0]).toMatchObject({
+    const rareSave = feed.body.data.activities.find(activity => activity.type === 'save');
+    expect(rareSave).toMatchObject({
       type: 'save',
       card: {
         id: card.id,
@@ -185,6 +214,24 @@ describe('community activity feed', () => {
         }
       }
     });
+  });
+
+  test('the first three saves on a card carry ordinal milestone copy', async () => {
+    const creator = await signup('milestonecreator');
+    const first = await signup('milestoneone');
+    const second = await signup('milestonetwo');
+    const third = await signup('milestonethree');
+    const fourth = await signup('milestonefour');
+    const card = await makeCard(creator, 'Society Counter');
+
+    await request(app).post(`/api/cards/${card.id}/save`).set(auth(first.token));
+    await request(app).post(`/api/cards/${card.id}/save`).set(auth(second.token));
+    await request(app).post(`/api/cards/${card.id}/save`).set(auth(third.token));
+    await request(app).post(`/api/cards/${card.id}/save`).set(auth(fourth.token));
+
+    const feed = await request(app).get('/api/cards/community/activity');
+    const saves = feed.body.data.activities.filter(activity => activity.card?.id === card.id);
+    expect(saves.map(activity => activity.saveOrdinal)).toEqual([null, '3rd', '2nd', '1st']);
   });
 
   test('saving the final card emits one set-completion milestone', async () => {
@@ -205,7 +252,7 @@ describe('community activity feed', () => {
     await request(app).post(`/api/cards/${final.id}/save`).set(auth(collector.token));
 
     const completed = await request(app).get('/api/cards/community/activity');
-    expect(completed.body.data.activities).toEqual([
+    expect(completed.body.data.activities.filter(activity => activity.type !== 'signup')).toEqual([
       expect.objectContaining({
         type: 'set_complete',
         actor: expect.objectContaining({ username: 'setcollector' }),
@@ -239,26 +286,31 @@ describe('community activity feed', () => {
     const card = await makeCard(alice, 'Temporary Pulse');
 
     await request(app).post(`/api/cards/${card.id}/save`).set(auth(bob.token));
-    expect((await request(app).get('/api/cards/community/activity')).body.data.activities).toHaveLength(1);
+    const afterSave = (await request(app).get('/api/cards/community/activity')).body.data.activities;
+    expect(afterSave.filter(activity => activity.type === 'save')).toHaveLength(1);
 
     await request(app).delete(`/api/cards/collection/${card.id}`).set(auth(bob.token));
-    expect((await request(app).get('/api/cards/community/activity')).body.data.activities).toEqual([]);
+    expect((await request(app).get('/api/cards/community/activity')).body.data.activities
+      .filter(activity => activity.type !== 'signup')).toEqual([]);
 
     await request(app)
       .put(`/api/cards/${card.id}/signals`)
       .set(auth(bob.token))
       .send({ signal: 'growth' });
-    expect((await request(app).get('/api/cards/community/activity')).body.data.activities).toHaveLength(1);
+    const afterReaction = (await request(app).get('/api/cards/community/activity')).body.data.activities;
+    expect(afterReaction.filter(activity => activity.type === 'reaction')).toHaveLength(1);
 
     await request(app)
       .delete(`/api/cards/${card.id}/signals`)
       .set(auth(bob.token))
       .send({ signal: 'growth' });
-    expect((await request(app).get('/api/cards/community/activity')).body.data.activities).toEqual([]);
+    expect((await request(app).get('/api/cards/community/activity')).body.data.activities
+      .filter(activity => activity.type !== 'signup')).toEqual([]);
 
     await request(app).post(`/api/cards/${card.id}/save`).set(auth(bob.token));
     await request(app).post(`/api/cards/${card.id}/report`).send({ reason: 'spam' });
-    expect((await request(app).get('/api/cards/community/activity')).body.data.activities).toEqual([]);
+    expect((await request(app).get('/api/cards/community/activity')).body.data.activities
+      .filter(activity => activity.type !== 'signup')).toEqual([]);
   });
 
   test('the activity store stays bounded and rolls back with its source unit', () => {
