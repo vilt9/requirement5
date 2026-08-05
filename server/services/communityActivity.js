@@ -108,6 +108,11 @@ const rebuildSnapshot = () => {
   const cards = new Map(memoryDb.getAllCards().map(card => [card.id, card]));
   const sets = new Map(memoryDb.getAllSets().map(set => [set.id, set]));
   const saves = memoryDb.getAllSaves();
+  const rewardsByActivity = new Map(
+    memoryDb.getAllTransactions()
+      .filter(txn => txn.type === 'society_reward' && txn.activity_id)
+      .map(txn => [txn.activity_id, { amount: txn.amount }])
+  );
   const savedCardIds = new Set(saves.map(save => save.card_id));
   const cardIdsBySet = new Map();
   for (const card of cards.values()) {
@@ -133,6 +138,7 @@ const rebuildSnapshot = () => {
           id: activity.id,
           type: activity.type,
           createdAt: activity.created_at,
+          reward: rewardsByActivity.get(activity.id) || null,
           actorId: actor.id,
           actor: {
             username: actor.username,
@@ -162,6 +168,7 @@ const rebuildSnapshot = () => {
         saveCount: activity.save_count || null,
         saveOrdinal: activity.save_count ? ordinal(activity.save_count) : null,
         createdAt: activity.created_at,
+        reward: rewardsByActivity.get(activity.id) || null,
         actorId: actor.id,
         actor: {
           username: actor.username,

@@ -78,6 +78,7 @@ describe('community activity feed', () => {
     const publicSave = publicFeed.body.data.activities.find(activity => activity.type === 'save');
     expect(publicSave).not.toHaveProperty('actorId');
     expect(publicSave.card).not.toHaveProperty('creatorId');
+    expect(publicSave.reward.amount).toBeGreaterThanOrEqual(0.018);
 
     const bobFeed = await request(app)
       .get('/api/cards/community/activity')
@@ -109,7 +110,8 @@ describe('community activity feed', () => {
       actor: {
         username: 'tickerjoiner',
         collectionPath: '/tickerjoiner/collection'
-      }
+      },
+      reward: { amount: reward.amount }
     });
     expect(feed.body.data.activities[0]).not.toHaveProperty('card');
   });

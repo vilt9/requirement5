@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import styled, { keyframes } from 'styled-components';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
+import { fmtT26 } from '../utils/economyRandom';
 import { cardArtworkUrl } from '../utils/poolCard';
 import { signalByKey } from '../utils/signals';
 import {
@@ -194,6 +195,11 @@ const CommunityActivityBanner = () => {
                     )}
                     {tickerMark && <TickerMark aria-hidden="true">{tickerMark}</TickerMark>}
                     <CardName $special={presentation.special}>{tickerSubject}</CardName>
+                    {activity.reward?.amount > 0 && (
+                      <RewardPill aria-label={`reward ${fmtT26(activity.reward.amount)} t26`}>
+                        +{fmtT26(activity.reward.amount)} /t26
+                      </RewardPill>
+                    )}
                   </Copy>
                   <Meta>
                     <time dateTime={activity.createdAt}>
@@ -376,6 +382,20 @@ const Actor = styled.strong`
 
 const CardName = styled.span`
   color: ${props => props.$special ? 'var(--white)' : 'var(--amber-text)'};
+`;
+
+const RewardPill = styled.span`
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  padding: 1px 4px;
+  border: 1px solid rgba(33, 233, 133, 0.34);
+  border-radius: 999px;
+  background: rgba(33, 233, 133, 0.08);
+  color: #83f0b4;
+  font-size: 8px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 `;
 
 const MomentGlyph = styled.span`
