@@ -36,9 +36,10 @@ router.post('/signup', async (req, res) => {
     });
     const fresh = claimStash(result.data.id, req.body?.stash);
     recordCommunitySignup(fresh);
+    const rewarded = memoryDb.getUserById(result.data.id);
     res.status(201).json({
       success: true,
-      data: { user: publicUser(fresh), token: signToken(result.data) }
+      data: { user: publicUser(rewarded), token: signToken(result.data) }
     });
   } catch (error) {
     console.error('Signup error:', error);

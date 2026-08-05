@@ -2,6 +2,8 @@ import request from 'supertest';
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import app from '../index.js';
 import { MAX_COMMUNITY_ACTIVITIES, memoryDb } from '../config/database.js';
+import { communityRewardFor } from '../services/communityActivity.js';
+import { ECONOMY } from '../services/economy.js';
 
 const signup = async (username) => {
   const response = await request(app)
@@ -92,6 +94,10 @@ describe('community activity feed', () => {
 
   test('signup enters the ticker without needing a card', async () => {
     const newcomer = await signup('tickerjoiner');
+    const reward = memoryDb.getTransactionsByUser(newcomer.user.id)
+      .find(txn => txn.type === 'society_reward');
+    expect(reward.amount).toBeGreaterThanOrEqual(0.018);
+    expect(newcomer.user.balance).toBe(ECONOMY.STARTING_GRANT + reward.amount);
 
     const feed = await request(app)
       .get('/api/cards/community/activity')
@@ -106,6 +112,33 @@ describe('community activity feed', () => {
       }
     });
     expect(feed.body.data.activities[0]).not.toHaveProperty('card');
+  });
+
+  test('ticker rewards are small, deterministic, upper-tailed, and idempotent', async () => {
+    const amounts = Array.from({ length: 2000 }, (_, i) => communityRewardFor(`sample-${i}`));
+    const sorted = amounts.slice().sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)];
+    const p95 = sorted[Math.floor(sorted.length * 0.95)];
+    expect(median).toBeGreaterThan(0.05);
+    expect(median).toBeLessThan(0.1);
+    expect(p95).toBeGreaterThan(0.25);
+    expect(Math.max(...amounts)).toBeGreaterThan(1);
+    expect(communityRewardFor('same-event')).toBe(communityRewardFor('same-event'));
+
+    const alice = await signup('rewardalice');
+    const bob = await signup('rewardbob');
+    const card = await makeCard(alice, 'Reward Once');
+    const before = memoryDb.getTransactionsByUser(bob.user.id)
+      .filter(txn => txn.type === 'society_reward').length;
+    await request(app).post(`/api/cards/${card.id}/save`).set(auth(bob.token));
+    await request(app).post(`/api/cards/${card.id}/save`).set(auth(bob.token));
+    const rewards = memoryDb.getTransactionsByUser(bob.user.id)
+      .filter(txn => txn.type === 'society_reward');
+    expect(rewards).toHaveLength(before + 1);
+    expect(rewards[0]).toMatchObject({
+      type: 'society_reward',
+      source_type: 'save'
+    });
   });
 
   test('only signed-in reactions to stored cards enter the feed, once', async () => {

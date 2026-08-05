@@ -40,7 +40,8 @@ describe('auth flow', () => {
   test('signup, login, me', async () => {
     const { token, user } = await signup('vex_haldane');
     expect(user.username).toBe('vex_haldane');
-    expect(user.balance).toBe(ECONOMY.STARTING_GRANT);
+    expect(user.balance).toBe(memoryDb.getUserById(user.id).balance);
+    expect(user.balance).toBeGreaterThan(ECONOMY.STARTING_GRANT);
     expect(user.password_hash).toBeUndefined();
     // Email is captured but private: it must never come back to the client.
     expect(user.email).toBeUndefined();
@@ -112,6 +113,7 @@ describe('auth flow', () => {
 describe('create flow', () => {
   test('confirm-start charges the create fee; publish assigns the rolled tier and is free', async () => {
     const { token, user } = await signup('creator');
+    const startingBalance = memoryDb.getUserById(user.id).balance;
     await beginCreation(token);
     const roll = memoryDb.getActiveRollByUser(user.id);
     memoryDb.updateRoll(roll.id, { rarity_score: 0.82 }); // force a galaxy roll
@@ -120,14 +122,14 @@ describe('create flow', () => {
     expect(started.status).toBe(201);
     const createFee = started.body.data.createFee;
     expect(createFee).toBeGreaterThan(0);
-    expect(started.body.data.balance).toBeCloseTo(ECONOMY.STARTING_GRANT - createFee, 6);
+    expect(started.body.data.balance).toBeCloseTo(startingBalance - createFee, 6);
 
     const released = await releaseDraft(token);
     expect(released.status).toBe(200);
     expect(released.body.data.card.tier).toBe('galaxy');
     expect(released.body.data.card.rarity_score).toBe(0.82);
     // publishing is free — balance unchanged from after confirm-start
-    expect(released.body.data.balance).toBeCloseTo(ECONOMY.STARTING_GRANT - createFee, 6);
+    expect(released.body.data.balance).toBeCloseTo(startingBalance - createFee, 6);
   });
 
   test('confirm-start needs a creation, publish needs a draft', async () => {
@@ -192,6 +194,7 @@ describe('create flow', () => {
 describe('draw engine', () => {
   test('synthetic draw when the pool is empty', async () => {
     const { user } = await signup('drawer');
+    const startingBalance = memoryDb.getUserById(user.id).balance;
     const result = draw(user.id, () => 0.5, 'abcd1234-seed-uuid'); // pool empty ⇒ synthetic
     expect(result.source).toBe('synthetic');
     // A synthetic draw carries no server tier now — the client mints the card
@@ -199,7 +202,7 @@ describe('draw engine', () => {
     expect(result.tier).toBeNull();
     expect(result.card).toBeNull();
     expect(result.yield.credited).toBe(drawYieldFor('abcd1234-seed-uuid'));
-    expect(result.balance).toBeCloseTo(ECONOMY.STARTING_GRANT + result.yield.credited, 6);
+    expect(result.balance).toBeCloseTo(startingBalance + result.yield.credited, 6);
   });
 
   test('pool draw serves a published card and counts it', async () => {
@@ -240,6 +243,8 @@ describe('save economics', () => {
 
   test('save debits cost, pays the creator dividend, cloud absorbs the rest', async () => {
     const { creator, saver, card, stake } = await publishAndDraw();
+    const creatorBalance = memoryDb.getUserById(creator.user.id).balance;
+    const saverBalance = memoryDb.getUserById(saver.user.id).balance;
     const cloudBefore = memoryDb.getCloud();
 
     const res = await request(app)
@@ -251,7 +256,9 @@ describe('save economics', () => {
     const dividend = creatorDividendFor(card.id);
     expect(res.body.data.cost).toBe(cost);
     expect(res.body.data.dividend).toBe(dividend);
-    expect(res.body.data.balance).toBeCloseTo(ECONOMY.STARTING_GRANT - cost, 6);
+    const reward = memoryDb.getTransactionsByUser(saver.user.id)
+      .find(txn => txn.type === 'society_reward' && txn.source_type === 'save');
+    expect(res.body.data.balance).toBeCloseTo(saverBalance - cost + reward.amount, 6);
     expect(res.body.data.collectionPosition.global).toMatchObject({
       rank: 1,
       total: 1
@@ -263,13 +270,11 @@ describe('save economics', () => {
     });
 
     const creatorUser = memoryDb.getUserById(creator.user.id);
-    // starting grant − publish stake + dividend
-    expect(creatorUser.balance).toBeCloseTo(
-      ECONOMY.STARTING_GRANT - stake + dividend, 6);
+    expect(creatorUser.balance).toBeCloseTo(creatorBalance + dividend, 6);
 
     const cloud = memoryDb.getCloud();
     expect(round6(cloud.total_absorbed - cloudBefore.total_absorbed)).toBeCloseTo(cost, 6);
-    expect(round6(cloud.total_issued - cloudBefore.total_issued)).toBeCloseTo(dividend, 6);
+    expect(round6(cloud.total_issued - cloudBefore.total_issued)).toBeCloseTo(dividend + reward.amount, 6);
 
     const fresh = memoryDb.getCardById(card.id);
     expect(fresh.times_saved).toBe(1);
@@ -348,6 +353,7 @@ describe('save economics', () => {
 describe('save-synthetic', () => {
   test('costs the card\'s own seeded price, keeps natural rarity, stores privately', async () => {
     const { token, user } = await signup('drawer');
+    const startingBalance = memoryDb.getUserById(user.id).balance;
     const claimedId = '9f0e1d2c-3b4a-5968-8776-a5b4c3d2e1f0';
     const res = await request(app)
       .post('/api/cards/save-synthetic')
@@ -364,7 +370,9 @@ describe('save-synthetic', () => {
     expect(res.body.data.card.creator_id).toBe('cloud');
     expect(res.body.data.card.rarity_score).toBe(0.75); // natural rarity kept
     expect(res.body.data.card.tier).toBe('holo');       // derived, not chosen
-    expect(res.body.data.balance).toBeCloseTo(ECONOMY.STARTING_GRANT - cost, 6);
+    const reward = memoryDb.getTransactionsByUser(user.id)
+      .find(txn => txn.type === 'society_reward' && txn.source_type === 'save');
+    expect(res.body.data.balance).toBeCloseTo(startingBalance - cost + reward.amount, 6);
     expect(res.body.data.collectionPosition.global.cards[0]).toMatchObject({
       owned: true,
       current: true,
@@ -417,7 +425,7 @@ describe('economy endpoints', () => {
     const { createFee } = await publishCard(token, { userId: user.id, rarity: 0.3, stateData: { x: 1 } });
 
     const res = await request(app).get('/api/economy/cloud');
-    expect(res.body.data.totalIssued).toBe(ECONOMY.STARTING_GRANT);
+    expect(res.body.data.totalIssued).toBeGreaterThan(ECONOMY.STARTING_GRANT);
     // the only /t26 absorbed is the create fee paid at confirm-start
     expect(res.body.data.totalAbsorbed).toBeCloseTo(createFee, 6);
     expect(res.body.data.inCirculation).toBe(memoryDb.getUserById(user.id).balance);
@@ -425,10 +433,10 @@ describe('economy endpoints', () => {
   });
 
   test('balance endpoint reports the balance', async () => {
-    const { token } = await signup('walleter');
+    const { token, user } = await signup('walleter');
     const res = await request(app).get('/api/economy/balance').set(auth(token));
     expect(res.status).toBe(200);
-    expect(res.body.data.balance).toBe(ECONOMY.STARTING_GRANT);
+    expect(res.body.data.balance).toBe(memoryDb.getUserById(user.id).balance);
     expect(res.body.data.inDebt).toBe(false);
   });
 

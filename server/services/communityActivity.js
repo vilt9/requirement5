@@ -1,5 +1,6 @@
 import { memoryDb } from '../config/database.js';
-import { getTier, tierForScore } from './economy.js';
+import { getTier, round6, tierForScore } from './economy.js';
+import { issue } from './ledger.js';
 
 const FEED_LIMIT = 12;
 const SPECIAL_RARITY_KEYS = new Set(['galaxy', 'wowa', 'ultra', 'vmax']);
@@ -13,6 +14,54 @@ const ordinal = (n) => {
   if (value % 10 === 2) return `${value}nd`;
   if (value % 10 === 3) return `${value}rd`;
   return `${value}th`;
+};
+
+const fnv1a = (str) => {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+};
+
+const mulberry32 = (a) => () => {
+  a |= 0; a = (a + 0x6D2B79F5) | 0;
+  let t = Math.imul(a ^ (a >>> 15), 1 | a);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+};
+
+const normal01 = (rand) => {
+  const u = Math.max(rand(), 1e-9);
+  const v = rand();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+};
+
+export const communityRewardFor = (seed) => {
+  const rand = mulberry32(fnv1a(`r5c:society-reward:v1:${seed}`));
+  const base = Math.exp(Math.log(0.075) + 0.28 * normal01(rand));
+  const tailGate = rand();
+  const tail = tailGate > 0.985
+    ? 1.15 + Math.pow(rand(), 0.35) * 1.85
+    : tailGate > 0.91
+      ? Math.pow(rand(), 0.45) * 0.55
+      : 0;
+  return round6(Math.min(3.25, Math.max(0.018, base + tail)));
+};
+
+const rewardActivity = (activity) => {
+  if (!activity?.id || !activity.actor_id) return null;
+  const duplicate = memoryDb.getAllTransactions().some(txn =>
+    txn.type === 'society_reward' && txn.activity_id === activity.id
+  );
+  if (duplicate) return null;
+  const amount = communityRewardFor(`${activity.source_type}:${activity.source_id}:${activity.type}`);
+  return issue(activity.actor_id, 'society_reward', amount, {
+    activity_id: activity.id,
+    source_type: activity.source_type,
+    source_id: activity.source_id
+  });
 };
 
 let cachedRevision = -1;
@@ -152,7 +201,7 @@ const record = ({ sourceType, sourceId, actorId, card, type, signal, setId, save
     ? new Set(memoryDb.getAllSaves().map(save => save.card_id))
     : new Set();
   if (!isPublicCollectionCard(card, savedCardIds)) return null;
-  return memoryDb.createActivity({
+  const activity = memoryDb.createActivity({
     source_type: sourceType,
     source_id: sourceId,
     actor_id: actorId,
@@ -163,6 +212,8 @@ const record = ({ sourceType, sourceId, actorId, card, type, signal, setId, save
     save_count: saveCount || null,
     created_at: createdAt
   });
+  rewardActivity(activity);
+  return activity;
 };
 
 export const recordCommunitySave = (save, card) => {
@@ -210,7 +261,7 @@ export const removeCommunityReaction = (reaction) =>
 
 export const recordCommunitySignup = (user) => {
   if (!user?.id || user.banned) return null;
-  return memoryDb.createActivity({
+  const activity = memoryDb.createActivity({
     source_type: 'signup',
     source_id: user.id,
     actor_id: user.id,
@@ -218,6 +269,8 @@ export const recordCommunitySignup = (user) => {
     type: 'signup',
     created_at: user.created_at
   });
+  rewardActivity(activity);
+  return activity;
 };
 
 export const getCommunityActivityFeed = (viewerId = null) => {

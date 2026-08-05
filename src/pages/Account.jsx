@@ -19,6 +19,7 @@ const TXN_LABELS = {
   claimed_yield: 'Claimed logged-out stash',
   save: 'Card saved',
   dividend: 'Creator dividend',
+  society_reward: 'Society reward',
   publish_stake: 'Publish stake',
   reroll: 'Card regeneration',
   create_stake: 'Card create fee',
