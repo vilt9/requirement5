@@ -5,6 +5,9 @@ import { issue } from './ledger.js';
 const FEED_LIMIT = 12;
 const SPECIAL_RARITY_KEYS = new Set(['galaxy', 'wowa', 'ultra', 'vmax']);
 export const COMMUNITY_ACTIVITY_REFRESH_MS = 15_000;
+const SYNTHETIC_CARD_LIMIT = 120;
+const SYNTHETIC_USER_COUNT = 144;
+const SYNTHETIC_INTERVAL_MS = 17 * 60 * 1000;
 
 const ordinal = (n) => {
   const value = Number(n) || 0;
@@ -31,6 +34,8 @@ const mulberry32 = (a) => () => {
   t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 };
+
+const pick = (items, rand) => items[Math.floor(rand() * items.length) % items.length];
 
 const normal01 = (rand) => {
   const u = Math.max(rand(), 1e-9);
@@ -67,6 +72,7 @@ const rewardActivity = (activity) => {
 let cachedRevision = -1;
 let cachedSnapshot = [];
 let cachedSavedCardsByUser = new Map();
+let cachedSyntheticCards = [];
 
 const safeString = (value, maxLength) => {
   if (typeof value !== 'string') return null;
@@ -92,6 +98,24 @@ const previewFor = (card) => {
     backgroundColor: /^#[0-9a-f]{3,8}$/i.test(rawBackgroundColor || '')
       ? rawBackgroundColor
       : null
+  };
+};
+
+const publicCardSummary = (card) => {
+  const tier = getTier(card.tier) || tierForScore(card.rarity_score);
+  return {
+    id: card.id,
+    name: card.name || 'Untitled card',
+    creatorId: card.creator_id,
+    preview: previewFor(card),
+    rarity: {
+      key: tier.key,
+      name: tier.name,
+      color: tier.color,
+      special: SPECIAL_RARITY_KEYS.has(tier.key)
+    },
+    setId: card.set_id || null,
+    rarityScore: Number(card.rarity_score) || 0
   };
 };
 
@@ -127,6 +151,14 @@ const rebuildSnapshot = () => {
     cardIds.add(save.card_id);
     cachedSavedCardsByUser.set(save.user_id, cardIds);
   }
+  cachedSyntheticCards = [...cards.values()]
+    .filter(card => memoryDb.isCirculating(card))
+    .sort((a, b) => {
+      const recent = String(b.created_at || '').localeCompare(String(a.created_at || ''));
+      return recent || String(a.id).localeCompare(String(b.id));
+    })
+    .slice(0, SYNTHETIC_CARD_LIMIT)
+    .map(publicCardSummary);
 
   const completedSetKeys = new Set();
   cachedSnapshot = memoryDb.getActivities()
@@ -160,7 +192,6 @@ const rebuildSnapshot = () => {
         completedSetKeys.add(dedupeKey);
         completedSet = { id: set.id, label: set.label, total: setCardIds.length };
       }
-      const tier = getTier(card.tier) || tierForScore(card.rarity_score);
       return {
         id: activity.id,
         type: activity.type,
@@ -174,23 +205,85 @@ const rebuildSnapshot = () => {
           username: actor.username,
           collectionPath: `/${actor.username}/collection`
         },
-        card: {
-          id: card.id,
-          name: card.name || 'Untitled card',
-          creatorId: card.creator_id,
-          preview: previewFor(card),
-          rarity: {
-            key: tier.key,
-            name: tier.name,
-            color: tier.color,
-            special: SPECIAL_RARITY_KEYS.has(tier.key)
-          }
-        },
+        card: publicCardSummary(card),
         ...(completedSet ? { set: completedSet } : {})
       };
     })
     .filter(Boolean);
   cachedRevision = memoryDb.getCommunityRevision();
+};
+
+const syntheticUsername = (index) => {
+  const first = [
+    'Moss', 'Velvet', 'Static', 'Ivory', 'Paper', 'Amber', 'Sable', 'Chrome',
+    'Lunar', 'Fern', 'Copper', 'Signal'
+  ];
+  const second = [
+    'Archivist', 'Memento', 'Rabbit', 'Lantern', 'Mosaic', 'Relic', 'Threshold', 'Vessel',
+    'Comet', 'Oracle', 'Figment', 'Weather'
+  ];
+  return `${first[index % first.length]}${second[Math.floor(index / first.length) % second.length]}${index + 1}`;
+};
+
+const syntheticActivityFor = (seed, index, viewerId, usedCardIds = new Set()) => {
+  if (!cachedSyntheticCards.length) return null;
+  const rand = mulberry32(fnv1a(`${seed}:${index}`));
+  const cardPool = cachedSyntheticCards.filter(card => !usedCardIds.has(card.id));
+  const card = pick(cardPool.length ? cardPool : cachedSyntheticCards, rand);
+  if (!card) return null;
+  usedCardIds.add(card.id);
+  const username = syntheticUsername(Math.floor(rand() * SYNTHETIC_USER_COUNT));
+  const typeRoll = rand();
+  const syntheticType = card.rarity.special && typeRoll > 0.45
+    ? 'set_rarest'
+    : typeRoll > 0.18
+      ? 'save'
+      : 'reaction';
+  const signal = syntheticType === 'reaction'
+    ? pick(['flame', 'sparkle', 'scan', 'trophy', 'rare'], rand)
+    : null;
+  const ageMs = (2 + index * 3 + Math.floor(rand() * 4)) * 60 * 1000;
+  return {
+    id: `synthetic:${seed}:${index}:${card.id}`,
+    synthetic: true,
+    type: syntheticType,
+    signal,
+    createdAt: new Date(Date.now() - ageMs).toISOString(),
+    actor: {
+      username,
+      collectionPath: null
+    },
+    card: { ...card },
+    relevance: null
+  };
+};
+
+const ambientActivitiesFor = (viewerId, realActivities) => {
+  const seed = `${viewerId || 'public'}:${Math.floor(Date.now() / SYNTHETIC_INTERVAL_MS)}:${realActivities[0]?.id || 'quiet'}`;
+  const usedCardIds = new Set(realActivities.map(activity => activity.card?.id).filter(Boolean));
+  return Array.from({ length: FEED_LIMIT }, (_, index) =>
+    syntheticActivityFor(seed, index, viewerId, usedCardIds)
+  ).filter(Boolean);
+};
+
+const interleaveAmbient = (activities, ambient) => {
+  if (!ambient.length) return activities.slice(0, FEED_LIMIT);
+  const mixed = [];
+  let ambientIndex = 0;
+  for (const activity of activities) {
+    mixed.push(activity);
+    const lonely = activity.relevance === 'you' || (
+      mixed.length >= 2 &&
+      mixed.slice(-2).every(item => item.relevance === 'you')
+    );
+    if ((lonely || mixed.length % 3 === 2) && ambient[ambientIndex]) {
+      mixed.push(ambient[ambientIndex++]);
+    }
+  }
+  while (mixed.length < FEED_LIMIT && ambient[ambientIndex]) {
+    mixed.push(ambient[ambientIndex++]);
+  }
+  return mixed.slice(0, FEED_LIMIT);
 };
 
 const ensureSnapshot = () => {
@@ -225,20 +318,24 @@ const record = ({ sourceType, sourceId, actorId, card, type, signal, setId, save
 
 export const recordCommunitySave = (save, card) => {
   let completedSet = null;
+  let rarestInSet = false;
   if (save?.user_id && card?.set_id) {
     const set = memoryDb.getSetById(card.set_id);
-    const setCardIds = memoryDb.getAllCards()
-      .filter(candidate => candidate.set_id === card.set_id && memoryDb.isCirculating(candidate))
-      .map(candidate => candidate.id);
+    const setCards = memoryDb.getAllCards()
+      .filter(candidate => candidate.set_id === card.set_id && memoryDb.isCirculating(candidate));
+    const setCardIds = setCards.map(candidate => candidate.id);
     const ownedIds = new Set(
       memoryDb.getSavesByUser(save.user_id).map(candidate => candidate.card_id)
     );
     if (set && setCardIds.length > 0 && setCardIds.every(cardId => ownedIds.has(cardId))) {
       completedSet = set;
     }
+    const topScore = Math.max(...setCards.map(candidate => Number(candidate.rarity_score) || 0));
+    const topCards = setCards.filter(candidate => (Number(candidate.rarity_score) || 0) === topScore);
+    rarestInSet = setCards.length > 1 && topCards.length === 1 && topCards[0].id === card.id;
   }
 
-  return record({
+  const primary = record({
     sourceType: 'save',
     sourceId: save?.id,
     actorId: save?.user_id,
@@ -248,6 +345,18 @@ export const recordCommunitySave = (save, card) => {
     saveCount: card?.times_saved && card.times_saved <= 3 ? card.times_saved : null,
     createdAt: save?.created_at
   });
+  if (rarestInSet) {
+    record({
+      sourceType: 'set_rarest_save',
+      sourceId: save?.id,
+      actorId: save?.user_id,
+      card,
+      type: 'set_rarest',
+      setId: card.set_id,
+      createdAt: save?.created_at
+    });
+  }
+  return primary;
 };
 
 export const recordCommunityReaction = (reaction, card) => record({
@@ -261,7 +370,10 @@ export const recordCommunityReaction = (reaction, card) => record({
 });
 
 export const removeCommunitySave = (save) =>
-  save?.id ? memoryDb.deleteActivityBySource('save', save.id) : null;
+  save?.id ? [
+    memoryDb.deleteActivityBySource('save', save.id),
+    memoryDb.deleteActivityBySource('set_rarest_save', save.id)
+  ].find(Boolean) || null : null;
 
 export const removeCommunityReaction = (reaction) =>
   reaction?.id ? memoryDb.deleteActivityBySource('signal', reaction.id) : null;
@@ -284,7 +396,7 @@ export const getCommunityActivityFeed = (viewerId = null) => {
   const snapshot = ensureSnapshot();
   const savedByViewer = cachedSavedCardsByUser.get(viewerId) || new Set();
 
-  const activities = snapshot
+  const realActivities = snapshot
     .map(activity => {
       const relevance = viewerId && activity.actorId === viewerId
         ? 'you'
@@ -300,13 +412,17 @@ export const getCommunityActivityFeed = (viewerId = null) => {
       const priority = (relevanceRank[b.relevance] || 0) - (relevanceRank[a.relevance] || 0);
       return priority || String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
     })
-    .slice(0, FEED_LIMIT)
+    .slice(0, FEED_LIMIT);
+
+  const activities = interleaveAmbient(realActivities, ambientActivitiesFor(viewerId, realActivities))
     .map(activity => {
       const publicActivity = { ...activity };
       delete publicActivity.actorId;
       if (publicActivity.card) {
         publicActivity.card = { ...publicActivity.card };
         delete publicActivity.card.creatorId;
+        delete publicActivity.card.setId;
+        delete publicActivity.card.rarityScore;
       }
       return publicActivity;
     });

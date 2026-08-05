@@ -79,6 +79,7 @@ describe('community activity feed', () => {
     expect(publicSave).not.toHaveProperty('actorId');
     expect(publicSave.card).not.toHaveProperty('creatorId');
     expect(publicSave.reward.amount).toBeGreaterThanOrEqual(0.018);
+    expect(publicFeed.body.data.activities.some(activity => activity.synthetic)).toBe(true);
 
     const bobFeed = await request(app)
       .get('/api/cards/community/activity')
@@ -218,7 +219,7 @@ describe('community activity feed', () => {
     const feed = await request(app)
       .get('/api/cards/community/activity')
       .set(auth(viewer.token));
-    const cardActivities = feed.body.data.activities.filter(activity => activity.card);
+    const cardActivities = feed.body.data.activities.filter(activity => activity.card && !activity.synthetic);
     expect(cardActivities.map(item => [item.card.name, item.relevance]).slice(0, 4)).toEqual([
       ['Shared Favourite', 'you'],
       ['Viewer Original', 'created'],
@@ -265,8 +266,41 @@ describe('community activity feed', () => {
     await request(app).post(`/api/cards/${card.id}/save`).set(auth(fourth.token));
 
     const feed = await request(app).get('/api/cards/community/activity');
-    const saves = feed.body.data.activities.filter(activity => activity.card?.id === card.id);
+    const saves = feed.body.data.activities.filter(activity => activity.card?.id === card.id && !activity.synthetic);
     expect(saves.map(activity => activity.saveOrdinal)).toEqual([null, '3rd', '2nd', '1st']);
+  });
+
+  test('saving the unique rarest card in a set emits a rarest-in-set milestone', async () => {
+    const creator = await signup('rarestcreator');
+    const collector = await signup('rarestcollector');
+    const common = await makeCard(creator, 'Set Stone');
+    const rarest = await makeCard(creator, 'Set Lightning');
+    const set = memoryDb.upsertSet({
+      id: 'rarestcreator_weather',
+      owner_id: creator.user.id,
+      label: 'Weather',
+      info: null
+    });
+    memoryDb.updateCard(common.id, { set_id: set.id, rarity_score: 0.2, tier: 'common' });
+    memoryDb.updateCard(rarest.id, { set_id: set.id, rarity_score: 0.93, tier: 'ultra' });
+
+    await request(app).post(`/api/cards/${common.id}/save`).set(auth(collector.token));
+    await request(app).post(`/api/cards/${rarest.id}/save`).set(auth(collector.token));
+
+    const feed = await request(app).get('/api/cards/community/activity').set(auth(collector.token));
+    const rarestMoment = feed.body.data.activities.find(activity =>
+      activity.type === 'set_rarest' && !activity.synthetic
+    );
+    expect(rarestMoment).toMatchObject({
+      type: 'set_rarest',
+      relevance: 'you',
+      actor: { username: 'rarestcollector' },
+      card: {
+        id: rarest.id,
+        name: 'Set Lightning',
+        rarity: { key: 'ultra', special: true }
+      }
+    });
   });
 
   test('saving the final card emits one set-completion milestone', async () => {
@@ -287,7 +321,7 @@ describe('community activity feed', () => {
     await request(app).post(`/api/cards/${final.id}/save`).set(auth(collector.token));
 
     const completed = await request(app).get('/api/cards/community/activity');
-    expect(completed.body.data.activities.filter(activity => activity.type !== 'signup')).toEqual([
+    expect(completed.body.data.activities.filter(activity => activity.type !== 'signup' && !activity.synthetic)).toEqual([
       expect.objectContaining({
         type: 'set_complete',
         actor: expect.objectContaining({ username: 'setcollector' }),
@@ -307,7 +341,7 @@ describe('community activity feed', () => {
     await request(app).post(`/api/cards/${encore.id}/save`).set(auth(collector.token));
     const recompleted = await request(app).get('/api/cards/community/activity');
     const milestones = recompleted.body.data.activities
-      .filter(activity => activity.type === 'set_complete');
+      .filter(activity => activity.type === 'set_complete' && !activity.synthetic);
     expect(milestones).toHaveLength(1);
     expect(milestones[0]).toMatchObject({
       card: { id: encore.id },
@@ -322,30 +356,30 @@ describe('community activity feed', () => {
 
     await request(app).post(`/api/cards/${card.id}/save`).set(auth(bob.token));
     const afterSave = (await request(app).get('/api/cards/community/activity')).body.data.activities;
-    expect(afterSave.filter(activity => activity.type === 'save')).toHaveLength(1);
+    expect(afterSave.filter(activity => activity.type === 'save' && !activity.synthetic)).toHaveLength(1);
 
     await request(app).delete(`/api/cards/collection/${card.id}`).set(auth(bob.token));
     expect((await request(app).get('/api/cards/community/activity')).body.data.activities
-      .filter(activity => activity.type !== 'signup')).toEqual([]);
+      .filter(activity => activity.type !== 'signup' && !activity.synthetic)).toEqual([]);
 
     await request(app)
       .put(`/api/cards/${card.id}/signals`)
       .set(auth(bob.token))
       .send({ signal: 'growth' });
     const afterReaction = (await request(app).get('/api/cards/community/activity')).body.data.activities;
-    expect(afterReaction.filter(activity => activity.type === 'reaction')).toHaveLength(1);
+    expect(afterReaction.filter(activity => activity.type === 'reaction' && !activity.synthetic)).toHaveLength(1);
 
     await request(app)
       .delete(`/api/cards/${card.id}/signals`)
       .set(auth(bob.token))
       .send({ signal: 'growth' });
     expect((await request(app).get('/api/cards/community/activity')).body.data.activities
-      .filter(activity => activity.type !== 'signup')).toEqual([]);
+      .filter(activity => activity.type !== 'signup' && !activity.synthetic)).toEqual([]);
 
     await request(app).post(`/api/cards/${card.id}/save`).set(auth(bob.token));
     await request(app).post(`/api/cards/${card.id}/report`).send({ reason: 'spam' });
     expect((await request(app).get('/api/cards/community/activity')).body.data.activities
-      .filter(activity => activity.type !== 'signup')).toEqual([]);
+      .filter(activity => activity.type !== 'signup' && !activity.synthetic)).toEqual([]);
   });
 
   test('the activity store stays bounded and rolls back with its source unit', () => {

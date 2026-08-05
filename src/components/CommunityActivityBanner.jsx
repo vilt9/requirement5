@@ -27,6 +27,9 @@ const presentationFor = (activity) => {
   if (activity.type === 'set_complete') {
     return { special: true, icon: 'trophy', ...signalByKey.trophy };
   }
+  if (activity.type === 'set_rarest') {
+    return { special: true, icon: 'rare', ...signalByKey.rare };
+  }
   if (activity.type === 'reaction') {
     const signal = signalByKey[activity.signal];
     return signal
@@ -109,10 +112,13 @@ const CommunityActivityBanner = () => {
           const presentation = presentationFor(activity);
           const artwork = cardArtworkUrl(activity.card?.preview) || '/r5c_card_back.png';
           const rareSave = activity.type === 'save' && activity.card?.rarity?.special;
+          const rarestSetSave = activity.type === 'set_rarest';
           const action = activity.type === 'signup'
             ? 'joined'
             : activity.type === 'set_complete'
-            ? 'completed'
+            ? 'completed a set'
+            : rarestSetSave
+            ? 'collected the rarest set card'
             : rareSave
               ? `saved a ${activity.card.rarity.name} card`
               : activity.type === 'save'
@@ -126,17 +132,19 @@ const CommunityActivityBanner = () => {
           const tickerSubject = activity.type === 'signup'
             ? 'joined the society'
             : activity.type === 'set_complete'
-            ? activity.set?.label || 'card set'
+            ? `set complete: ${activity.set?.label || 'card set'}`
+            : rarestSetSave
+            ? `rarest in set: ${activity.card.name}`
             : rareSave
-              ? `${activity.card.rarity.name} · ${activity.card.name}`
+              ? `collected ${activity.card.rarity.name}: ${activity.card.name}`
               : activity.saveOrdinal
-                ? `${activity.saveOrdinal} save · ${activity.card.name}`
-              : activity.card.name;
+                ? `made the ${activity.saveOrdinal} save on ${activity.card.name}`
+              : activity.type === 'reaction'
+                ? `reacted to ${activity.card.name}`
+                : `collected ${activity.card.name}`;
           const tickerMark = activity.type === 'set_complete'
             ? '✓'
-            : activity.type === 'save'
-              ? (activity.saveOrdinal || '+')
-              : activity.type === 'signup'
+            : activity.type === 'signup'
                 ? '+'
               : null;
           const relevance = activity.relevance === 'created'
@@ -150,13 +158,17 @@ const CommunityActivityBanner = () => {
             ? 'signup'
             : activity.type === 'set_complete'
               ? 'milestone'
-              : activity.type === 'reaction'
-                ? 'reaction'
-                : rareSave
-                  ? 'rare'
-                  : activity.saveOrdinal
-                    ? 'save-milestone'
-                    : 'standard';
+              : rarestSetSave
+                ? 'rare'
+                : activity.type === 'reaction'
+                  ? 'reaction'
+                  : rareSave
+                    ? 'rare'
+                    : activity.saveOrdinal
+                      ? 'save-milestone'
+                      : activity.synthetic
+                        ? 'ambient'
+                        : 'standard';
 
           return (
             <ActivityItem key={activity.id} role="listitem">

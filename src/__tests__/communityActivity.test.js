@@ -5,12 +5,18 @@ import {
 } from '../utils/communityActivity';
 
 describe('community activity display helpers', () => {
-  test('save links point at the collector copy; reactions point at the card', () => {
+  test('real saves point at the collector copy; milestones and ambient items point at cards', () => {
     expect(communityActivityPath({
       type: 'save',
       actor: { username: 'Ada Earth' },
       card: { id: 'card/1' }
     })).toBe('/Ada%20Earth/card/card%2F1');
+    expect(communityActivityPath({
+      type: 'save',
+      synthetic: true,
+      actor: { username: 'Ada Earth' },
+      card: { id: 'card/1' }
+    })).toBe('/card/card%2F1');
     expect(communityActivityPath({
       type: 'reaction',
       actor: { username: 'Ada Earth' },
@@ -20,7 +26,7 @@ describe('community activity display helpers', () => {
       type: 'set_complete',
       actor: { username: 'Ada Earth', collectionPath: '/Ada%20Earth/collection' },
       card: { id: 'card/1' }
-    })).toBe('/Ada%20Earth/collection');
+    })).toBe('/card/card%2F1');
   });
 
   test('relative times stay compact and tolerate invalid/future values', () => {

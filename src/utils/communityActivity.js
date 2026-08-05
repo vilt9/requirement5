@@ -1,13 +1,10 @@
 export const communityActivityPath = (activity) => {
-  if (activity?.type === 'signup' && activity?.actor?.collectionPath) {
+  if (activity?.type === 'signup' && activity?.actor?.collectionPath && !activity?.synthetic) {
     return activity.actor.collectionPath;
   }
   const cardId = encodeURIComponent(activity?.card?.id || '');
-  if (activity?.type === 'set_complete' && activity?.actor?.collectionPath) {
-    return activity.actor.collectionPath;
-  }
   if (!cardId) return '/';
-  if (activity?.type === 'save' && activity?.actor?.username) {
+  if (activity?.type === 'save' && activity?.actor?.username && !activity?.synthetic) {
     return `/${encodeURIComponent(activity.actor.username)}/card/${cardId}`;
   }
   return `/card/${cardId}`;
