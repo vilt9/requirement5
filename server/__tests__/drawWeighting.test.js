@@ -170,15 +170,13 @@ describe('batch draw', () => {
     expect(after).toBeGreaterThan(before); // yield credited
   });
 
-  test('SYNTHETIC_DRAW_SHARE keeps only a small slice synthetic when the pool exists', async () => {
+  test('SYNTHETIC_DRAW_SHARE is zero while the pool exists', async () => {
     const { user } = await signup('drawer_slice');
     for (let i = 0; i < 8; i++) poolCard(0.3, `cccccccc-000${i}`);
-    // Over many single draws with real randomness, the synthetic share stays near
-    // the configured small aperture instead of dominating the pool.
     let synth = 0;
-    const N = 1000;
+    const N = 100;
     for (let i = 0; i < N; i++) if (drawMany(user.id, 1, Math.random, [])[0].source === 'synthetic') synth++;
-    expect(synth / N).toBeGreaterThan(SYNTHETIC_DRAW_SHARE - 0.04);
-    expect(synth / N).toBeLessThan(SYNTHETIC_DRAW_SHARE + 0.04);
+    expect(SYNTHETIC_DRAW_SHARE).toBe(0);
+    expect(synth).toBe(0);
   });
 });

@@ -64,14 +64,15 @@ const buildResult = (userId, card, yieldSeed) => {
 
 // Draw `count` cards in one pass. Pool cards are drawn WITHOUT replacement within
 // the batch (a working copy of the pool is depleted as we go), so a refill never
-// queues the same pool card twice in a row. `seeds[i]` seeds the i-th synthetic.
+// queues the same pool card twice in a row. `seeds[i]` only matters for the
+// empty-pool synthetic fallback.
 export const drawMany = (userId, count, rand = Math.random, seeds = []) => {
   const n = Math.max(1, Math.min(20, Math.floor(Number(count) || 1)));
   const pool = memoryDb.getCommunityCards().slice(); // mutable working copy
   const results = [];
   for (let i = 0; i < n; i++) {
     let card = null;
-    // Synthetic slice keeps generation fresh; an empty pool ⇒ always synthetic.
+    // Normal circulation is the actual published pool; an empty pool ⇒ synthetic.
     if (pool.length > 0 && rand() >= SYNTHETIC_DRAW_SHARE) {
       const weights = pool.map(c => drawWeightFor(c.rarity_score));
       const idx = pickWeightedIndex(weights, rand());

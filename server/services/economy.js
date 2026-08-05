@@ -163,11 +163,10 @@ export const tierForScore = (score) => {
 // ---- Draw weighting ---------------------------------------------------------
 // Generate should feel like a tour through the whole published pool. Rarity still
 // affects price and tier, but not how often an eligible card appears: every
-// in-circulation pool card has the same draw weight. A small synthetic aperture
-// keeps old /card/<uuid> discovery alive without letting the legacy synthetic
-// image families dominate the experience.
+// in-circulation pool card has the same draw weight. Synthetic uuid cards are
+// only an empty-pool fallback, never part of normal pool circulation.
 export const DRAW_RARITY_FALLOFF = 0;
-export const SYNTHETIC_DRAW_SHARE = 0.05; // fraction of draws that mint fresh
+export const SYNTHETIC_DRAW_SHARE = 0; // fraction of draws that mint fresh while pool has cards
 
 export const drawWeightFor = (rarityScore) =>
   1;
