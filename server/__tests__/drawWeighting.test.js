@@ -4,7 +4,7 @@ import app from '../index.js';
 import { memoryDb } from '../config/database.js';
 import {
   drawWeightFor, pickWeightedIndex, tierForScore,
-  DRAW_RARITY_FALLOFF, SYNTHETIC_DRAW_SHARE
+  SYNTHETIC_DRAW_SHARE
 } from '../services/economy.js';
 import { drawMany } from '../services/drawEngine.js';
 
@@ -34,17 +34,14 @@ const poolCard = (rarity, id) => memoryDb.createCard({
 // ---- The weighting maths (pure, deterministic) ------------------------------
 
 describe('draw weighting maths', () => {
-  test('weight falls off with rarity value', () => {
-    // Strictly decreasing: a rarer card always weighs less.
+  test('pool card weight is uniform across rarity values', () => {
+    // Rarity affects price and tier, not how often a card appears in Generate.
     const rs = [0, 0.2, 0.4, 0.6, 0.8, 0.95, 1];
     const ws = rs.map(drawWeightFor);
-    for (let i = 1; i < ws.length; i++) expect(ws[i]).toBeLessThan(ws[i - 1]);
-    // The ratio matches e^(k·Δ): a 0.3 card vs a 0.9 card.
-    const ratio = drawWeightFor(0.3) / drawWeightFor(0.9);
-    expect(ratio).toBeCloseTo(Math.exp(DRAW_RARITY_FALLOFF * 0.6), 5);
+    expect(new Set(ws)).toEqual(new Set([1]));
   });
 
-  test('rarity is clamped, so out-of-range scores never explode the weight', () => {
+  test('out-of-range rarity scores still have normal pool weight', () => {
     expect(drawWeightFor(-1)).toBe(drawWeightFor(0));
     expect(drawWeightFor(2)).toBe(drawWeightFor(1));
     expect(drawWeightFor(undefined)).toBe(drawWeightFor(0));
@@ -66,14 +63,13 @@ describe('draw weighting maths', () => {
     expect(counts[2]).toBeGreaterThan(0);
   });
 
-  test('a low-rarity card is favoured without collapsing pool variety', () => {
+  test('rarity does not favour one pool card over another', () => {
     const weights = [drawWeightFor(0.1), drawWeightFor(0.95)];
-    let low = 0;
+    const counts = [0, 0];
     const N = 20000;
-    for (let i = 0; i < N; i++) if (pickWeightedIndex(weights, (i + 0.5) / N) === 0) low++;
-    // Rarity still matters, but both cards remain genuinely discoverable.
-    expect(low / N).toBeGreaterThan(0.68);
-    expect(low / N).toBeLessThan(0.72);
+    for (let i = 0; i < N; i++) counts[pickWeightedIndex(weights, (i + 0.5) / N)]++;
+    expect(counts[0] / N).toBeCloseTo(0.5, 2);
+    expect(counts[1] / N).toBeCloseTo(0.5, 2);
   });
 });
 
@@ -174,15 +170,15 @@ describe('batch draw', () => {
     expect(after).toBeGreaterThan(before); // yield credited
   });
 
-  test('SYNTHETIC_DRAW_SHARE keeps a real slice of draws synthetic even with a pool', async () => {
+  test('SYNTHETIC_DRAW_SHARE keeps only a small slice synthetic when the pool exists', async () => {
     const { user } = await signup('drawer_slice');
     for (let i = 0; i < 8; i++) poolCard(0.3, `cccccccc-000${i}`);
-    // Over many single draws with real randomness, a meaningful share are synthetic.
+    // Over many single draws with real randomness, the synthetic share stays near
+    // the configured small aperture instead of dominating the pool.
     let synth = 0;
-    const N = 400;
+    const N = 1000;
     for (let i = 0; i < N; i++) if (drawMany(user.id, 1, Math.random, [])[0].source === 'synthetic') synth++;
-    // Expected ≈ SYNTHETIC_DRAW_SHARE; assert it's clearly non-trivial.
-    expect(synth / N).toBeGreaterThan(SYNTHETIC_DRAW_SHARE - 0.15);
-    expect(synth / N).toBeLessThan(SYNTHETIC_DRAW_SHARE + 0.15);
+    expect(synth / N).toBeGreaterThan(SYNTHETIC_DRAW_SHARE - 0.04);
+    expect(synth / N).toBeLessThan(SYNTHETIC_DRAW_SHARE + 0.04);
   });
 });

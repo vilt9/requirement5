@@ -161,18 +161,16 @@ export const tierForScore = (score) => {
 };
 
 // ---- Draw weighting ---------------------------------------------------------
-// A published card's chance of being DRAWN falls off with its rarity value:
-// weight = e^(-k·rarity), so a rarer card surfaces less. The pool draw picks in
-// proportion to these weights, normalised over whatever is currently published —
-// so a newly published card just joins the lottery and every share re-balances on
-// the next draw (no cron, no stored distribution). A fixed share of every draw
-// still mints a brand-new synthetic card, so generating stays generative however
-// big the pool grows.
-export const DRAW_RARITY_FALLOFF = 1;    // gentle scarcity: 0.3→0.9 is ~1.8× rarer
-export const SYNTHETIC_DRAW_SHARE = 0.5; // fraction of draws that mint fresh
+// Generate should feel like a tour through the whole published pool. Rarity still
+// affects price and tier, but not how often an eligible card appears: every
+// in-circulation pool card has the same draw weight. A small synthetic aperture
+// keeps old /card/<uuid> discovery alive without letting the legacy synthetic
+// image families dominate the experience.
+export const DRAW_RARITY_FALLOFF = 0;
+export const SYNTHETIC_DRAW_SHARE = 0.05; // fraction of draws that mint fresh
 
 export const drawWeightFor = (rarityScore) =>
-  Math.exp(-DRAW_RARITY_FALLOFF * clamp01(rarityScore));
+  1;
 
 // Pick an index in proportion to weights, given a uniform u in [0,1). Returns -1
 // when the weights are empty or sum to zero. Pure and deterministic — the draw
