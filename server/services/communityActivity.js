@@ -4,7 +4,7 @@ import { issue } from './ledger.js';
 
 const FEED_LIMIT = 12;
 const SPECIAL_RARITY_KEYS = new Set(['galaxy', 'wowa', 'ultra', 'vmax']);
-export const COMMUNITY_ACTIVITY_REFRESH_MS = 15_000;
+export const COMMUNITY_ACTIVITY_REFRESH_MS = 30_000;
 const SYNTHETIC_CARD_LIMIT = 120;
 const SYNTHETIC_USER_COUNT = 144;
 const SYNTHETIC_INTERVAL_MS = 17 * 60 * 1000;

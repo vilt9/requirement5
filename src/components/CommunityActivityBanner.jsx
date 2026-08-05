@@ -12,8 +12,9 @@ import {
 } from '../utils/communityActivity';
 import SignalGlyph from './SignalGlyph';
 
-const DEFAULT_REFRESH_MS = 60_000;
+const DEFAULT_REFRESH_MS = 30_000;
 const MIN_REFRESH_MS = 30_000;
+const QUIET_REFRESH_CHANCE = 0.28;
 const RARITY_SIGNAL = {
   wowa: 'rare',
   ultra: 'crown',
@@ -54,6 +55,11 @@ const CommunityActivityBanner = () => {
   const location = useLocation();
   const captureRoute = location.pathname.startsWith('/capture/');
   const [activities, setActivities] = useState([]);
+  const [pulse, setPulse] = useState({
+    status: 'checking',
+    remainingMs: DEFAULT_REFRESH_MS,
+    durationMs: DEFAULT_REFRESH_MS
+  });
 
   useEffect(() => {
     if (captureRoute) return undefined;
@@ -61,28 +67,66 @@ const CommunityActivityBanner = () => {
     let stopped = false;
     let inFlight = false;
     let timer = null;
+    let tick = null;
+    let pulseHold = null;
+    let pulseHoldUntil = 0;
+    let nextRefreshAt = 0;
+    let refreshDuration = DEFAULT_REFRESH_MS;
+    let lastSignature = '';
 
-    const schedule = (delay = DEFAULT_REFRESH_MS) => {
+    const signatureFor = (items = []) => items.map(item => item.id).join('|');
+
+    const setCountdown = (status, remainingMs = refreshDuration, durationMs = refreshDuration) => {
+      setPulse({ status, remainingMs: Math.max(0, remainingMs), durationMs });
+    };
+
+    const schedule = (delay = DEFAULT_REFRESH_MS, holdPulse = false) => {
       if (stopped) return;
       clearTimeout(timer);
-      timer = setTimeout(load, Math.max(MIN_REFRESH_MS, delay));
+      clearTimeout(pulseHold);
+      const wait = Math.max(MIN_REFRESH_MS, delay);
+      refreshDuration = wait;
+      nextRefreshAt = Date.now() + wait;
+      if (holdPulse) {
+        pulseHoldUntil = Date.now() + 1100;
+        pulseHold = setTimeout(() => {
+          pulseHoldUntil = 0;
+          if (!stopped) setCountdown('waiting', nextRefreshAt - Date.now(), wait);
+        }, 1100);
+      } else {
+        pulseHoldUntil = 0;
+        setCountdown('waiting', wait, wait);
+      }
+      timer = setTimeout(load, wait);
     };
 
     const load = async () => {
       if (stopped || inFlight || document.visibilityState === 'hidden') return;
       inFlight = true;
       let refreshAfter = DEFAULT_REFRESH_MS;
+      setCountdown('checking', 0, refreshDuration);
       try {
         const data = await api('/api/cards/community/activity');
         if (!stopped) {
-          setActivities(Array.isArray(data?.activities) ? data.activities : []);
+          const nextActivities = Array.isArray(data?.activities) ? data.activities : [];
+          const nextSignature = signatureFor(nextActivities);
+          const firstLoad = !lastSignature;
+          const quiet = !firstLoad && (
+            nextSignature === lastSignature || Math.random() < QUIET_REFRESH_CHANCE
+          );
+          if (!quiet) {
+            setActivities(nextActivities);
+            lastSignature = nextSignature;
+          }
+          setCountdown(quiet ? 'quiet' : 'new', 0, refreshDuration);
           refreshAfter = Number(data?.refreshAfterMs) || DEFAULT_REFRESH_MS;
         }
       } catch {
         // Ambient UI: a feed outage must never block or alarm the primary page.
+        if (!stopped) setCountdown('quiet', 0, refreshDuration);
       } finally {
         inFlight = false;
-        schedule(refreshAfter);
+        schedule(refreshAfter, true);
       }
     };
 
@@ -93,10 +137,17 @@ const CommunityActivityBanner = () => {
 
     document.addEventListener('visibilitychange', visibilityChanged);
     window.addEventListener('r5c:community-activity-changed', load);
+    tick = setInterval(() => {
+      if (stopped || document.visibilityState === 'hidden' || !nextRefreshAt) return;
+      if (Date.now() < pulseHoldUntil) return;
+      setCountdown('waiting', nextRefreshAt - Date.now(), refreshDuration);
+    }, 250);
     load();
     return () => {
       stopped = true;
       clearTimeout(timer);
+      clearTimeout(pulseHold);
+      clearInterval(tick);
       document.removeEventListener('visibilitychange', visibilityChanged);
       window.removeEventListener('r5c:community-activity-changed', load);
     };
@@ -106,6 +157,23 @@ const CommunityActivityBanner = () => {
 
   return (
     <Banner aria-label="Recent community activity">
+      <Pulse
+        aria-label={`Society feed ${pulse.status}; next check in ${Math.ceil(pulse.remainingMs / 1000)} seconds`}
+        title={pulse.status === 'quiet'
+          ? 'No new society movement this time'
+          : pulse.status === 'new'
+            ? 'Society stream refreshed'
+            : pulse.status === 'checking'
+              ? 'Checking the society stream'
+              : 'Next society check'}
+        $status={pulse.status}
+        $progress={pulse.durationMs > 0 ? pulse.remainingMs / pulse.durationMs : 0}
+      >
+        <PulseStem aria-hidden="true" />
+        <PulseOrb aria-hidden="true">
+          <span>{pulse.status === 'checking' ? '…' : Math.ceil(pulse.remainingMs / 1000)}</span>
+        </PulseOrb>
+      </Pulse>
       <Rail role="list">
         {activities.map(activity => {
           const signal = signalByKey[activity.signal];
@@ -238,6 +306,9 @@ const Banner = styled.section`
   width: 100vw;
   margin: -32px calc(50% - 50vw) -12px;
   padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   background: transparent;
   text-align: left;
   animation: ${arrive} 220ms ease-out both;
@@ -250,11 +321,84 @@ const Banner = styled.section`
   @media (prefers-reduced-motion: reduce) { animation: none; }
 `;
 
+const Pulse = styled.div`
+  --pulse-progress: ${props => Math.max(0, Math.min(1, props.$progress || 0))};
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 38px;
+  display: grid;
+  place-items: start center;
+  padding-top: 1px;
+  margin-left: max(8px, env(safe-area-inset-left));
+  border-radius: 999px;
+  background: linear-gradient(90deg, #000 0%, rgba(0, 0, 0, 0.82) 68%, rgba(0, 0, 0, 0));
+  color: ${props => props.$status === 'quiet'
+    ? 'var(--amber-dim)'
+    : props.$status === 'new'
+      ? '#83f0b4'
+      : 'var(--gold-bright)'};
+`;
+
+const PulseStem = styled.span`
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  width: 2px;
+  height: 18px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: linear-gradient(
+    to bottom,
+    rgba(232, 180, 85, 0.66),
+    rgba(232, 180, 85, 0.12)
+  );
+  box-shadow: 0 0 10px rgba(232, 180, 85, 0.2);
+`;
+
+const PulseOrb = styled.span`
+  position: relative;
+  z-index: 1;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 48% 47%, rgba(255, 255, 255, 0.18) 0 12%, transparent 13%),
+    radial-gradient(circle, rgba(49, 40, 24, 0.96) 0 45%, transparent 46%),
+    conic-gradient(
+      currentColor calc(var(--pulse-progress) * 1turn),
+      rgba(156, 138, 104, 0.22) 0
+    );
+  box-shadow:
+    0 0 0 1px rgba(232, 180, 85, 0.32),
+    0 0 13px rgba(232, 180, 85, 0.28);
+  color: inherit;
+  font-size: 7px;
+  font-weight: 700;
+  line-height: 1;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 4px;
+    border-radius: 50%;
+    border: 1px solid rgba(232, 180, 85, 0.23);
+    background: rgba(0, 0, 0, 0.2);
+  }
+
+  > * { position: relative; z-index: 1; }
+`;
+
 const Rail = styled.div`
   display: flex;
+  flex: 1 1 auto;
   gap: 5px;
   overflow-x: auto;
-  padding: 2px max(12px, env(safe-area-inset-left)) 2px max(12px, env(safe-area-inset-right));
+  padding: 2px max(12px, env(safe-area-inset-right)) 2px 0;
   scrollbar-width: none;
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
