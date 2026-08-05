@@ -216,10 +216,6 @@ const arrive = keyframes`
   to { opacity: 1; transform: translateY(0); }
 `;
 
-const dashDrift = keyframes`
-  to { background-position: 26px 0; }
-`;
-
 const Banner = styled.section`
   width: 100vw;
   margin: -32px calc(50% - 50vw) -12px;
@@ -240,7 +236,7 @@ const Rail = styled.div`
   display: flex;
   gap: 5px;
   overflow-x: auto;
-  padding: 2px 6px;
+  padding: 2px max(12px, env(safe-area-inset-left)) 2px max(12px, env(safe-area-inset-right));
   scrollbar-width: none;
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
@@ -280,16 +276,10 @@ const ActivityLink = styled(Link)`
   }
 
   &[data-presentation='milestone'] {
-    border-color: rgba(255, 255, 255, 0.76);
+    border-color: rgba(255, 255, 255, 0.64);
     border-style: dashed;
-    background:
-      repeating-linear-gradient(
-        90deg,
-        rgba(255, 255, 255, 0.13) 0 8px,
-        transparent 8px 16px
-      ),
-      rgba(255, 255, 255, 0.035);
-    animation: ${dashDrift} 1.4s linear infinite;
+    background: rgba(20, 14, 9, 0.86);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
   }
 
   &[data-presentation='save-milestone'] {
@@ -335,7 +325,6 @@ const ActivityLink = styled(Link)`
 
   @media (prefers-reduced-motion: reduce) {
     transition: none;
-    &[data-presentation='milestone'] { animation: none; }
   }
 `;
 
