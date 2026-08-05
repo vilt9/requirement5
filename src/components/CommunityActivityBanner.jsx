@@ -194,8 +194,8 @@ const arrive = keyframes`
 `;
 
 const Banner = styled.section`
-  width: calc(100% + 64px);
-  margin: -32px -32px -12px;
+  width: 100vw;
+  margin: -32px calc(50% - 50vw) -12px;
   padding: 0;
   background: transparent;
   text-align: left;
